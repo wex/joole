@@ -60,6 +60,7 @@ The application runs in the browser. Node is needed only in development and CI: 
 - Versions use the `^` form, and the lockfile is in version control. CI installs with `pnpm install --frozen-lockfile`.
 - Runtime dependencies are deliberately kept few: Solid, nanoid, the PWA runtime and the Lucide SVGs, which are bundled at build time. Math, geometry, parsers and rendering are our own code.
 - Note: Solid 2.0.0 and `@solidjs/vite-plugin` 3.0 were released on 17.11.2026. They meet the 7-day rule, but the latest 2.0.x patch releases may not meet it yet.
+- pnpm 12 dependency permissions are explicit. `solid-js` and `@solidjs/web` are approved for their `skills` capability only: they ship Solid 2 documentation for coding agents, symlinked under `.agents/skills/` at install time. No lifecycle build scripts are approved. The generated `.agents/skills/.gitignore` is committed so the machine-local symlinks stay out of Git.
 
 ## Build and dev server: Vite 8
 

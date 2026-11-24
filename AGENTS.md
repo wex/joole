@@ -26,7 +26,7 @@ This file is a guide for both human developers and coding agents: where informat
 
 ## Project status
 
-So far the repository contains only documentation. The implementation follows [PLAN.md](PLAN.md), and the first phase is phase 0 (_Foundations_: remote repository, `package.json`, `tsconfig` projects, Vite, ESLint, Prettier, Vitest, Playwright and CI). The commands and directories below describe the target state. Once the project scaffold is done (P0.9), this section is updated to reflect the actual state.
+The repository now contains the local phase 0 scaffold: `package.json` and the lockfile, the layer directories, TypeScript project references, Vite, ESLint, Prettier, Vitest, Playwright, CI configuration and a placeholder application. Phase 1 has not started. The remaining phase 0 verification is external to the code: the owner must verify the GitHub repository settings and connect Cloudflare, and CI must be observed on a pull request.
 
 ## Directory structure and layer rules
 
@@ -81,25 +81,25 @@ If a change requires a new dependency direction, the spec's rule table, the Merm
 - **q2pro** for testing compiled maps in the game. It is the reference engine.
 - **Q2 game data:** testing requires your own legal Quake 2 installation (`baseq2/pak0.pak`). The game data is not GPL-licensed, and it is never added to the repository (see Test data).
 
-## Commands (target state)
+## Commands
 
-| Command                             | Purpose                                                                                     |
-| ----------------------------------- | ------------------------------------------------------------------------------------------- |
-| `pnpm install`                      | Install dependencies (`--frozen-lockfile` in CI)                                            |
-| `pnpm dev`                          | Vite dev server with the COOP/COEP headers                                                  |
-| `pnpm build`                        | Production build into `dist/`                                                               |
-| `pnpm preview`                      | Run the production build locally                                                            |
-| `pnpm typecheck`                    | TypeScript 7 (`node node_modules/typescript7/bin/tsc -b`), all tsconfig projects            |
-| `pnpm lint` / `pnpm lint:fix`       | ESLint, including the layer boundaries                                                      |
-| `pnpm format` / `pnpm format:check` | Prettier                                                                                    |
-| `pnpm test`                         | Vitest, single run                                                                          |
-| `pnpm test:watch`                   | Vitest in watch mode                                                                        |
-| `pnpm test:coverage`                | Coverage, `core/` threshold ≥ 90 %                                                          |
-| `pnpm bench`                        | Vitest benchmarks                                                                           |
-| `pnpm e2e`                          | Playwright tests, including screenshot comparison                                           |
-| `pnpm build:tools`                  | qbsp3, qvis3 and qrad3 to WebAssembly into `workers/` (requires emsdk or Docker)            |
-| `pnpm gen:entities`                 | Generates `game/q2/q2.def` and the md2 table from the game code (reads `ext/Quake-2/game/`) |
-| `pnpm check`                        | All checks before a commit: format:check, lint, typecheck, test, build                      |
+| Command                             | Purpose                                                                          |
+| ----------------------------------- | -------------------------------------------------------------------------------- |
+| `pnpm install`                      | Install dependencies (`--frozen-lockfile` in CI)                                 |
+| `pnpm dev`                          | Vite dev server with the COOP/COEP headers                                       |
+| `pnpm build`                        | Production build into `dist/`                                                    |
+| `pnpm preview`                      | Run the production build locally                                                 |
+| `pnpm typecheck`                    | TypeScript 7 (`node node_modules/typescript7/bin/tsc -b`), all tsconfig projects |
+| `pnpm lint` / `pnpm lint:fix`       | ESLint, including the layer boundaries                                           |
+| `pnpm format` / `pnpm format:check` | Prettier                                                                         |
+| `pnpm test`                         | Vitest, single run                                                               |
+| `pnpm test:watch`                   | Vitest in watch mode                                                             |
+| `pnpm test:coverage`                | Coverage, `core/` threshold ≥ 90 %                                               |
+| `pnpm bench`                        | Vitest benchmarks                                                                |
+| `pnpm e2e`                          | Playwright tests                                                                 |
+| `pnpm build:tools`                  | Added in P2.11: qbsp3, qvis3 and qrad3 to WebAssembly into `workers/`            |
+| `pnpm gen:entities`                 | Added in P4.2: generates `game/q2/q2.def` and the md2 table from the game code   |
+| `pnpm check`                        | All checks before a commit: format:check, lint, typecheck, test, build           |
 
 When a command is added to `package.json` or renamed, this table is updated in the same change.
 

@@ -2,7 +2,7 @@
 
 This plan breaks the work of building Joole, from an empty repository to v1.0, into phases and work packages.
 
-Status: draft, 24.11.2026. The normative sources are [docs/00-spec.md](docs/00-spec.md) (what to build), [docs/10-stack.md](docs/10-stack.md) (which technologies to use) and [AGENTS.md](AGENTS.md) (how to work). This plan only sets the order and the slicing of the work. If the plan and the spec disagree, the spec wins, and the plan is corrected in the same change.
+Status: active, 24.11.2026. The normative sources are [docs/00-spec.md](docs/00-spec.md) (what to build), [docs/10-stack.md](docs/10-stack.md) (which technologies to use) and [AGENTS.md](AGENTS.md) (how to work). This plan only sets the order and the slicing of the work. If the plan and the spec disagree, the spec wins, and the plan is corrected in the same change.
 
 ## How to use this plan
 
@@ -68,7 +68,7 @@ Goal: a repository in which every later WP can follow the normal workflow (write
 - **Depends on:** –
 - **Done when:** the remote exists, `main` is protected as above, the existing local history is pushed, and `git status` never shows `ext/`.
 
-### [ ] P0.2 Package scaffold
+### [x] P0.2 Package scaffold
 
 - **Goal:** set up `package.json` and the dependencies listed in the stack.
 - **Scope:**
@@ -81,7 +81,7 @@ Goal: a repository in which every later WP can follow the normal workflow (write
 - **Depends on:** P0.1
 - **Done when:** `pnpm install --frozen-lockfile` works on a clean checkout, and `pnpm dev` serves an empty page.
 
-### [ ] P0.3 TypeScript project references
+### [x] P0.3 TypeScript project references
 
 - **Goal:** make each layer's environment rules a compile error.
 - **Scope:**
@@ -97,7 +97,7 @@ Goal: a repository in which every later WP can follow the normal workflow (write
 - **Depends on:** P0.2
 - **Done when:** `pnpm typecheck` (TS 7 `tsc -b`) passes, the DOM canary fails as expected, and the type-aware lint canary runs.
 
-### [ ] P0.4 Lint, format and layer enforcement
+### [x] P0.4 Lint, format and layer enforcement
 
 - **Goal:** turn the spec's dependency rules into automated checks.
 - **Scope:**
@@ -114,7 +114,7 @@ Goal: a repository in which every later WP can follow the normal workflow (write
 - **Depends on:** P0.3
 - **Done when:** `pnpm lint` passes on the repository, and every row of the layer table is covered by the canary test.
 
-### [ ] P0.5 Vite configuration
+### [x] P0.5 Vite configuration
 
 - **Goal:** set up a dev server and build that are ready for workers, WASM and threads.
 - **Scope:** `vite.config.ts` with:
@@ -127,7 +127,7 @@ Goal: a repository in which every later WP can follow the normal workflow (write
 - **Depends on:** P0.2
 - **Done when:** the smoke test passes, and `pnpm build` produces `dist/`.
 
-### [ ] P0.6 Test infrastructure ⇄
+### [x] P0.6 Test infrastructure ⇄
 
 - **Goal:** get Vitest and Playwright running with the agreed limits.
 - **Scope:**
@@ -135,7 +135,7 @@ Goal: a repository in which every later WP can follow the normal workflow (write
     - `include` covers `src/**/*.test.ts` and `tests/**/*.test.ts` only.
     - The Node environment is used for `core`, `game` and `app`.
     - Coverage uses v8 with a 90 % line threshold for `src/core/**`.
-    - `bench` is set up for `*.bench.ts`.
+    - benchmarks are set up for `*.bench.ts` with Vitest 5's `benchmark` configuration.
   - `playwright.config.ts`:
     - `testDir: tests/e2e` and a Chromium project with `--use-angle=swiftshader`.
     - A `webServer` that runs `pnpm build && pnpm preview`.
