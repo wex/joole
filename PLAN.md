@@ -236,7 +236,7 @@ Goal: read Q2 game data and `.map` files without loss, and show the map in four 
 - **Depends on:** P1.1
 - **Done when:** every vanilla texture in `pak0.pak` decodes, verified locally with `JOOLE_Q2_DIR`.
 
-### [ ] P1.5 `.map` reader and writer (`core/formats`)
+### [x] P1.5 `.map` reader and writer (`core/formats`)
 
 - **Goal:** read and write `.map` files without loss, following every rule in the spec.
 - **Scope:**
