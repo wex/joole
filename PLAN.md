@@ -208,7 +208,7 @@ Goal: read Q2 game data and `.map` files without loss, and show the map in four 
 - **Depends on:** P1.1
 - **Done when:** coverage is at least 90 % and a 5 000-brush polygon build benchmark is recorded.
 
-### [ ] P1.3 Game module basics (`game/q2`) ⇄
+### [x] P1.3 Game module basics (`game/q2`) ⇄
 
 - **Goal:** collect the Q2 constants in one place.
 - **Scope:**
