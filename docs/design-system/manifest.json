@@ -1,6 +1,6 @@
 {
   "manifestVersion": 3,
-  "name": "Q2 Web Editor UI",
+  "name": "Joole UI",
   "namespace": "Q2UI",
   "files": [
     "components/ContextMenu/README.md",

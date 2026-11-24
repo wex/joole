@@ -1,147 +1,149 @@
-# Käytetyt teknologiat
+# Technology stack
 
-Tämä dokumentti kuvaa Joolen teknologiapinon: mitä käytetään, mihin ja millä rajoituksilla. Toiminnalliset vaatimukset ovat määrittelyssä ([00-spec.md](00-spec.md)), ja ulkoiset lähdeprojektit on listattu tiedostossa [20-sources.md](20-sources.md).
+This document describes Joole's technology stack: what is used, what for, and with which constraints. The functional requirements are in the specification ([00-spec.md](00-spec.md)), and the external source projects are listed in [20-sources.md](20-sources.md).
 
-Versiot on kirjattu pääversioina. Tarkat versiot lukitaan `package.json`- ja `pnpm-lock.yaml`-tiedostoihin. Uuden riippuvuuden tai version pitää olla julkaistu vähintään 7 päivää ennen käyttöönottoa (ks. [Riippuvuuksien hallinta](#riippuvuuksien-hallinta)). Tilanne on tarkistettu 24.11.2026.
+Versions are recorded as major versions. Exact versions are locked in `package.json` and `pnpm-lock.yaml`. A new dependency or version must have been published at least 7 days before it is adopted (see [Dependency management](#dependency-management)). The situation was checked on 24.11.2026.
 
-## Yhteenveto
+## Summary
 
-| Alue | Teknologia | Pääversio | Käyttötarkoitus |
+| Area | Technology | Major version | Purpose |
 | --- | --- | --- | --- |
-| Kieli | TypeScript (natiivi `tsc`) | 7 | Kaikki sovelluskoodi, `strict`-tila |
-| Ajoympäristö (kehitys, CI) | Node.js LTS | 26 | Työkalut, testit, `core/`-ytimen ajo ilman selainta |
-| Paketinhallinta | pnpm | 12 | Riippuvuudet, skriptit, lukkotiedosto |
-| Build ja kehityspalvelin | Vite | 8 | Kehityspalvelin, tuotantobuild, workerit, staattiset resurssit |
-| UI | Solid (`solid-js`, `@solidjs/web`) | 2 | Paneelit: ominaisuudet, puu, tekstuuriselain, loki, valikot |
-| Solidin Vite-integraatio | `@solidjs/vite-plugin` | 3 | JSX-muunnos Solid 2:lle |
-| Renderöinti | WebGL2 + GLSL ES 3.00 | – | Kaikki neljä näkymää yhdessä canvasissa, ei 3D-kirjastoa |
-| Tunnisteet | nanoid | 6 | Solmujen pysyvät `Id`-tunnisteet |
-| Natiivityökalut | Emscripten (emsdk) | 7 | qbsp3, qvis3 ja qrad3 WebAssemblyksi |
-| PWA | vite-plugin-pwa (Workbox) | 2 | Service worker ja offline-käyttö (vaihe 5) |
-| Tyylit | CSS Modules (Viten sisäänrakennettu) + CSS Grid | – | Paneelien tyylit ja asettelu |
-| Isännöinti | Cloudflare Pages | – | Staattinen tuotantoisännöinti COOP- ja COEP-otsakkeineen |
-| CI | GitHub Actions | – | Tarkistukset, E2E ja WASM-buildin toistettavuus |
-| Yksikkötestit | Vitest + `@vitest/coverage-v8` | 5 | `core/`-ydin, jäsentäjät, benchmarkit, kattavuus |
-| Ominaisuuspohjaiset testit | fast-check | 4 | CSG- ja geometriainvariantit |
-| E2E ja kuvavertailu | Playwright | 1 | Työnkulut, suorituskykytestit, näkymien pikselivertailu |
-| Lint | ESLint (flat config) + typescript-eslint + eslint-plugin-import-x + eslint-plugin-solid | 10 / 8 / 4 / 0.20 | Kerrosrajat, tyyppisäännöt, Solid 2 -säännöt |
-| Muotoilu | Prettier | 3 | Yhtenäinen koodityyli |
+| Language | TypeScript (native `tsc`) | 7 | All application code, `strict` mode |
+| Runtime (development, CI) | Node.js LTS | 26 | Tooling, tests, running the `core/` code without a browser |
+| Package manager | pnpm | 12 | Dependencies, scripts, lockfile |
+| Build and dev server | Vite | 8 | Dev server, production build, workers, static assets |
+| UI | Solid (`solid-js`, `@solidjs/web`) | 2 | Panels: properties, tree, texture browser, log, menus |
+| Solid's Vite integration | `@solidjs/vite-plugin` | 3 | JSX transform for Solid 2 |
+| Rendering | WebGL2 + GLSL ES 3.00 | – | All four views in one canvas, no 3D library |
+| Ids | nanoid | 6 | Persistent node `Id`s |
+| Native tools | Emscripten (emsdk) | 7 | qbsp3, qvis3 and qrad3 to WebAssembly |
+| PWA | vite-plugin-pwa (Workbox) | 2 | Service worker and offline use (phase 5) |
+| Styles | CSS Modules (built into Vite) + CSS Grid | – | Panel styles and layout |
+| Icons | `lucide-static` | 1 | UI icons as static SVGs, plus custom CSG, Hollow and Clip icons |
+| Hosting | Cloudflare Pages | – | Static production hosting with the COOP and COEP headers |
+| CI | GitHub Actions | – | Checks, E2E and WASM build reproducibility |
+| Unit tests | Vitest + `@vitest/coverage-v8` | 5 | The `core/` code, parsers, benchmarks, coverage |
+| Property-based tests | fast-check | 4 | CSG and geometry invariants |
+| E2E and screenshot comparison | Playwright | 1 | Workflows, performance tests, pixel comparison of the views |
+| Lint | ESLint (flat config) + typescript-eslint + eslint-plugin-import-x + eslint-plugin-solid | 10 / 8 / 4 / 0.20 | Layer boundaries, type rules, Solid 2 rules |
+| Formatting | Prettier | 3 | Consistent code style |
 
-## Kieli ja tyypitys: TypeScript 7
+## Language and typing: TypeScript 7
 
-TypeScript 7 on Go-kielinen natiivitoteutus, jonka `tsc` on moninkertaisesti nopeampi kuin 5.x- ja 6.x-sarjan kääntäjä. Sitä käytetään vain tyyppitarkistukseen (`tsc -b --noEmit`). Vite ja Vitest poistavat tyypit omalla muunnoksellaan, joten build ei riipu `tsc`:stä.
+TypeScript 7 is the native implementation written in Go, and its `tsc` is many times faster than the 5.x and 6.x compilers. It is used only for type checking (`tsc -b --noEmit`). Vite and Vitest strip types with their own transform, so the build does not depend on `tsc`.
 
-- **Lähtöasetukset:** `strict`, `noUncheckedIndexedAccess`, `noImplicitOverride`, `verbatimModuleSyntax`, `isolatedModules`, `moduleResolution: "bundler"`, `target`/`lib` vähintään ES2023.
-- **Kerroskohtaiset `tsconfig`-projektit** (project references):
-  - `core/` ja `game/q2/`: `"lib": ["ES2023"]` ilman `DOM`- ja `WebWorker`-kirjastoja ja `"types": []`, jolloin globaalit DOM- ja WebGL-tyypit (`document`, `WebGL2RenderingContext`) ja Noden tyypit ovat käännösvirheitä. Importtirajoitus ei yksin riitä, koska nämä tyypit eivät tule importeista.
-  - `app/`, `render/`, `platform/` ja `ui/`: `DOM`-kirjasto. `src/main.ts` kuuluu samaan projektiin.
-  - `workers/`: `WebWorker`-kirjasto ilman `DOM`:ia.
-  - Testit (`*.test.ts`, `*.bench.ts`): oma projekti, jossa ovat Vitestin ja `@types/node`:n tyypit. Lähdekoodin projektit eivät sisällä testitiedostoja, joten testityypit eivät vuoda ytimeen.
-- **Tunnettu rajoitus:** typescript-eslint 8 tukee TypeScriptin JS-API:a vain versioon < 6.1, eikä TS 7 tarjoa sitä vielä vakaana. Siksi TS 6.0 asennetaan rinnalle typescript-eslintin parseria ja tyyppitietoisia sääntöjä varten (esim. pnpm-aliaksena tai `packageExtensions`-asetuksella), ja tyyppitarkistuksen tekee TS 7. Mekanismi valitaan ja kirjataan tähän projektipohjaa luotaessa. Kun typescript-eslint tukee TS 7:ää, TS 6 poistetaan.
-- **Editori:** TS 7:n natiivi kielipalvelin. VS Codessa käytetään työtilan TypeScript-versiota.
+- **Baseline options:** `strict`, `noUncheckedIndexedAccess`, `noImplicitOverride`, `verbatimModuleSyntax`, `isolatedModules`, `moduleResolution: "bundler"`, and `target`/`lib` at least ES2023.
+- **Per-layer `tsconfig` projects** (project references):
+  - `core/` and `game/q2/`: `"lib": ["ES2023"]` without the `DOM` and `WebWorker` libraries, and `"types": []`, so the global DOM and WebGL types (`document`, `WebGL2RenderingContext`) and Node's types are compile errors. An import restriction alone is not enough, because these types do not come from imports.
+  - `app/`, `render/`, `platform/` and `ui/`: the `DOM` library. `src/main.ts` belongs to the same project.
+  - `workers/`: the `WebWorker` library, without `DOM`.
+  - Tests (`*.test.ts`, `*.bench.ts`): a project of their own, with the Vitest and `@types/node` types. The source projects contain no test files, so test types do not leak into the core.
+- **Known limitation:** typescript-eslint 8 supports TypeScript's JS API only for versions below 6.1, and TS 7 does not offer a stable one yet. That is why TS 6.0 is installed alongside it for typescript-eslint's parser and type-aware rules (for example as a pnpm alias or with the `packageExtensions` setting), while type checking is done by TS 7. The mechanism is chosen and recorded here when the project scaffold is created. Once typescript-eslint supports TS 7, TS 6 is removed.
+- **Editor:** TS 7's native language server. In VS Code, the workspace's TypeScript version is used.
 
-## Ajoympäristö ja paketinhallinta: Node.js 26 LTS ja pnpm 12
+## Runtime and package management: Node.js 26 LTS and pnpm 12
 
-Sovellus ajetaan selaimessa. Nodea tarvitaan vain kehityksessä ja CI:ssä: Vite, testit, ESLint ja WASM-työkalujen Node-testiajo (kääntäjätesti). Node 26 on ollut Active LTS -versio 28.10.2026 alkaen.
+The application runs in the browser. Node is needed only in development and CI: Vite, tests, ESLint and running the WASM tools in Node (the compiler test). Node 26 has been the Active LTS version since 28.10.2026.
 
-- Versio lukitaan `.nvmrc`- ja `package.json`-tiedoston `engines.node`-kenttään (`>=26`).
-- pnpm valitaan, koska sen tiukka riippuvuuseristys estää käyttämästä paketteja, joita ei ole listattu `package.json`:ssa, ja koska sen asennukset ovat nopeita. Versio lukitaan `packageManager`-kenttään. Corepack ei enää sisälly Node 25+:aan, joten pnpm asennetaan erikseen (`npm install -g pnpm@12` tai pnpm:n oma asennusskripti).
-- Repo on yksi paketti, ei monorepo. `pnpm-workspace.yaml` luodaan vain pnpm:n asetuksia varten.
+- The version is pinned in `.nvmrc` and in the `engines.node` field of `package.json` (`>=26`).
+- pnpm is chosen because its strict dependency isolation prevents using packages that are not listed in `package.json`, and because its installs are fast. The version is pinned in the `packageManager` field. Corepack is no longer bundled with Node 25+, so pnpm is installed separately (`npm install -g pnpm@12` or pnpm's own install script).
+- The repository is a single package, not a monorepo. `pnpm-workspace.yaml` exists only for pnpm's settings.
 
-### Riippuvuuksien hallinta
+### Dependency management
 
-- `pnpm-workspace.yaml`: `minimumReleaseAge: 10080` (7 vrk minuutteina). pnpm ei silloin asenna alle viikon vanhoja versioita, mikä suojaa toimitusketjuhyökkäyksiltä. Asetusta ei saa ohittaa build-ongelmien kiertämiseksi.
-- Versiot `^`-muodossa ja lukkotiedosto versionhallintaan. CI asentaa komennolla `pnpm install --frozen-lockfile`.
-- Ajonaikaisia riippuvuuksia pidetään tarkoituksella vähän: Solid, nanoid ja PWA-ajonaikainen osa. Matematiikka, geometria, jäsentäjät ja renderöinti ovat omaa koodia.
-- Huom. Solid 2.0.0 ja `@solidjs/vite-plugin` 3.0 julkaistiin 17.11.2026. Ne täyttävät 7 päivän säännön, mutta tuoreimmat 2.0.x-korjausversiot eivät välttämättä vielä täytä sitä.
+- `pnpm-workspace.yaml`: `minimumReleaseAge: 10080` (7 days in minutes). pnpm then refuses to install versions less than a week old, which protects against supply-chain attacks. The setting must not be bypassed to work around build problems.
+- Versions use the `^` form, and the lockfile is in version control. CI installs with `pnpm install --frozen-lockfile`.
+- Runtime dependencies are deliberately kept few: Solid, nanoid, the PWA runtime and the Lucide SVGs, which are bundled at build time. Math, geometry, parsers and rendering are our own code.
+- Note: Solid 2.0.0 and `@solidjs/vite-plugin` 3.0 were released on 17.11.2026. They meet the 7-day rule, but the latest 2.0.x patch releases may not meet it yet.
 
-## Build ja kehityspalvelin: Vite 8
+## Build and dev server: Vite 8
 
-Vite tarjoaa kehityspalvelimen ja tuotantobuildin (Rolldown).
+Vite provides the dev server and the production build (Rolldown).
 
-- **Workerit:** `new Worker(new URL('./x.worker.ts', import.meta.url), { type: 'module' })`. Vite niputtaa workerit erikseen. Käyttökohteet: tekstuurien `.wal` → RGBA8 -muunnos ja qbsp3/qvis3/qrad3-ajot.
-- **WASM ja resurssit:** Emscriptenin tuottamat `.wasm`-tiedostot ladataan `?url`-importilla, ja varjostimet ladataan merkkijonoina `?raw`-importilla.
-- **COOP/COEP:** `server.headers` ja `preview.headers` asettavat `Cross-Origin-Opener-Policy: same-origin` ja `Cross-Origin-Embedder-Policy: require-corp`, jotta `SharedArrayBuffer` ja säikeistetty WASM toimivat myös kehityksessä. Tuotannossa Cloudflare Pages lähettää samat otsakkeet `public/_headers`-tiedoston perusteella (ks. [Isännöinti ja CI](#isännöinti-ja-ci)).
-- **Polkualiakset** vastaavat hakemistorakennetta (`@core/*`, `@game/*`, `@app/*`, `@render/*`, `@platform/*`, `@ui/*`). `workers/`-hakemistolle ei tehdä aliasta, koska sitä ei tuoda muualta. Ne määritellään sekä `tsconfig`- että Vite-asetuksissa.
+- **Workers:** `new Worker(new URL('./x.worker.ts', import.meta.url), { type: 'module' })`. Vite bundles workers separately. Uses: converting `.wal` textures to RGBA8, and running qbsp3, qvis3 and qrad3.
+- **WASM and assets:** the `.wasm` files produced by Emscripten are loaded with a `?url` import, and shaders are loaded as strings with a `?raw` import.
+- **COOP/COEP:** `server.headers` and `preview.headers` set `Cross-Origin-Opener-Policy: same-origin` and `Cross-Origin-Embedder-Policy: require-corp`, so that `SharedArrayBuffer` and threaded WASM also work in development. In production, Cloudflare Pages sends the same headers based on the `public/_headers` file (see [Hosting and CI](#hosting-and-ci)).
+- **Path aliases** mirror the directory structure (`@core/*`, `@game/*`, `@app/*`, `@render/*`, `@platform/*`, `@ui/*`). The `workers/` directory gets no alias, because nothing imports it. The aliases are defined in both the `tsconfig` and the Vite settings.
 
 ## UI: Solid 2
 
-Solid 2 (`solid-js` 2 ja `@solidjs/web` 2) valitaan paneelikirjastoksi. Hienojakoinen reaktiivisuus päivittää vain ne DOM-solmut, joiden data muuttuu, eikä virtuaali-DOMia tarvita. Tämä sopii hyvin malliin, jossa jokainen komento tuottaa patchin muuttuneista solmuista.
+Solid 2 (`solid-js` 2 and `@solidjs/web` 2) is chosen as the panel library. Fine-grained reactivity updates only the DOM nodes whose data changes, and no virtual DOM is needed. This fits well with a model in which every command produces a patch of the changed nodes.
 
-- **Käyttöalue:** vain `ui/`-kerros, eli paneelit, valikot, dialogit, puunäkymä, tekstuuri- ja prefabiselain sekä lokiruutu. Näkymien `<canvas>` on yksi DOM-elementti, jonka Solid luo mutta ei renderöi. Renderöijä piirtää sen itse. Sen rajapinta ottaa vastaan vain ytimen tyyppejä (`MapDocument`, `Patch`, kameran tiedot), ja `src/main.ts` kytkee sen `app/`-kerroksen muutosilmoitusten tilaajaksi. `render/` ei tuo `app/`- eikä `ui/`-hakemistoa (ks. määrittelyn kerrossäännöt).
-- **Tilan silta:** `app/` tarjoaa valinnan, asetukset ja dokumentin muutosilmoitukset. `ui/` muuttaa ne Solidin signaaleiksi ja storeiksi. `core/`, `game/`, `app/`, `render/`, `platform/` ja `workers/` eivät tuo `solid-js`:ää.
-- **Vite-integraatio:** `@solidjs/vite-plugin` 3 (Babel-pohjainen JSX-muunnos). Vanha `vite-plugin-solid` 2.x on Solid 1:lle, eikä sitä asenneta.
-- **Solid 2:n API eroaa Solid 1:stä:** `createResource`, `batch`, `startTransition`, `on`, `produce`, `createComputed` ja `createMutable` on poistettu, ja asynkronisuus kulkee `createMemo`n ja `<Loading>`-komponentin kautta. Solid 1:n esimerkkejä tai dokumentaatiota ei käytetä sellaisenaan (Solid 1:n dokumentaatio on osoitteessa v1.solidjs.com). Solid 2:n kehitysbuild raportoi reaktiivisuusvirheet diagnostiikkakoodeina, joten ne korjataan, eikä niitä ohiteta.
-- **Tyylit ja asettelu:** CSS Modules (`*.module.css`), jonka Vite tukee ilman lisäriippuvuuksia. Jokaisella komponentilla on oma moduulinsa, ja luokkanimet ovat komponenttikohtaisia. Teeman värit ja mitat ovat globaaleina CSS-muuttujina yhdessä tiedostossa. Pääasettelu (neljä näkymää, sivu- ja alapaneelit) tehdään CSS Gridillä.
+- **Scope:** the `ui/` layer only, that is, panels, menus, dialogs, the tree view, the texture and prefab browsers and the log pane. The views' `<canvas>` is a single DOM element that Solid creates but does not render. The renderer draws it itself. The renderer's interface accepts only core types (`MapDocument`, `Patch`, camera data), and `src/main.ts` subscribes it to the `app/` layer's change notifications. `render/` does not import `app/` or `ui/` (see the spec's layer rules).
+- **State bridge:** `app/` provides the selection, settings and document change notifications. `ui/` turns them into Solid signals and stores. `core/`, `game/`, `app/`, `render/`, `platform/` and `workers/` do not import `solid-js`.
+- **Vite integration:** `@solidjs/vite-plugin` 3 (a Babel-based JSX transform). The old `vite-plugin-solid` 2.x is for Solid 1 and is not installed.
+- **Solid 2's API differs from Solid 1:** `createResource`, `batch`, `startTransition`, `on`, `produce`, `createComputed` and `createMutable` have been removed, and asynchrony goes through `createMemo` and the `<Loading>` component. Solid 1 examples and documentation are not used as they are (Solid 1's documentation is at v1.solidjs.com). Solid 2's development build reports reactivity mistakes as diagnostic codes, and they are fixed rather than suppressed.
+- **Styles and layout:** CSS Modules (`*.module.css`), which Vite supports without extra dependencies. Each component has its own module, and class names are scoped to the component. Theme colours and dimensions are global CSS variables in one file (the design system's `tokens.css`, see [design-system/README.md](design-system/README.md)). The main layout (four views, side and bottom panels) uses CSS Grid. The fonts (IBM Plex Sans and Mono) are self-hosted from `public/fonts/`, because the app makes no external requests.
+- **Icons:** Lucide via `lucide-static` (ISC; the icons derived from Feather are MIT, both GPLv2-compatible). Each icon is imported as an SVG string (`lucide-static/icons/<name>.svg?raw`), so only the used icons are bundled. `lucide-solid` is not used, because it requires `solid-js` 1. Custom icons for CSG Subtract, Hollow and Clip follow the same style (16 × 16, 1.5px stroke, `currentColor`) and live in `src/ui/icons/`. Lucide publishes almost daily, so the 7-day rule applies to every update.
 
-## Renderöinti: WebGL2 ilman 3D-kirjastoa
+## Rendering: WebGL2 without a 3D library
 
-Raaka WebGL2-rajapinta valitaan, koska renderöinti on kapea-alaista ja täysin hallittua: teksturoidut kuperat polygonit, rautalanka, hila ja kahvat. Three.js:n kaltainen kirjasto toisi oman scenegraphin, joka kilpailisi dokumenttimallin kanssa.
+The raw WebGL2 API is chosen because the rendering is narrow and fully controlled: textured convex polygons, wireframes, the grid and handles. A library such as Three.js would bring its own scene graph that would compete with the document model.
 
-- Yksi WebGL2-konteksti ja yksi canvas. Näkymät rajataan `gl.viewport`- ja `gl.scissor`-kutsuilla.
-- Varjostimet kirjoitetaan GLSL ES 3.00:lla (`#version 300 es`) omina `.glsl`-tiedostoinaan `render/`-hakemistossa.
-- Paksut viivat piirretään instansoiduilla nelikulmioilla, ja hila piirretään proseduraalisesti fragmenttivarjostimessa.
-- Tekstuurit: `REPEAT`, `generateMipmap`, `NEAREST_MIPMAP_LINEAR`.
-- Matematiikka (vektorit, matriisit, tasot) on omaa koodia `core/`-ytimessä float64-tarkkuudella. `Float32Array`-muunnos tehdään vasta GPU-puskureita kirjoitettaessa. gl-matrixin kaltaisia kirjastoja ei käytetä.
-- Poiminta tehdään prosessorilla `core/geom/`-moduulin BVH-puulla eikä GPU:n ID-puskurilla.
+- One WebGL2 context and one canvas. The views are delimited with `gl.viewport` and `gl.scissor`.
+- Shaders are written in GLSL ES 3.00 (`#version 300 es`) as separate `.glsl` files in the `render/` directory.
+- Thick lines are drawn with instanced quads, and the grid is drawn procedurally in a fragment shader.
+- Textures: `REPEAT`, `generateMipmap`, `NEAREST_MIPMAP_LINEAR`.
+- Math (vectors, matrices, planes) is our own code in the `core/` code at float64 precision. Conversion to `Float32Array` happens only when GPU buffers are written. Libraries such as gl-matrix are not used.
+- Picking is done on the CPU with the BVH of the `core/geom/` module, not with a GPU id buffer.
 
-## Geometriaydin ja tiedostoformaatit
+## Geometry core and file formats
 
-`core/` on riippuvuudeton TypeScript-koodi, jonka ainoa ulkoinen riippuvuus on nanoid tunnisteille. Kaikki jäsentäjät ovat puhtaita funktioita (`ArrayBuffer` tai `string` sisään, tietorakenne ulos). Niitä ajetaan sekä selaimessa että Nodessa.
+`core/` is dependency-free TypeScript code whose only external dependency is nanoid for ids. All parsers are pure functions (an `ArrayBuffer` or `string` in, a data structure out). They run both in the browser and in Node.
 
-Moduulit on lueteltu riippuvuusjärjestyksessä: kukin saa tuoda vain yllä olevia.
+The modules are listed in dependency order: each may import only the ones above it.
 
-| Moduuli | Sisältö | Ulkoinen viite |
+| Module | Contents | External reference |
 | --- | --- | --- |
-| `core/types` | tietomallin tyypit (`Id`, `Vec3`, `Plane`, `FaceTexture`, `Face`, solmutyypit, `MapDocument`, `Patch`), ei ajonaikaista koodia | – |
-| `core/geom` | vektori- ja matriisilaskenta, tasot, windingit, CSG, poiminta, BVH, toleranssit (`PLANE_EPS`, `POINT_EPS`) | Qoole `source/Objects/Geometry.cpp`, Quake-2-Tools `common/polylib.c` |
-| `core/doc` | solmujen luonti (nanoid), komentojen toteutukset (`Command.run` → `Patch`), patchien soveltaminen | Qoole `source/Qoole/QooleOp.cpp` |
-| `core/formats` | `.map`, `.pak`, `.pkz` (ZIP), `.wal`, `.pcx`, `.md2`, entiteettimääritykset, `.pts`, `.joole.json` | q2pro `inc/format/*.h` ja `src/common/files.c` (`load_zip_file`), Quake-2-Tools `common/qfiles.h` |
-| `game/q2` | paletti, pinta- ja contents-liput, hakemistot, käännösprofiilit, oletustekstuuri | Qoole `source/Game/Quake2.cpp` |
+| `core/types` | data model types (`Id`, `Vec3`, `Plane`, `FaceTexture`, `Face`, node types, `MapDocument`, `Patch`), no runtime code | – |
+| `core/geom` | vector and matrix math, planes, windings, CSG, picking, BVH, tolerances (`PLANE_EPS`, `POINT_EPS`) | Qoole `source/Objects/Geometry.cpp`, Quake-2-Tools `common/polylib.c` |
+| `core/doc` | creating nodes (nanoid), command implementations (`Command.run` → `Patch`), applying patches | Qoole `source/Qoole/QooleOp.cpp` |
+| `core/formats` | `.map`, `.pak`, `.pkz` (ZIP), `.wal`, `.pcx`, `.md2`, entity definitions, `.pts`, `.joole.json` | q2pro `inc/format/*.h` and `src/common/files.c` (`load_zip_file`), Quake-2-Tools `common/qfiles.h` |
+| `game/q2` | palette, surface and contents flags, directories, compile profiles, default texture | Qoole `source/Game/Quake2.cpp` |
 
-CommandBus, undo-historia (yhdistäminen, muistiraja) ja valinta ovat `app/`-kerroksessa. Ne käyttävät `core/doc`-moduulin puhtaita funktioita.
+The CommandBus, undo history (merging, memory limit) and selection live in the `app/` layer. They use the pure functions of the `core/doc` module.
 
-## Selaimen alusta-API:t (`platform/`)
+## Browser platform APIs (`platform/`)
 
-| API | Käyttötarkoitus | Tuki |
+| API | Purpose | Support |
 | --- | --- | --- |
-| File System Access API (`showDirectoryPicker`, `showOpenFilePicker`, `createWritable`) | Pelikansion valinta, kartan avaus ja tallennus suoraan tiedostoon, `.bsp`:n kirjoitus `baseq2/maps/`-hakemistoon | Chromium |
-| `<input type=file webkitdirectory>`, raahaus, `<a download>` | Varapolku avaukseen ja tallennukseen | Firefox, Safari |
-| `Blob.slice` | `.pak`-tiedostojen luku osina ilman koko tiedoston lataamista muistiin | Kaikki |
-| OPFS (Origin Private File System) | Automaattinen tallennus, prefabit, muunnettujen tekstuurien välimuisti | Kaikki |
-| IndexedDB | Asetukset, viimeisimmät tiedostot, File System Access -kahvat | Kaikki |
-| Web Workers | Tekstuurimuunnos, WASM-kääntäjät | Kaikki |
-| `SharedArrayBuffer` + COOP/COEP | Säikeistetty qvis3/qrad3 | Kaikki, kun otsakkeet ovat paikallaan |
-| Pointer Lock API | 3D-näkymän lentokamera | Kaikki |
-| Service Worker | PWA, offline-käyttö | Kaikki |
+| File System Access API (`showDirectoryPicker`, `showOpenFilePicker`, `createWritable`) | Choosing the game folder, opening a map and saving directly to the file, writing the `.bsp` to `baseq2/maps/` | Chromium |
+| `<input type=file webkitdirectory>`, drag and drop, `<a download>` | Fallback path for opening and saving | Firefox, Safari |
+| `Blob.slice` | Reading `.pak` files in chunks without loading the whole file into memory | All |
+| OPFS (Origin Private File System) | Autosave, prefabs, cache of converted textures | All |
+| IndexedDB | Settings, recent files, File System Access handles | All |
+| Web Workers | Texture conversion, WASM compilers | All |
+| `SharedArrayBuffer` + COOP/COEP | Threaded qvis3/qrad3 | All, when the headers are in place |
+| Pointer Lock API | The 3D view's fly camera | All |
+| Service Worker | PWA, offline use | All |
 
-Ominaisuuksien tuki tarkistetaan ajonaikaisesti (feature detection), ei selaimen nimen perusteella.
+Feature support is checked at runtime (feature detection), not by the browser's name.
 
-## Q2-kääntäjät: Emscripten 7
+## Q2 compilers: Emscripten 7
 
-qbsp3, qvis3 ja qrad3 käännetään WebAssemblyksi id Softwaren alkuperäisestä [Quake-2-Tools](https://github.com/id-Software/Quake-2-Tools)-lähdekoodista (`ext/Quake-2-Tools`). Tiedostojen otsakkeiden mukaan lisenssi on "GPL v2 tai myöhempi". Versiovalinta on kirjattu määrittelyn päätöksiin 24.11.2026.
+qbsp3, qvis3 and qrad3 are compiled to WebAssembly from id Software's original [Quake-2-Tools](https://github.com/id-Software/Quake-2-Tools) source code (`ext/Quake-2-Tools`). According to the file headers, the licence is "GPL v2 or later". The version choice is recorded in the spec's decisions of 24.11.2026.
 
-- **Mallipohja:** q3edit kääntää vastaavasti q3mapin (`q3map-compiler/Makefile`, `src/q3map-worker.ts`). Lähtöliput: `-sMODULARIZE=1`, `-sEXPORT_NAME=…`, `-sFORCE_FILESYSTEM=1`, `-sINVOKE_RUN=0`, `-sEXIT_RUNTIME=0`, `-sALLOW_MEMORY_GROWTH=1` ja `-sEXPORTED_RUNTIME_METHODS=FS,callMain`. Ympäristönä `web,worker,node`, jotta sama build toimii myös CI:n kääntäjätestissä Nodessa.
-- **Kaksi buildia per työkalu:** säikeistetty (`-pthread`, vaatii COOP/COEP:n) ja yksisäikeinen varabuild. Quake-2-Toolsin `common/threads.c` on kirjoitettu Win32- ja pthreads-rajapinnoille, joten se sovitetaan Emscriptenin pthreads-tukeen.
-- **Natiivikoodi** on `tools/`-hakemistossa: kopio tarvittavista Quake-2-Toolsin tiedostoista, Emscripten-muutokset, Makefile ja README, johon jokainen muutos alkuperäiseen kirjataan q3editin tapaan.
-- **Vaiheistus:** yksisäikeinen `qbsp3.wasm` (ympäristö `node`) tehdään vaiheessa 2 kääntäjätestiä varten. Selainbuildit, qvis3, qrad3 ja säikeistys tehdään vaiheessa 5.
-- **Jakelu ja toistettavuus:** valmiit `.wasm`-tiedostot ja niiden JS-liimakoodi commitoidaan `workers/`-hakemistoon, joten kehittäjä ei tarvitse emsdk:ta. CI buildaa ne uudelleen lukitulla `emscripten/emsdk`-Docker-kuvalla ja epäonnistuu, jos tulos poikkeaa commitoiduista tiedostoista. Ensimmäisen buildin yhteydessä varmistetaan, että tuloste on deterministinen (ei aikaleimoja eikä absoluuttisia polkuja). `pnpm build:tools` ajaa saman buildin paikallisesti.
+- **Template:** q3edit compiles q3map the same way (`q3map-compiler/Makefile`, `src/q3map-worker.ts`). Starting flags: `-sMODULARIZE=1`, `-sEXPORT_NAME=…`, `-sFORCE_FILESYSTEM=1`, `-sINVOKE_RUN=0`, `-sEXIT_RUNTIME=0`, `-sALLOW_MEMORY_GROWTH=1` and `-sEXPORTED_RUNTIME_METHODS=FS,callMain`. The environment is `web,worker,node`, so that the same build also works in CI's compiler test in Node.
+- **Two builds per tool:** a threaded one (`-pthread`, requires COOP/COEP) and a single-threaded fallback build. Quake-2-Tools' `common/threads.c` is written for the Win32 and pthreads APIs, so it is adapted to Emscripten's pthreads support.
+- **The native code** lives in the `tools/` directory: a copy of the needed Quake-2-Tools files, the Emscripten changes, a Makefile and a README in which every change to the original is recorded, as q3edit does.
+- **Phasing:** a single-threaded `qbsp3.wasm` (environment `node`) is made in phase 2 for the compiler test. The browser builds, qvis3, qrad3 and threads are done in phase 5.
+- **Distribution and reproducibility:** the finished `.wasm` files and their JS glue code are committed to the `workers/` directory, so developers do not need emsdk. CI rebuilds them with a pinned `emscripten/emsdk` Docker image and fails if the result differs from the committed files. The first build verifies that the output is deterministic (no timestamps or absolute paths). `pnpm build:tools` runs the same build locally.
 
-## Testaus
+## Testing
 
-| Työkalu | Kohde | Huomiot |
+| Tool | Target | Notes |
 | --- | --- | --- |
-| Vitest 5 | `core/`, `game/q2/`, `app/` (Node-ympäristö) | Kattavuus `@vitest/coverage-v8`:lla, tavoite ≥ 90 % riveistä `core/`-hakemistossa. Benchmarkit (`vitest bench`) suorituskykytaulukon CSG-tavoitteille. |
-| fast-check 4 | CSG-operaatiot, polygonien muodostus, tekstuurilukko | Satunnaisilla kuperilla brusheilla tarkistetaan tuloksen validius ja tilavuuksien säilyminen. |
-| Vitest + WASM | Kääntäjätesti | qbsp3.wasm ajetaan Nodessa testikartoilla, ja testi epäonnistuu varoituksista. |
-| Playwright 1 | E2E, suorituskyky, kuvavertailu | Pääselain on Chromium. Kuvavertailu ajetaan headless-Chromiumilla SwiftShader-ohjelmistorenderöinnillä (`--use-angle=swiftshader`), jotta tulos on sama joka koneella. Firefox ja WebKit testataan vaiheessa 5 lataus- ja tallennuspolkujen osalta. |
+| Vitest 5 | `core/`, `game/q2/`, `app/` (Node environment) | Coverage with `@vitest/coverage-v8`, target ≥ 90 % of lines in the `core/` directory. Benchmarks (`vitest bench`) for the CSG targets in the performance table. |
+| fast-check 4 | CSG operations, building polygons, texture lock | Random convex brushes are used to check that results are valid and volumes are preserved. |
+| Vitest + WASM | Compiler test | qbsp3.wasm runs in Node on the test maps, and the test fails on warnings. |
+| Playwright 1 | E2E, performance, screenshot comparison | The main browser is Chromium. Screenshot comparison runs in headless Chromium with SwiftShader software rendering (`--use-angle=swiftshader`), so the result is the same on every machine. Firefox and WebKit are tested in phase 5 for the load and save paths. |
 
-UI-komponenttien yksikkötestaukseen tarkoitettu `@solidjs/testing-library` on Solid 2:lle vasta RC-versiona, joten sitä ei oteta perusstackiin. Paneelit testataan Playwrightilla, ja paneelien logiikka pidetään `app/`-kerroksessa, jossa se on Vitestillä testattavissa.
+`@solidjs/testing-library`, intended for unit testing UI components, exists for Solid 2 only as a release candidate, so it is not part of the base stack. Panels are tested with Playwright, and panel logic is kept in the `app/` layer, where Vitest can test it.
 
-## Koodin laatu
+## Code quality
 
-- **ESLint 10** flat-konfiguraatiolla (`eslint.config.js`) ja **typescript-eslint 8**:lla (ks. TS 7 -rajoitus yllä).
-- **Kerrosrajat** määritellään määrittelyn kohdassa *Kerrosjärjestys ja riippuvuussäännöt*, ja niitä valvotaan **eslint-plugin-import-x 4**:n säännöllä `import-x/no-restricted-paths`. Alkuperäinen `eslint-plugin-import` (2.x) ei tue ESLint 10:tä. Polkualiakset (`@core/*` ym.) ratkaistaan `eslint-import-resolver-typescript`-paketilla (`createTypeScriptImportResolver`), jotta vyöhykkeet tunnistavat myös aliastuonnit. `src/main.ts` ei ole minkään vyöhykkeen kohteena, joten se saa tuoda kaikkea. Lähtökonfiguraatio:
+- **ESLint 10** with a flat config (`eslint.config.js`) and **typescript-eslint 8** (see the TS 7 limitation above).
+- **Layer boundaries** are defined in the spec's *Layer order and dependency rules* section and enforced with **eslint-plugin-import-x 4**'s rule `import-x/no-restricted-paths`. The original `eslint-plugin-import` (2.x) does not support ESLint 10. Path aliases (`@core/*` etc.) are resolved with the `eslint-import-resolver-typescript` package (`createTypeScriptImportResolver`), so that the zones also recognise alias imports. `src/main.ts` is not the target of any zone, so it may import everything. Starting configuration:
 
   ```js
   'import-x/no-restricted-paths': ['error', { zones: [
@@ -158,47 +160,47 @@ UI-komponenttien yksikkötestaukseen tarkoitettu `@solidjs/testing-library` on S
   ]}]
   ```
 
-  Viimeinen vyöhyke varmistaa, että workereihin yhteys on vain viesteillä. `new Worker(new URL(…, import.meta.url))` ei ole import, joten worker-asiakkaat `platform/`-hakemistossa toimivat. Pakettitason rajoitukset tehdään sisäänrakennetulla `no-restricted-imports`-säännöllä: `solid-js` ja `@solidjs/*` ovat sallittuja vain `ui/`-hakemistossa. `core/types`-moduulin tuonneissa vaaditaan `import type` -muoto (`@typescript-eslint/consistent-type-imports`).
-- **eslint-plugin-solid** otetaan käyttöön `ui/`-hakemistolle sen `v2`-konfiguraatiolla. Konfiguraatio sisältää Solid 2:n säännöt (esim. `solid/removed-api`, joka estää Solid 1:n poistettujen API:en käytön). Tuki on tarkistettu paketin README:stä 24.11.2026.
-- **Prettier 3** muotoilee koodin. ESLintin tyylisäännöt on poistettu käytöstä (`eslint-config-prettier`), jotta työkalut eivät ole ristiriidassa.
+  The last zone ensures that workers are reached only through messages. `new Worker(new URL(…, import.meta.url))` is not an import, so the worker clients in `platform/` work. Package-level restrictions use the built-in `no-restricted-imports` rule: `solid-js` and `@solidjs/*` are allowed only in `ui/`. Imports from the `core/types` module must use the `import type` form (`@typescript-eslint/consistent-type-imports`).
+- **eslint-plugin-solid** is enabled for the `ui/` directory with its `v2` configuration. The configuration contains Solid 2's rules (for example `solid/removed-api`, which prevents use of the APIs removed in Solid 1). Support was checked from the package README on 24.11.2026.
+- **Prettier 3** formats the code. ESLint's style rules are turned off (`eslint-config-prettier`), so the tools do not conflict.
 
-## Lähdeprojektien rooli
+## Role of the source projects
 
-Lähteet on kuvattu tiedostossa [20-sources.md](20-sources.md), ja niiden paikalliset kopiot ovat hakemistossa `ext/<repo>/`. Taulukossa on lähdeprojektien tärkeimmät tiedostot teknisten ratkaisujen kannalta, ja polut ovat suhteessa repon juureen (esim. `ext/q2pro/inc/format/pak.h`). Kaikki ovat lisenssiltään "GPL v2 tai myöhempi", joten koodia saa siirtää Jooleen (`GPL-2.0-or-later`), kun tekijänoikeusmerkinnät säilytetään.
+The sources are described in [20-sources.md](20-sources.md), and their local copies are in the `ext/<repo>/` directory. The table lists the source projects' most important files for the technical solutions, and the paths are relative to each repository's root (for example `ext/q2pro/inc/format/pak.h`). All are licensed "GPL v2 or later", so code may be moved into Joole (`GPL-2.0-or-later`) as long as the copyright notices are kept.
 
-| Lähde | Tiedostot | Mitä sieltä otetaan |
+| Source | Files | What is taken from it |
 | --- | --- | --- |
-| [q2pro](https://github.com/q2pro/q2pro) | `inc/format/{pak,wal,pcx,md2,bsp}.h`, `src/common/files.c`, `src/refresh/images.c`, `src/refresh/models.c` | Binääriformaattien rakenteet, pak- ja hakemistojen hakujärjestys (modit), md2:n luku |
-| [Quake-2](https://github.com/id-Software/Quake-2) | `qcommon/files.c` (`FS_AddGameDirectory`), `qcommon/qfiles.h`, `game/*.c` (`/*QUAKED*/`-lohkot, spawn-funktiot), `ctf/*.c` | Vanilla-moottorin käytös (hakujärjestys), entiteettimääritysten generointi ja md2-taulukko, esimerkki modin määrityksistä (CTF) |
-| [Quake-2-Tools](https://github.com/id-Software/Quake-2-Tools) `qe4/` | `eclass.c`, `csg.c` (`CSG_MakeHollow`, `CSG_Subtract`), `brush.c`, `map.c`, `points.c`, `vertsel.c`, `select.c`, `textures.c` | id:n oma Q2-editori QuakeEd 4: `/*QUAKED … */`-entiteettimääritysten jäsennys, CSG ja onton tekeminen, brushien luonti tasoista, `.map`-luku ja -kirjoitus, vuotopistetiedosto, verteksimuokkaus |
-| [Quake-2-Tools](https://github.com/id-Software/Quake-2-Tools) | `common/qfiles.h`, `bsp/qbsp3/textures.c` (`TextureAxisFromPlane`, `TexinfoForBrushTexture`), `bsp/qbsp3/map.c`, `bsp/qbsp3/leakfile.c` | Pinta- ja contents-lippujen vakiot, UV-laskenta täsmälleen kuten kääntäjässä, `.map`-jäsennyksen säännöt, `.pts`-formaatti, WASM-käännettävä koodi |
-| [Qoole](https://github.com/demoth/qoole) | `source/Objects/Geometry.cpp`, `source/Objects/EntList.cpp`, `source/Game/Quake2.cpp`, `source/Qoole/QooleOp.cpp`, `source/Render/Selector.cpp` | Editorin toimintalogiikka: CSG, onton tekeminen, tasoleikkaus, operaatiot ja undo, poiminta |
-| [q3edit](https://github.com/drdator/q3edit) | `q3map-compiler/Makefile`, `src/q3map-worker.ts`, `src/gl-utils.ts`, `src/pak.ts`, `src/map-parser.ts` | Emscripten-liput ja worker-malli kääntäjille, WebGL2-käytännöt, selainpuolen pak- ja map-käsittely |
+| [q2pro](https://github.com/q2pro/q2pro) | `inc/format/{pak,wal,pcx,md2,bsp}.h`, `src/common/files.c`, `src/refresh/images.c`, `src/refresh/models.c` | Binary format structures, the search order of paks and directories (mods), reading md2 |
+| [Quake-2](https://github.com/id-Software/Quake-2) | `qcommon/files.c` (`FS_AddGameDirectory`), `qcommon/qfiles.h`, `game/*.c` (`/*QUAKED*/` blocks, spawn functions), `ctf/*.c` | Vanilla engine behaviour (search order), generating entity definitions and the md2 table, an example of a mod's definitions (CTF) |
+| [Quake-2-Tools](https://github.com/id-Software/Quake-2-Tools) `qe4/` | `eclass.c`, `csg.c` (`CSG_MakeHollow`, `CSG_Subtract`), `brush.c`, `map.c`, `points.c`, `vertsel.c`, `select.c`, `textures.c` | id's own Q2 editor QuakeEd 4: parsing `/*QUAKED … */` entity definitions, CSG and hollowing, building brushes from planes, reading and writing `.map`, the leak file, vertex editing |
+| [Quake-2-Tools](https://github.com/id-Software/Quake-2-Tools) | `common/qfiles.h`, `bsp/qbsp3/textures.c` (`TextureAxisFromPlane`, `TexinfoForBrushTexture`), `bsp/qbsp3/map.c`, `bsp/qbsp3/leakfile.c` | Surface and contents flag constants, UV computation exactly as in the compiler, the `.map` parsing rules, the `.pts` format, the code compiled to WASM |
+| [Qoole](https://github.com/demoth/qoole) | `source/Objects/Geometry.cpp`, `source/Objects/EntList.cpp`, `source/Game/Quake2.cpp`, `source/Qoole/QooleOp.cpp`, `source/Render/Selector.cpp` | The editor's behaviour: CSG, hollowing, plane clip, operations and undo, picking |
+| [q3edit](https://github.com/drdator/q3edit) | `q3map-compiler/Makefile`, `src/q3map-worker.ts`, `src/gl-utils.ts`, `src/pak.ts`, `src/map-parser.ts` | Emscripten flags and the worker model for compilers, WebGL2 practices, browser-side pak and map handling |
 
-## Isännöinti ja CI
+## Hosting and CI
 
-**Cloudflare Pages** isännöi tuotantobuildin (`dist/`). Tiedosto `public/_headers` asettaa kaikille poluille otsakkeet `Cross-Origin-Opener-Policy: same-origin` ja `Cross-Origin-Embedder-Policy: require-corp`, jotta `SharedArrayBuffer` ja säikeistetty WASM toimivat. COEP edellyttää, että kaikki resurssit tulevat samasta originista. Tämä sopii yhteen sen periaatteen kanssa, ettei ulkoisia ajonaikaisia pyyntöjä tehdä. PWA:n service worker tarjoillaan samasta originista. Julkaisu tehdään GitHub-integraatiolla tai CI:stä.
+**Cloudflare Pages** hosts the production build (`dist/`). The `public/_headers` file sets `Cross-Origin-Opener-Policy: same-origin` and `Cross-Origin-Embedder-Policy: require-corp` for all paths, so that `SharedArrayBuffer` and threaded WASM work. COEP requires all resources to come from the same origin. This fits the principle that no external runtime requests are made. The PWA's service worker is served from the same origin. Deployment is done through the GitHub integration or from CI.
 
-**GitHub Actions** ajaa CI:n jokaiselle pull requestille ja `main`-haaralle:
+**GitHub Actions** runs CI for every pull request and for the `main` branch:
 
-- `pnpm install --frozen-lockfile`, `pnpm check` ja `pnpm e2e` (Playwright, Chromium ja SwiftShader). Node 26 asennetaan `actions/setup-node`-actionilla ja pnpm `pnpm/action-setup`-actionilla.
-- WASM-työ: `tools/` buildataan `emscripten/emsdk`-Docker-kuvalla ja verrataan commitoituihin `.wasm`-tiedostoihin.
-- Kolmannen osapuolen actionit lukitaan commit-SHA:han eikä tagiin.
+- `pnpm install --frozen-lockfile`, `pnpm check` and `pnpm e2e` (Playwright, Chromium and SwiftShader). Node 26 is installed with the `actions/setup-node` action and pnpm with the `pnpm/action-setup` action.
+- WASM job: `tools/` is built with the `emscripten/emsdk` Docker image and compared with the committed `.wasm` files.
+- Third-party actions are pinned to a commit SHA, not a tag.
 
-Repolla ei vielä ole etärepoa. Se luodaan GitHubiin ennen kuin CI otetaan käyttöön.
+The repository does not have a remote yet. It is created on GitHub before CI is taken into use.
 
-## Viitekoodin rajaus työkaluista (`ext/`)
+## Keeping reference code out of the tooling (`ext/`)
 
-`ext/` sisältää lähdeprojektien kloonit, joissa on muun muassa satoja TypeScript-tiedostoja, omia testejä (`ext/q3edit/tests/*.test.ts`), `package.json`-tiedostoja ja `index.html` (q3edit). Ne eivät saa päätyä Joolen buildiin, testeihin eikä tarkistuksiin. Siksi:
+`ext/` contains clones of the source projects, which include, among other things, hundreds of TypeScript files, their own tests (`ext/q3edit/tests/*.test.ts`), `package.json` files and an `index.html` (q3edit). These must not end up in Joole's build, tests or checks. Therefore:
 
-- **tsconfig:** `include` listaa vain `src/`-, `workers/`- ja `tests/`-hakemistot.
-- **Vitest:** `include` rajataan hakemistoihin `src/` ja `tests/`, eikä oletusarvoista `**/*.test.ts`-hakua käytetä.
-- **Playwright:** `testDir` on `tests/e2e`.
-- **ESLint:** globaali `ignores: ['ext/**']` flat-konfiguraatiossa.
-- **Prettier:** `ext/` lisätään tiedostoon `.prettierignore`. Prettier noudattaa myös `.gitignore`a, mutta erillinen merkintä tekee rajauksen näkyväksi.
-- **Vite:** `optimizeDeps.entries: ['index.html']`, koska Vite muuten skannaa riippuvuuksia projektin kaikista HTML-tiedostoista, myös `ext/q3edit/index.html`:stä. Lisäksi `server.watch.ignored` sisältää polun `**/ext/**`, jotta kehityspalvelin ei seuraa tuhansia viitetiedostoja.
-- **pnpm:** `pnpm-workspace.yaml` sisältää vain asetuksia eikä `packages`-listaa, joten `ext/`:n `package.json`-tiedostot eivät muutu workspace-paketeiksi.
+- **tsconfig:** `include` lists only the `src/`, `workers/` and `tests/` directories.
+- **Vitest:** `include` is limited to the `src/` and `tests/` directories, and the default `**/*.test.ts` search is not used.
+- **Playwright:** `testDir` is `tests/e2e`.
+- **ESLint:** a global `ignores: ['ext/**']` in the flat config.
+- **Prettier:** `ext/` is added to `.prettierignore`. Prettier also honours `.gitignore`, but the separate entry makes the exclusion visible.
+- **Vite:** `optimizeDeps.entries: ['index.html']`, because otherwise Vite scans dependencies from every HTML file in the project, including `ext/q3edit/index.html`. In addition, `server.watch.ignored` contains `**/ext/**`, so that the dev server does not watch thousands of reference files.
+- **pnpm:** `pnpm-workspace.yaml` contains only settings and no `packages` list, so the `package.json` files in `ext/` do not become workspace packages.
 
-## Avoimet teknologiapäätökset
+## Open technology decisions
 
-- [ ] **TS 7 ja typescript-eslint:** kuinka TS 6 asennetaan rinnalle (alias tai `packageExtensions`). Päätetään projektipohjaa luotaessa.
+- [ ] **TS 7 and typescript-eslint:** how TS 6 is installed alongside it (an alias or `packageExtensions`). Decided when the project scaffold is created.

@@ -1,6 +1,6 @@
 @import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap");
 
-/* Q2 Web Editor UI — component styles. Every value comes from tokens.css. */
+/* Joole UI — component styles. Every value comes from tokens.css. */
 html, body { margin: 0; background: var(--surface-0); color: var(--ink); }
 body { font: 400 12px/16px var(--font-ui); -webkit-font-smoothing: antialiased; padding: var(--space-lg); }
 .q2-mono { font-family: var(--font-mono); }

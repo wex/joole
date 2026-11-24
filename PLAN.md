@@ -4,11 +4,9 @@ This plan breaks the work of building Joole, from an empty repository to v1.0, i
 
 Status: draft, 24.11.2026. The normative sources are [docs/00-spec.md](docs/00-spec.md) (what to build), [docs/10-stack.md](docs/10-stack.md) (which technologies to use) and [AGENTS.md](AGENTS.md) (how to work). This plan only sets the order and the slicing of the work. If the plan and the spec disagree, the spec wins, and the plan is corrected in the same change.
 
-> This file is written in English by request. All other project documentation is in Finnish (see AGENTS.md).
-
 ## How to use this plan
 
-- **Phases** follow the spec's five implementation phases (*Toteutusvaiheet*). Phase 0 is an extra foundation phase that must be finished before phase 1 starts. A phase is closed only when its **gate**, which is the spec's *Valmis, kun* criterion, has been verified and checked off here.
+- **Phases** follow the spec's five implementation phases (*Implementation phases and decisions*). Phase 0 is an extra foundation phase that must be finished before phase 1 starts. A phase is closed only when its **gate**, which is the spec's *Done when* criterion, has been verified and checked off here.
 - **Work packages** (WP) have IDs of the form `P<phase>.<n>`. A WP is normally one to three pull requests. Each WP lists:
   - *Goal*
   - *Scope*: modules and files
@@ -75,7 +73,7 @@ Goal: a repository in which every later WP can follow the normal workflow (write
 - **Scope:**
   - `package.json` with `type: module`, `engines.node >=26`, `packageManager: pnpm@12.x` and `license: GPL-2.0-or-later`.
   - `pnpm-workspace.yaml` containing settings only: `minimumReleaseAge: 10080` and no `packages`.
-  - Runtime dependencies: `solid-js@2`, `@solidjs/web@2` and `nanoid@6`.
+  - Runtime dependencies: `solid-js@2`, `@solidjs/web@2`, `nanoid@6` and `lucide-static@1`.
   - Dev dependencies: `vite@8`, `@solidjs/vite-plugin@3`, `typescript@7`, `vitest@5`, `@vitest/coverage-v8@5`, `fast-check@4`, `@playwright/test@1`, `eslint@10`, `typescript-eslint@8`, `eslint-plugin-import-x@4`, `eslint-import-resolver-typescript@4`, `eslint-plugin-solid`, `eslint-config-prettier`, `prettier@3`, `@types/node`, and `vite-plugin-pwa@2`, which is installed now but configured in P5.4.
   - `index.html`, a placeholder `src/main.ts`, and the empty layer directories with `index.ts` barrels.
   - Install everything with `pnpm add`. Every version must be at least 7 days old.
@@ -168,7 +166,7 @@ Goal: a repository in which every later WP can follow the normal workflow (write
 ### [ ] P0.9 Documentation sync
 
 - **Goal:** make the documents describe reality rather than the target state.
-- **Scope:** AGENTS.md (*Projektin tila*, the command table, actual file names), the stack (the TS 6 mechanism), and this plan's status.
+- **Scope:** AGENTS.md (*Project status*, the command table, actual file names), the stack (the TS 6 mechanism), and this plan's status.
 - **Depends on:** P0.1 to P0.7
 - **Done when:** every command listed in AGENTS.md exists in `package.json`, or is marked with the phase that adds it.
 
@@ -190,7 +188,7 @@ Goal: read Q2 game data and `.map` files without loss, and show the map in four 
   - A `Result<T, E>` type for operations that can fail.
 - **Tests:** none needed beyond type checks. ESLint ensures that `core/types` contains no runtime code (`import type` only).
 - **Depends on:** Gate 0
-- **Done when:** the types match the spec's *Tietomalli* section exactly.
+- **Done when:** the types match the spec's *Data model* section exactly.
 
 ### [ ] P1.2 Geometry basics (`core/geom`)
 
@@ -256,7 +254,7 @@ Goal: read Q2 game data and `.map` files without loss, and show the map in four 
 
 ### [ ] P1.6 Integer plane points for export (`core/geom`)
 
-- **Goal:** implement the spec's *Kokonaislukupisteet* rule.
+- **Goal:** implement the spec's *Integer plane points* rule.
 - **Scope:** for a face whose points are not integers, compute three integer points that define the plane closest to the original. Approach:
   1. Round the face polygon's vertices to integers.
   2. Pick the non-collinear triple whose plane deviates least from the original.
@@ -338,7 +336,9 @@ Goal: read Q2 game data and `.map` files without loss, and show the map in four 
 - **Goal:** build the application frame around the renderer.
 - **Scope:**
   - A Solid app shell laid out with CSS Grid: the 2×2 views, a right-hand properties panel and a bottom log panel, with resizable splitters and view maximise. It implements the design system's `Workspace`, `ViewportPane`, `Toolbar` and `PanelTabs`. Styles use CSS Modules that read only `tokens.css` variables. The dark theme is the primary one and the light theme the secondary one.
-  - Fonts (IBM Plex Sans and Mono) are self-hosted under `public/fonts/`. The design system currently loads them from Google Fonts, but that conflicts with the no-external-requests rule and with COEP.
+  - Fonts (IBM Plex Sans and Mono) are self-hosted under `public/fonts/` (the design system's previews load them from Google Fonts, the app never does).
+  - Icons from `lucide-static`, imported per icon as SVG strings, plus the custom CSG Subtract, Hollow and Clip icons in `src/ui/icons/`.
+  - F1–F4 maximise a view (3D, Top, Front, Side), and the same key restores the grid.
   - File menu: open game folder, open map.
   - The log panel.
   - 2D cameras: pan and zoom around the cursor.
@@ -425,7 +425,7 @@ Goal: editing through commands with unlimited undo, project files and autosave, 
 - **Scope:**
   - A tool interface in `app`: neutral pointer and key events in world coordinates plus modifiers in, commands and preview state out.
   - A keyboard shortcut map (S, B, E, C, V, F, T and grid keys) that respects fly mode.
-  - The viewport `ContextMenu` from the design system.
+  - The viewport `ContextMenu` from the design system, starting with Add Brush. The Add Entity and Apply Entity entries arrive in P4.4.
   - The Select tool: click, Shift to add, box select, drag to move, handles to scale, Ctrl+drag to rotate.
   - `ui` views convert DOM events into tool events.
 - **Tests:**
@@ -493,7 +493,7 @@ Goal: editing through commands with unlimited undo, project files and autosave, 
   - In `tools/qbsp3/`, a copy of the needed files from `ext/Quake-2-Tools` (`bsp/qbsp3/*`, `common/*`), each with a provenance header.
   - A Makefile for `emcc` with the q3edit-style flags (`MODULARIZE`, `FORCE_FILESYSTEM`, `INVOKE_RUN=0`, `EXIT_RUNTIME=0`, memory growth, exported `FS` and `callMain`) and `ENVIRONMENT=node,web,worker`.
   - Documented patches, recorded in `tools/README.md`:
-    1. plane points read with `atof` (spec, *Kokonaislukupisteet*)
+    1. plane points read with `atof` (spec, *Integer plane points*)
     2. anything needed for Emscripten (`threads.c`, file IO)
   - Facts from the code that shape the build:
     - qbsp3 forces `numthreads = 1`, so no threads are needed here.
@@ -563,7 +563,7 @@ Goal: Qoole-level geometry operations, and textures that look exactly the same i
 - **Scope:**
   - Handles for vertices, edges and faces. V switches between vertex and edge mode, and F selects face mode.
   - Dragging a handle recomputes the planes of the touching faces. Non-planar faces are split into triangles (after Qoole's `BreakPlanes`).
-  - A convexity check rejects the edit and shows it in red.
+  - A convexity check rejects the edit and shows it as a dashed `vp-invalid` line.
   - Dragging snaps to the grid.
 - **Tests:**
   - fast-check property: an accepted edit always gives a valid convex brush
@@ -607,7 +607,7 @@ Goal: Qoole-level geometry operations, and textures that look exactly the same i
 ### [ ] P3.10 Surface and content flags panel (`ui`, `app`)
 
 - **Goal:** edit each face's flags, contents and value.
-- **Scope:** checkboxes from the `game/q2` constants, an indicator when a value differs from the `.wal` default, and edits that set `attribsInFile` where needed.
+- **Scope:** checkboxes from the `game/q2` constants, an indicator when a value differs from the `.wal` default, and edits that set `attribsInFile` where needed. The properties panel also shows the selection's texture with the design system's `ObjectPreview` (one texture, or "Multiple textures").
 - **Tests:** unit tests on the panel logic in `app`, and an E2E test.
 - **Depends on:** P3.8
 - **Done when:** changes appear in the exported `.map` and the compiled `.bsp`.
@@ -662,7 +662,8 @@ Goal: everything needed to build a complete playable single-player level.
 - **Scope:**
   - Clicking places a point entity of the chosen class.
   - Choosing a brush class (`func_*`, `trigger_*`) turns the selected brushes into that entity.
-  - Entity boxes are drawn in the definition's colour, with `angle` arrows.
+  - Entity boxes are drawn in the definition's colour (or `vp-entity`), with `angle` arrows.
+  - The context menu's Add Entity and Apply Entity → category → class entries.
 - **Tests:** tool event-script tests and screenshot tests.
 - **Depends on:** P4.2, P2.5
 - **Done when:** entities can be placed and converted.
@@ -670,7 +671,7 @@ Goal: everything needed to build a complete playable single-player level.
 ### [ ] P4.5 Entity panel
 
 - **Goal:** a form generated from the definitions.
-- **Scope:** implements the design system's `EntityProperties`. Spawnflag checkboxes, a `_color` picker, an `angle` compass, `target` and `targetname` drop-downs filled from the names in the map, and a raw key–value table for unknown keys. `target` links are drawn as lines in the 2D views.
+- **Scope:** implements the design system's `EntityProperties`. A class picker (category, then class), spawnflag checkboxes, a `_color` picker, an `angle` compass, `target` and `targetname` drop-downs filled from the names in the map, and a raw key–value table for unknown keys. `target` links are drawn as lines in the 2D views.
 - **Tests:** unit tests on the panel logic in `app`, and an E2E test.
 - **Depends on:** P4.4
 - **Done when:** the spec's panel features exist.
@@ -706,7 +707,7 @@ Goal: everything needed to build a complete playable single-player level.
 ### [ ] P4.9 md2 preview
 
 - **Goal:** show models for point entities.
-- **Scope:** uses the design system's `ObjectPreview` where a preview panel is shown. An md2 parser (`IDP2`, version 8, frame 0) in `core/formats`, models loaded through the virtual filesystem, and a wireframe drawing. Classes without a model fall back to their box.
+- **Scope:** an md2 parser (`IDP2`, version 8, frame 0) in `core/formats`, models loaded through the virtual filesystem, and a wireframe drawing. Classes without a model fall back to their box.
 - **Tests:** a parser unit test on a synthetic md2, and a screenshot test.
 - **Depends on:** P4.2, P1.8
 - **Done when:** vanilla monsters and items show their models.
@@ -748,7 +749,7 @@ Goal: the full compile cycle in the browser, plus the performance targets, brows
 ### [ ] P5.3 Leak display
 
 - **Goal:** make leaks easy to find and fix.
-- **Scope:** a `.pts` parser, the leak path drawn in all views, and a *Next leak point* command that moves the camera along the path.
+- **Scope:** a `.pts` parser, the leak path drawn in all views in `vp-leak`, and a *Next leak point* command (N) that moves the camera along the path.
 - **Tests:** a parser unit test, and an E2E test with a leaking fixture.
 - **Depends on:** P5.2
 - **Done when:** a leak found by qbsp3 is displayed automatically.
@@ -803,7 +804,7 @@ Goal: the full compile cycle in the browser, plus the performance targets, brows
 
 These run through every phase. They are not WPs of their own, but they are part of every WP's Definition of Done.
 
-- **Documentation:** the spec, stack, AGENTS.md and this plan are updated in the same change as the code they describe. Decisions get a date in the spec's *Päätökset* list.
+- **Documentation:** the spec, stack, AGENTS.md and this plan are updated in the same change as the code they describe. Decisions get a date in the spec's *Decisions* list.
 - **Licensing and provenance:** borrowed code (from Qoole, q2pro, Quake-2, Quake-2-Tools or q3edit) gets a header naming its origin, plus an entry in `THIRD_PARTY_NOTICES.md`. Only licences that are compatible with GPL-2.0-or-later are allowed.
 - **Dependencies:** new dependencies need a justification and an entry in the stack, and must be at least 7 days old. `minimumReleaseAge` is never bypassed.
 - **Test data:** only self-made or synthetic fixtures are committed. id game data is used only through `JOOLE_Q2_DIR`.
@@ -830,8 +831,6 @@ These run through every phase. They are not WPs of their own, but they are part 
 
 | Item | Source | Resolved in |
 | --- | --- | --- |
-| How TS 6 is installed next to TS 7 for typescript-eslint | Stack, *Avoimet teknologiapäätökset* | P0.3 |
-| How undo history memory is estimated | Spec, *Tarkennetaan myöhemmin* | P2.1 |
-| Creating the remote repository and the Cloudflare account (owner actions) | Stack, *Isännöinti ja CI* | P0.1, P0.8 |
-| The design system shows rejected moves as a dashed orange `vp-invalid` line, but the spec says red | `docs/design-system/README.md` | Before P3.6: update the spec or the design system |
-| The design system names the product "Q2 Web Editor", while the spec names it Joole | `docs/design-system/README.md`, `manifest.json` | Before P1.11 |
+| How TS 6 is installed next to TS 7 for typescript-eslint | Stack, *Open technology decisions* | P0.3 |
+| How undo history memory is estimated | Spec, *To be refined later* | P2.1 |
+| Creating the remote repository and the Cloudflare account (owner actions) | Stack, *Hosting and CI* | P0.1, P0.8 |

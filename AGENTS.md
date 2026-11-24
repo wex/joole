@@ -1,190 +1,191 @@
 # AGENTS.md – Joole
 
-Joole on selaimessa toimiva brush-pohjainen Quake 2 -karttaeditori (TypeScript, WebGL2, Solid 2). Toiminnallinen esikuva on Qoole 99. Lisenssi on GNU GPL v2.0 tai myöhempi (`GPL-2.0-or-later`).
+Joole is a browser-based, brush-based Quake 2 map editor (TypeScript, WebGL2, Solid 2). Its functional model is Qoole 99. The licence is GNU GPL v2.0 or later (`GPL-2.0-or-later`).
 
-Tämä tiedosto on ohje sekä ihmiskehittäjille että koodausagenteille: mistä tieto löytyy, miten kehitys etenee ja mitä sääntöjä noudatetaan.
+This file is a guide for both human developers and coding agents: where information is found, how development proceeds and which rules apply.
 
-## Dokumentaatio
+## Documentation
 
-| Tiedosto | Sisältö | Milloin päivitetään |
+| File | Contents | When to update |
 | --- | --- | --- |
-| [docs/00-spec.md](docs/00-spec.md) | Tekninen määrittely: tavoitteet, rajaus, arkkitehtuuri, tietomalli, formaatit, algoritmit, toteutusvaiheet, päätökset | Kun toiminnallisuus, rajaus tai arkkitehtuuri muuttuu tai kun "tarkistetaan ennen toteutusta" -kohta on tarkistettu |
-| [docs/10-stack.md](docs/10-stack.md) | Teknologiat, pääversiot, käyttötarkoitukset ja rajoitukset | Kun riippuvuus lisätään, poistetaan tai sen pääversio vaihtuu, tai kun teknologiapäätös tehdään |
-| [docs/20-sources.md](docs/20-sources.md) | Ulkoiset lähdeprojektit, niiden käyttötarkoitus ja paikalliset kopiot `ext/`-hakemistossa | Kun uusi lähde otetaan käyttöön (kloonataan myös `ext/`-hakemistoon) |
-| [PLAN.md](PLAN.md) | Toteutussuunnitelma: vaiheet 0–5, työpaketit (`P<vaihe>.<n>`), riippuvuudet, portit ja riskit (englanniksi) | Kun työpaketti valmistuu (valintaruutu), kun järjestys tai jako muuttuu, tai kun määrittely muuttuu |
-| `AGENTS.md` | Kehitysprosessi, komennot ja käytännöt | Kun komento, prosessi tai käytäntö muuttuu |
+| [docs/00-spec.md](docs/00-spec.md) | Technical specification: goals, scope, architecture, data model, formats, algorithms, implementation phases, decisions | When functionality, scope or architecture changes, or when a detail is verified against the source code |
+| [docs/10-stack.md](docs/10-stack.md) | Technologies, major versions, purposes and constraints | When a dependency is added or removed or its major version changes, or when a technology decision is made |
+| [docs/20-sources.md](docs/20-sources.md) | External source projects, what they are used for, and their local copies in the `ext/` directory | When a new source is adopted (it is also cloned into `ext/`) |
+| [docs/design-system/](docs/design-system/README.md) | UI design system: tokens, components, the UI's language and voice | When UI conventions, tokens or components change |
+| [PLAN.md](PLAN.md) | Implementation plan: phases 0–5, work packages (`P<phase>.<n>`), dependencies, gates and risks | When a work package is finished (checkbox), when the order or breakdown changes, or when the spec changes |
+| `AGENTS.md` | Development process, commands and practices | When a command, process or practice changes |
 
-**Säännöt:**
+**Rules:**
 
-- **Määrittely on normatiivinen.** Jos toteutus poikkeaa määrittelystä, määrittely päivitetään samassa muutoksessa, tai muutos jätetään tekemättä ja asiasta kysytään. Koodia ei kirjoiteta määrittelyn vastaisesti.
-- **Tieto on yhdessä paikassa.** Teknologiat ja versiot ovat vain tiedostossa `10-stack.md`, ja määrittely viittaa sinne. Toiminnalliset vaatimukset ovat vain määrittelyssä.
-- **Päätökset kirjataan** määrittelyn kohtaan *Päätökset pp.kk.vvvv* päivämäärän kanssa. Avoimet asiat ovat `- [ ]`-tehtävinä *Tarkennetaan myöhemmin* -listassa (määrittely) tai *Avoimet teknologiapäätökset* -listassa (stack). Ratkaistu kohta merkitään tehdyksi tai siirretään päätöksiin.
-- **Numerointi:** `docs/`-tiedostot numeroidaan kymmenin (`00`, `10`, `20` …). Uusi dokumentti saa seuraavan vapaan numeron, esim. `30-testdata.md`.
-- **Kaaviot** kirjoitetaan Mermaid-muodossa (` ```mermaid `), jotta ne näkyvät GitHubissa ja ovat luettavissa tekstinä. Upotettuja kuvia tai ulkoisia kaaviotyökaluja ei käytetä.
-- **Kieli:** dokumentaatio kirjoitetaan suomeksi. Poikkeus: `PLAN.md` on omistajan pyynnöstä englanniksi. Koodin tunnisteet, koodikommentit ja commit-viestit kirjoitetaan englanniksi. Tiedostonimet, tunnisteet ja komennot merkitään dokumenteissa `koodina`.
+- **The spec is normative.** If the implementation deviates from the spec, the spec is updated in the same change, or the change is not made and the question is raised. Code is not written against the spec.
+- **Information lives in one place.** Technologies and versions are only in `10-stack.md`, and the spec refers there. Functional requirements are only in the spec.
+- **Decisions are recorded** in the spec's *Decisions dd.mm.yyyy* section with a date. Open items are `- [ ]` tasks in the *To be refined later* list (spec) or the *Open technology decisions* list (stack). A resolved item is ticked off or moved to the decisions.
+- **Numbering:** `docs/` files are numbered in tens (`00`, `10`, `20` …). A new document gets the next free number, for example `30-testdata.md`.
+- **Diagrams** are written in Mermaid (` ```mermaid `), so they render on GitHub and are readable as text. Embedded images and external diagram tools are not used.
+- **Language:** all documentation is written in English, as are code identifiers, code comments and commit messages. File names, identifiers and commands are marked as `code` in documents.
 
-## Projektin tila
+## Project status
 
-Repossa on toistaiseksi vain dokumentaatio. Toteutus etenee [PLAN.md](PLAN.md):n mukaan, ja ensimmäinen vaihe on vaihe 0 (*Foundations*: etärepo, `package.json`, `tsconfig`-projektit, Vite, ESLint, Prettier, Vitest, Playwright ja CI). Alla olevat komennot ja hakemistot kuvaavat tavoitetilaa. Kun projektipohja on tehty (P0.9), tämä osio päivitetään vastaamaan todellista tilaa.
+So far the repository contains only documentation. The implementation follows [PLAN.md](PLAN.md), and the first phase is phase 0 (*Foundations*: remote repository, `package.json`, `tsconfig` projects, Vite, ESLint, Prettier, Vitest, Playwright and CI). The commands and directories below describe the target state. Once the project scaffold is done (P0.9), this section is updated to reflect the actual state.
 
-## Hakemistorakenne ja kerrossäännöt
+## Directory structure and layer rules
 
-Kerrosarkkitehtuuri, kaavio ja riippuvuussäännöt ovat määrittelyn kohdassa *Arkkitehtuuri* (*Kerrosjärjestys ja riippuvuussäännöt*). ESLint-konfiguraatio on stackin kohdassa *Koodin laatu*. Alla on tiivistelmä.
+The layered architecture, its diagram and the dependency rules are in the spec's *Architecture* section (*Layer order and dependency rules*). The ESLint configuration is in the stack's *Code quality* section. A summary follows.
 
 ```text
-docs/             määrittely, stack, lähteet
-ext/              lähdeprojektien Git-kloonit, vain luettavaksi (ei koskaan Gitiin)
+docs/             specification, stack, sources, design system
+ext/              Git clones of the source projects, read-only (never in Git)
 src/
-  main.ts         käynnistys: ainoa tiedosto, joka saa tuoda kaikkia kerroksia
-  core/types/     tietomallin jaetut tyypit (vain tyyppejä)
-  core/geom/      tasot, windingit, CSG, poiminta, BVH
-  core/doc/       dokumenttimalli, komennot, patchit
-  core/formats/   map, pak, pkz, wal, pcx, md2, def, pts, projekti (.joole.json)
-  game/q2/        Q2-vakiot ja -oletukset, generoitu q2.def, md2-taulukko
-  app/            CommandBus ja undo, valinta ja scope, asetukset, työkalujen logiikka
-  render/         WebGL2, varjostimet, näkymien piirto
-  platform/       tiedostot, OPFS, IndexedDB, worker-asiakkaat
-  ui/             Solid-paneelit, näkymien syöte ja kamerat
-workers/          tekstuurimuunnos, qbsp3/qvis3/qrad3.wasm (commitoidut buildit)
-tools/            Q2-kääntäjien C-lähdekoodi, Emscripten-build ja muutoslista (README)
-tests/            E2E-testit (Playwright) ja testiaineisto
+  main.ts         start-up: the only file that may import every layer
+  core/types/     shared data model types (types only)
+  core/geom/      planes, windings, CSG, picking, BVH
+  core/doc/       document model, commands, patches
+  core/formats/   map, pak, pkz, wal, pcx, md2, def, pts, project (.joole.json)
+  game/q2/        Q2 constants and defaults, generated q2.def, md2 table
+  app/            CommandBus and undo, selection and scope, settings, tool logic
+  render/         WebGL2, shaders, view drawing
+  platform/       files, OPFS, IndexedDB, worker clients
+  ui/             Solid panels, view input and cameras
+workers/          texture conversion, qbsp3/qvis3/qrad3.wasm (committed builds)
+tools/            C source of the Q2 compilers, Emscripten build and change log (README)
+tests/            E2E tests (Playwright) and test data
 ```
 
-Yksikkötestit sijoitetaan testattavan tiedoston viereen (`foo.ts` → `foo.test.ts`).
+Unit tests are placed next to the file they test (`foo.ts` → `foo.test.ts`).
 
-**Riippuvuusjärjestys** ylhäältä alas: **UI (`ui/`) → sovellus (`app/`) → alusta (`render/`, `platform/`, `workers/`) → ydin (`core/`)**. `game/q2/` on ytimen ja muiden kerrosten välissä. Kerros saa tuoda vain alempia kerroksia ja ydintä.
+**Dependency order** from top to bottom: **UI (`ui/`) → application (`app/`) → platform (`render/`, `platform/`, `workers/`) → core (`core/`)**. `game/q2/` sits between the core and the other layers. A layer may import only lower layers and the core.
 
-**Ehdottomat säännöt** (valvotaan `import-x/no-restricted-paths`-säännöllä ja tsconfig-projekteilla):
+**Hard rules** (enforced with the `import-x/no-restricted-paths` rule and the tsconfig projects):
 
-1. `core/` ei tuo muita `src/`-kerroksia eikä käytä DOM-, WebGL- tai Node-rajapintoja. Ulkoisista paketeista se käyttää vain nanoidia. Se ajetaan sellaisenaan Nodessa.
-2. Ytimen sisäinen järjestys on `core/types` ← `core/geom` ← `core/doc` ← `core/formats`. `core/types` sisältää vain tyyppejä, ja sitä tuodaan `import type` -muodossa.
-3. `game/q2/` saa tuoda vain `core/`:ta, eikä ydin tuo `game/q2/`:ta. Pelikohtaiset vakiot (paletti, liput, polut, oletustekstuuri, käännösprofiilit) ovat vain siellä.
-4. Alusta (`render/`, `platform/`, `workers/`) ei tuo `app/`- eikä `ui/`-hakemistoa. `render/` saa tuoda `platform/`-hakemistoa, mutta ei päinvastoin.
-5. `workers/` saa tuoda vain `core/`- ja `game/q2/`-moduuleja. Muut kerrokset eivät tuo worker-koodia, vaan kommunikoivat workerin kanssa viesteillä `platform/`-hakemiston worker-asiakkaiden kautta.
-6. `app/` ei tuo `ui/`-hakemistoa. Kerroksen sisällä tuonnit ovat vapaita.
-7. Dokumenttia muutetaan vain `CommandBus`-väylän kautta. UI, renderöijä ja alusta eivät koskaan muuta `MapDocument`ia suoraan.
-8. Renderöijän rajapinta ottaa vastaan vain ytimen tyyppejä (`MapDocument`, `Patch`, kamera). `src/main.ts` kytkee sen sovelluksen muutosilmoitusten tilaajaksi.
-9. Työkalujen tilakone ja logiikka (mitä komentoa syöte tuottaa) ovat `app/`:ssa. `ui/`:n näkymät muuntavat syötteen maailmakoordinaateiksi, hoitavat kamerat ja välittävät tapahtumat työkalulle.
-10. `solid-js` ja `@solidjs/*` ovat käytössä vain `ui/`:ssa.
+1. `core/` does not import other `src/` layers and does not use DOM, WebGL or Node APIs. Of external packages, it uses only nanoid. It runs as is in Node.
+2. The core's internal order is `core/types` ← `core/geom` ← `core/doc` ← `core/formats`. `core/types` contains only types and is imported with `import type`.
+3. `game/q2/` may import only `core/`, and the core does not import `game/q2/`. Game-specific constants (palette, flags, paths, default texture, compile profiles) live only there.
+4. The platform (`render/`, `platform/`, `workers/`) does not import `app/` or `ui/`. `render/` may import `platform/`, but not the other way round.
+5. `workers/` may import only `core/` and `game/q2/` modules. Other layers do not import worker code. They talk to workers with messages through the worker clients in `platform/`.
+6. `app/` does not import `ui/`. Imports within a layer are free.
+7. The document is changed only through the `CommandBus`. The UI, renderer and platform never change the `MapDocument` directly.
+8. The renderer's interface accepts only core types (`MapDocument`, `Patch`, camera). `src/main.ts` subscribes it to the application's change notifications.
+9. The tools' state machine and logic (which command an input produces) live in `app/`. The `ui/` views convert input into world coordinates, handle the cameras and pass the events to the tool.
+10. `solid-js` and `@solidjs/*` are used only in `ui/`.
 
-Jos muutos vaatii uuden riippuvuussuunnan, määrittelyn sääntötaulukko, Mermaid-kaavio ja ESLint-vyöhykkeet päivitetään samassa muutoksessa. Sääntöä ei kierretä `eslint-disable`-kommentilla.
+If a change requires a new dependency direction, the spec's rule table, the Mermaid diagram and the ESLint zones are updated in the same change. Rules are not bypassed with an `eslint-disable` comment.
 
-## Kehitysympäristö
+## Development environment
 
-- **Node.js 26 LTS** (`.nvmrc`) ja **pnpm 12** (`packageManager`-kenttä). Corepack ei sisälly Node 26:een, joten pnpm asennetaan erikseen.
-- **Chromium-pohjainen selain** (Chrome tai Edge) kehitykseen, koska File System Access API toimii vain niissä. Firefox- ja Safari-polut testataan erikseen.
-- **emsdk** (tai Docker ja `emscripten/emsdk`-kuva) tarvitaan vain, kun Q2-kääntäjiä (`tools/`) muutetaan. Valmiit `.wasm`-tiedostot ovat repossa.
-- **Lähdeprojektit:** kloonaa `docs/20-sources.md`:ssä listatut repot hakemistoon `ext/` (komennot ovat siinä tiedostossa). Niitä tarvitaan lähdekoodin lukemiseen, mutta ei buildiin eikä testeihin.
-- **`JOOLE_Q2_DIR`:** paikallisen Q2-asennuksen polku (hakemisto, jossa on `baseq2/`) pelidataa käyttäviä testejä varten.
-- **Q2-pelidata:** testaamiseen tarvitaan oma laillinen Quake 2 -asennus (`baseq2/pak0.pak`). Pelidata ei ole GPL-lisensoitua, eikä sitä koskaan lisätä repoon (ks. testiaineisto).
+- **Node.js 26 LTS** (`.nvmrc`) and **pnpm 12** (the `packageManager` field). Corepack is not bundled with Node 26, so pnpm is installed separately.
+- **A Chromium-based browser** (Chrome or Edge) for development, because the File System Access API works only there. The Firefox and Safari paths are tested separately.
+- **emsdk** (or Docker and the `emscripten/emsdk` image) is needed only when the Q2 compilers (`tools/`) are changed. The finished `.wasm` files are in the repository.
+- **Source projects:** clone the repositories listed in `docs/20-sources.md` into `ext/` (the commands are in that file). They are needed for reading source code, but not for the build or tests.
+- **`JOOLE_Q2_DIR`:** the path of a local Q2 installation (the directory containing `baseq2/`) for tests that use game data.
+- **Q2 game data:** testing requires your own legal Quake 2 installation (`baseq2/pak0.pak`). The game data is not GPL-licensed, and it is never added to the repository (see Test data).
 
-## Komennot (tavoitetila)
+## Commands (target state)
 
-| Komento | Tarkoitus |
+| Command | Purpose |
 | --- | --- |
-| `pnpm install` | Riippuvuuksien asennus (`--frozen-lockfile` CI:ssä) |
-| `pnpm dev` | Viten kehityspalvelin COOP/COEP-otsakkeilla |
-| `pnpm build` | Tuotantobuild hakemistoon `dist/` |
-| `pnpm preview` | Tuotantobuildin paikallinen ajo |
-| `pnpm typecheck` | `tsc -b --noEmit` TypeScript 7:llä, kaikki tsconfig-projektit |
-| `pnpm lint` / `pnpm lint:fix` | ESLint, mukaan lukien kerrosrajat |
+| `pnpm install` | Install dependencies (`--frozen-lockfile` in CI) |
+| `pnpm dev` | Vite dev server with the COOP/COEP headers |
+| `pnpm build` | Production build into `dist/` |
+| `pnpm preview` | Run the production build locally |
+| `pnpm typecheck` | `tsc -b --noEmit` with TypeScript 7, all tsconfig projects |
+| `pnpm lint` / `pnpm lint:fix` | ESLint, including the layer boundaries |
 | `pnpm format` / `pnpm format:check` | Prettier |
-| `pnpm test` | Vitest kerran ajettuna |
-| `pnpm test:watch` | Vitest seurantatilassa |
-| `pnpm test:coverage` | Kattavuus, `core/`-raja ≥ 90 % |
-| `pnpm bench` | Vitest-benchmarkit |
-| `pnpm e2e` | Playwright-testit, myös kuvavertailu |
-| `pnpm build:tools` | qbsp3, qvis3 ja qrad3 WebAssemblyksi `workers/`-hakemistoon (vaatii emsdk:n tai Dockerin) |
-| `pnpm gen:entities` | Generoi `game/q2/q2.def`-tiedoston ja md2-taulukon pelikoodista (lukee `ext/Quake-2/game/`) |
-| `pnpm check` | Kaikki tarkistukset ennen committia: format:check, lint, typecheck, test, build |
+| `pnpm test` | Vitest, single run |
+| `pnpm test:watch` | Vitest in watch mode |
+| `pnpm test:coverage` | Coverage, `core/` threshold ≥ 90 % |
+| `pnpm bench` | Vitest benchmarks |
+| `pnpm e2e` | Playwright tests, including screenshot comparison |
+| `pnpm build:tools` | qbsp3, qvis3 and qrad3 to WebAssembly into `workers/` (requires emsdk or Docker) |
+| `pnpm gen:entities` | Generates `game/q2/q2.def` and the md2 table from the game code (reads `ext/Quake-2/game/`) |
+| `pnpm check` | All checks before a commit: format:check, lint, typecheck, test, build |
 
-Kun komento lisätään `package.json`:iin tai sen nimi muuttuu, taulukko päivitetään samassa muutoksessa.
+When a command is added to `package.json` or renamed, this table is updated in the same change.
 
-## Kehitystyön kulku
+## Development workflow
 
-Toteutus etenee määrittelyn viiden vaiheen järjestyksessä. Seuraava vaihe aloitetaan vasta, kun edellisen *Valmis, kun* -kriteeri täyttyy. Myöhempien vaiheiden ominaisuuksia ei toteuteta etuajassa, mutta rakenne ei saa estää niitä.
+The implementation follows the spec's five phases in order. The next phase starts only when the previous phase's *Done when* criterion is met. Features from later phases are not implemented early, but the structure must not prevent them.
 
-Yksittäinen muutos tehdään näin:
+A single change is made like this:
 
-1. **Lue määrittelyn osio**, jota muutos koskee, ja tarkista `PLAN.md`:stä, mihin työpakettiin se kuuluu ja ovatko sen riippuvuudet valmiita. Jos määrittely on epäselvä tai ristiriitainen, kysy ennen toteutusta.
-2. **Tarkista lähteet.** Algoritmeissa ja editorin käytöksessä esikuvana on Qoole. Formaateissa ja vakioissa totuuden lähteenä ovat id:n alkuperäinen moottori (`ext/Quake-2`) ja Quake-2-Tools (`common/qfiles.h`). Laajennuksissa (`.pkz`, pakettien hakusäännöt) lähteenä on q2pro. Selainratkaisuissa mallina on q3edit. Koodi luetaan paikallisesta kopiosta `ext/<repo>/`, ja tiedostokohtaiset viitteet ovat stackin kohdassa *Lähdeprojektien rooli*. Editorin perustoimintoihin (entiteettimääritykset, CSG, `.map`) kannattaa katsoa myös id:n omaa editoria `ext/Quake-2-Tools/qe4/`. Määrittelyn "tarkistetaan ennen toteutusta" -kohdat (esim. kääntäjien versio ja lisenssi) tarkistetaan lähdekoodista, ja tulos kirjataan määrittelyyn.
-3. **Kirjoita testi ensin** aina, kun muutos koskee `core/`- tai `app/`-koodia: yksikkötesti, fast-check-ominaisuus tai kierrostesti. Bugikorjaukseen kuuluu testi, joka epäonnistuu ennen korjausta.
-4. **Toteuta** noudattaen kerrossääntöjä ja koodauskäytäntöjä.
-5. **Aja `pnpm check`.** Renderöintiä tai UI:ta koskevissa muutoksissa aja myös `pnpm e2e`. Suorituskykykriittisissä muutoksissa (geometria, renderöinnin välimuisti, jäsentäjät) aja `pnpm bench` ja vertaa määrittelyn suorituskykytaulukkoon.
-6. **Päivitä dokumentaatio** samassa muutoksessa: määrittely, stack, `PLAN.md` (työpaketin tila) ja tämä tiedosto tarpeen mukaan.
-7. **Commitoi** pieninä, yhden asian kokonaisuuksina (ks. Git).
+1. **Read the spec section** the change concerns, and check in `PLAN.md` which work package it belongs to and whether its dependencies are done. If the spec is unclear or contradictory, ask before implementing.
+2. **Check the sources.** For algorithms and editor behaviour, the model is Qoole. For formats and constants, the source of truth is id's original engine (`ext/Quake-2`) and Quake-2-Tools (`common/qfiles.h`). For extensions (`.pkz`, package search rules), the source is q2pro. For browser solutions, the template is q3edit. Code is read from the local copy in `ext/<repo>/`, and the file-level references are in the stack's *Role of the source projects* section. For the editor's basic features (entity definitions, CSG, `.map`), id's own editor in `ext/Quake-2-Tools/qe4/` is also worth checking. When the spec relies on a detail of the original code (a constant, a file format, an order of operations), verify it from the source code and record the result with a date in the spec.
+3. **Write the test first** whenever the change concerns `core/` or `app/` code: a unit test, a fast-check property or a round-trip test. A bug fix comes with a test that fails before the fix.
+4. **Implement** following the layer rules and the coding practices.
+5. **Run `pnpm check`.** For changes to rendering or the UI, also run `pnpm e2e`. For performance-critical changes (geometry, render cache, parsers), run `pnpm bench` and compare against the spec's performance table.
+6. **Update the documentation** in the same change: the spec, the stack, `PLAN.md` (the work package's status) and this file as needed.
+7. **Commit** in small, single-purpose units (see Git).
 
-## Koodauskäytännöt
+## Coding practices
 
-**Yleiset:**
+**General:**
 
-- TypeScriptin `strict`-tila. Ei `any`-tyyppiä eikä `@ts-ignore`-kommenttia ilman perustelukommenttia. Mieluummin `@ts-expect-error` perustelun kanssa.
-- Tunnisteet, kommentit ja virheilmoitusten avaimet englanniksi.
-- Uusi riippuvuus vaatii perustelun, ja se lisätään tiedostoon `10-stack.md`. Ensisijaisesti kirjoitetaan oma kapea toteutus. Versio asennetaan `pnpm add` -komennolla ja on vähintään 7 päivää vanha. `minimumReleaseAge`-asetusta ei ohiteta.
+- TypeScript's `strict` mode. No `any` type and no `@ts-ignore` comment without a justification comment. Prefer `@ts-expect-error` with a justification.
+- Identifiers, comments and error message keys in English.
+- A new dependency needs a justification, and it is added to `10-stack.md`. A narrow implementation of our own is preferred. The version is installed with `pnpm add` and is at least 7 days old. The `minimumReleaseAge` setting is not bypassed.
 
-**Ydin (`core/`):**
+**Core (`core/`):**
 
-- Laskenta tehdään float64-tarkkuudella. `Float32Array` on sallittu vain renderöijän GPU-puskureissa.
-- Solmut (`MapNode`) ovat muuttumattomia. Muutos tuottaa uuden olion, ja muuttumattomat solmut jaetaan vanhan ja uuden tilan kesken.
-- Brushin totuus on tasojoukko (kolme pistettä per sivu). Verteksit, reunat ja polygonit ovat johdettua välimuistia, eikä niitä tallenneta.
-- Kaikki koordinaatit ovat maailmakoordinaatteja, eikä paikallisia muunnosmatriiseja käytetä.
-- Toleranssit (`PLANE_EPS`, `POINT_EPS`) määritellään yhdessä paikassa, eikä uusia taikalukuja lisätä.
-- Geometriaoperaatio palauttaa validit brushit tai virheen (tulostyyppi), ei koskaan rikkinäistä geometriaa. Ennakoitavissa olevista virheistä ei heitetä poikkeusta.
-- Jäsentäjät ovat puhtaita funktioita: `ArrayBuffer` tai `string` sisään, tietorakenne ulos. Binääriformaatit luetaan little-endian-muodossa `DataView`:llä.
-- Avaus ja tallennus eivät saa muuttaa mitään. Entiteettien ominaisuuksien järjestys ja tuntemattomat avaimet säilytetään, ja `.map`-lukujen muotoilu noudattaa määrittelyä.
+- Computation is done at float64 precision. `Float32Array` is allowed only in the renderer's GPU buffers.
+- Nodes (`MapNode`) are immutable. A change produces a new object, and unchanged nodes are shared between the old and new state.
+- A brush's truth is its set of planes (three points per face). Vertices, edges and polygons are a derived cache and are not stored.
+- All coordinates are world coordinates, and no local transform matrices are used.
+- The tolerances (`PLANE_EPS`, `POINT_EPS`) are defined in one place, and no new magic numbers are added.
+- A geometry operation returns valid brushes or an error (a result type), never broken geometry. Exceptions are not thrown for foreseeable errors.
+- Parsers are pure functions: an `ArrayBuffer` or `string` in, a data structure out. Binary formats are read little-endian with `DataView`.
+- Opening and saving must change nothing. Entity property order and unknown keys are preserved, and `.map` number formatting follows the spec.
 
-**Komennot ja tila:**
+**Commands and state:**
 
-- Jokainen dokumentin muutos on `Command`, jonka `run()` palauttaa `Patch`in. Raahauksen välivaiheet yhdistetään `mergeKey`:llä yhdeksi undo-askeleeksi.
-- Valinta ei kuulu dokumenttiin eikä undo-historiaan.
+- Every document change is a `Command` whose `run()` returns a `Patch`. The intermediate steps of a drag are merged into one undo step with `mergeKey`.
+- The selection is not part of the document or the undo history.
 
-**Renderöinti ja UI:**
+**Rendering and UI:**
 
-- Piirto tehdään vain muutoksen yhteydessä (dokumentti, kamera tai osoitin). Jatkuvaa `requestAnimationFrame`-silmukkaa ei käytetä.
-- Renderöijä päivittää vain patchien kertomat brushit, eikä koko puskuria rakenneta uudelleen.
-- Solid 2:n API:a käytetään sen omien ohjeiden mukaan. Solid 1:n poistettuja API:a ei käytetä (lista stackissa). Kehitysbuildin reaktiivisuusdiagnostiikat korjataan.
-- Paneelien logiikka (validointi, muunnokset) on `app/`-kerroksessa, ja `ui/` vain esittää ja välittää tapahtumat.
-- Tyylit kirjoitetaan CSS Modules -tiedostoina (`Komponentti.module.css`) komponentin viereen. Värit ja mitat otetaan teeman CSS-muuttujista, eikä niitä kovakoodata.
+- Drawing happens only on a change (document, camera or pointer). No continuous `requestAnimationFrame` loop is used.
+- The renderer updates only the brushes reported by the patches, and the whole buffer is not rebuilt.
+- Solid 2's API is used according to its own documentation. APIs removed in Solid 1 are not used (the list is in the stack). Reactivity diagnostics from the development build are fixed.
+- Panel logic (validation, conversions) lives in the `app/` layer, and `ui/` only presents and forwards events.
+- Styles are written as CSS Modules files (`Component.module.css`) next to the component. Colours and dimensions come from the theme's CSS variables (`docs/design-system/tokens.css`) and are never hard-coded. The UI follows the design system, including its language and voice rules.
 
-**Yksityisyys:** käyttäjän tiedostoja ei lähetetä minnekään. Ei telemetriaa, analytiikkaa eikä ulkoisia ajonaikaisia pyyntöjä (CDN-fontit, kolmannen osapuolen skriptit). Sovelluksen pitää toimia ilman verkkoyhteyttä.
+**Privacy:** the user's files are not sent anywhere. No telemetry, no analytics and no external runtime requests (CDN fonts, third-party scripts). The application must work offline.
 
-## Testaus ja testiaineisto
+## Testing and test data
 
-- **Yksikkötestit (Vitest):** kaikki `core/`- ja `game/q2/`-koodi sekä `app/`-logiikka. Kattavuusraja `core/`:ssa on ≥ 90 % riveistä, ja raja on CI:ssä pakollinen.
-- **Ominaisuuspohjaiset testit (fast-check):** jokainen CSG-operaatio, polygonien muodostus ja tekstuurilukko. Epäonnistuneen tapauksen siemen (seed) ja minimoitu syöte lisätään pysyväksi regressiotestiksi.
-- **Kierrostestit:** jokainen testikartta luetaan, kirjoitetaan ja luetaan uudelleen. Tietorakenteen pitää olla aina identtinen, ja tekstin pitää olla sama rivitasolla, kun tiedosto on kanonisessa muodossa (määrittely, *Tiedostoformaatit*). Sama tehdään `.joole.json`-formaatille, ja jokaisella projektiformaatin versiolla on oma testitiedostonsa.
-- **Kääntäjätesti:** qbsp3.wasm ajetaan Nodessa testikartoilla, ja varoitukset virheellisistä brusheista kaatavat testin.
-- **E2E (Playwright):** päätyönkulut (avaa, luo brush, vähennä, undo, tallenna), suorituskykytestit ja näkymien kuvavertailu SwiftShaderilla. Vertailukuvat päivitetään vain tarkoituksellisen visuaalisen muutoksen yhteydessä, ja syy kirjataan commit-viestiin.
-- **Testiaineisto:**
-  - Repoon lisätään vain itse tehtyjä tai GPL-yhteensopivasti lisensoituja karttoja ja tekstuureja (`tests/fixtures/`).
-  - id Softwaren pelidataa (`pak0.pak`, `.wal`-tekstuurit, vanilla-kartat, `colormap.pcx`) ei commitoida. Niitä käyttävät testit lukevat Q2-asennuksen polun ympäristömuuttujasta `JOOLE_Q2_DIR`, ja ne ohitetaan, jos muuttujaa ei ole asetettu. CI ajaa vain repon omalla aineistolla.
-  - Paletista ja `.wal`-rakenteesta tehdään pieniä synteettisiä testitiedostoja, jotta perustestit toimivat ilman pelidataa.
+- **Unit tests (Vitest):** all `core/` and `game/q2/` code and the `app/` logic. The coverage threshold in `core/` is ≥ 90 % of lines, and the threshold is mandatory in CI.
+- **Property-based tests (fast-check):** every CSG operation, building polygons and texture lock. The seed and minimised input of a failing case are added as a permanent regression test.
+- **Round-trip tests:** every test map is read, written and read again. The data structure must always be identical, and the text must be the same line by line when the file is in canonical form (spec, *File formats*). The same is done for the `.joole.json` format, and each project format version has its own test file.
+- **Compiler test:** qbsp3.wasm runs in Node on the test maps, and warnings about invalid brushes fail the test.
+- **E2E (Playwright):** the main workflows (open, create a brush, subtract, undo, save), performance tests and screenshot comparison of the views with SwiftShader. Reference screenshots are updated only for an intentional visual change, and the reason is recorded in the commit message.
+- **Test data:**
+  - Only self-made or GPL-compatibly licensed maps and textures are added to the repository (`tests/fixtures/`).
+  - id Software's game data (`pak0.pak`, `.wal` textures, vanilla maps, `colormap.pcx`) is not committed. Tests that use it read the path of a Q2 installation from the `JOOLE_Q2_DIR` environment variable, and they are skipped if the variable is not set. CI runs only with the repository's own data.
+  - Small synthetic test files are made of the palette and the `.wal` structure, so that the basic tests work without game data.
 
-## Git ja commitit
+## Git and commits
 
-- Päähaara on `main`. Muutokset tehdään pieninä, yhden asian kokonaisuuksina.
-- Commit-viestit noudattavat Conventional Commits -muotoa englanniksi (`feat:`, `fix:`, `refactor:`, `test:`, `docs:`, `chore:`, `perf:`), esim. `feat(geom): add CSG subtract`. Laajuus (scope) on hakemiston nimi: `geom`, `formats`, `doc`, `q2`, `app`, `render`, `platform`, `ui`, `tools`.
-- `pnpm check` menee läpi ennen committia. CI (GitHub Actions) ajaa saman sekä E2E-testit ja WASM-buildin toistettavuustarkistuksen jokaiselle pull requestille. Hookeja ei ohiteta (`--no-verify`).
-- Lukkotiedosto (`pnpm-lock.yaml`) commitoidaan. Buildin tuotokset (`dist/`, kattavuusraportit, Playwrightin raportit), paikallinen pelidata ja `ext/` ovat `.gitignore`:ssa.
-- `ext/`-hakemistoa tai sen sisältöä ei koskaan lisätä Gitiin, ei myöskään alimoduuleina tai `git add -f` -komennolla. Ennen committia tarkista, ettei `git status` näytä `ext/`-polkuja.
+- The main branch is `main`. Changes are made in small, single-purpose units.
+- Commit messages follow the Conventional Commits format in English (`feat:`, `fix:`, `refactor:`, `test:`, `docs:`, `chore:`, `perf:`), for example `feat(geom): add CSG subtract`. The scope is the directory name: `geom`, `formats`, `doc`, `q2`, `app`, `render`, `platform`, `ui`, `tools`.
+- `pnpm check` passes before a commit. CI (GitHub Actions) runs the same, plus the E2E tests and the WASM build reproducibility check, for every pull request. Hooks are not bypassed (`--no-verify`).
+- The lockfile (`pnpm-lock.yaml`) is committed. Build outputs (`dist/`, coverage reports, Playwright reports), local game data and `ext/` are in `.gitignore`.
+- The `ext/` directory and its contents are never added to Git, not as submodules and not with `git add -f`. Before committing, check that `git status` shows no `ext/` paths.
 
-## Lisenssi ja lainattu koodi
+## License and borrowed code
 
-- Joole julkaistaan GNU GPL v2.0 tai myöhemmän version lisenssillä. SPDX-tunniste on `GPL-2.0-or-later` (`package.json`, `LICENSE` ja lähdetiedostojen otsakkeet).
-- Qoolen, q2pro:n, Quake-2:n, Quake-2-Toolsin ja q3editin koodia saa käyttää (kaikki "GPL v2 tai myöhempi"). Kun koodia siirretään tai käännetään toiselle kielelle:
-  - tiedoston alkuun kirjataan alkuperä (projekti, tiedosto, funktio) ja alkuperäiset tekijänoikeusmerkinnät
-  - lähde lisätään tiedostoon `THIRD_PARTY_NOTICES.md` (luodaan ensimmäisen lainauksen yhteydessä)
-  - uusi lähdeprojekti lisätään tiedostoon `docs/20-sources.md`.
-- Lisättävän koodin ja datan lisenssin pitää sallia Joolen jakaminen GPLv2:lla. Esimerkiksi MIT, BSD, ISC, LGPL ja GPL-2.0-or-later sallivat sen. GPLv3-only- tai Apache-2.0-koodi pakottaisi koko teoksen GPLv3:ksi, joten sellaista ei lisätä ilman erillistä päätöstä.
+- Joole is released under GNU GPL v2.0 or later. The SPDX identifier is `GPL-2.0-or-later` (`package.json`, `LICENSE` and the source file headers).
+- Code from Qoole, q2pro, Quake-2, Quake-2-Tools and q3edit may be used (all "GPL v2 or later"). When code is moved or translated into another language:
+  - the origin (project, file, function) and the original copyright notices are recorded at the top of the file
+  - the source is added to `THIRD_PARTY_NOTICES.md` (created with the first borrowing)
+  - a new source project is added to `docs/20-sources.md`.
+- The licence of added code and data must allow Joole to be distributed under GPLv2. For example, MIT, BSD, ISC, LGPL and GPL-2.0-or-later allow it. GPLv3-only or Apache-2.0 code would force the whole work to GPLv3, so such code is not added without a separate decision.
 
-## Ohjeet koodausagenteille
+## Instructions for coding agents
 
-- Lue määrittelyn ja stackin relevantit osiot ennen muutosta. Älä oleta API:a, versiota tai formaatin yksityiskohtaa, vaan tarkista se lähdekoodista, dokumentaatiosta tai npm:stä.
-- Solid 2 julkaistiin marraskuussa 2026. Koulutusdatan Solid-esimerkit ovat todennäköisesti Solid 1:n API:a, joten käytä Solid 2:n dokumentaatiota ja sen mukana tulevia agenttiohjeita.
-- TypeScript 7:n `tsc` on natiivi binääri, eikä sillä ole vakaata JS-API:a. Älä tuo `typescript`-pakettia ajonaikaiseen koodiin.
-- Älä lataa, pura tai commitoi Q2-pelidataa.
-- **`ext/` on vain luettavissa.** Älä muokkaa sen tiedostoja, älä aja siellä `git`-komentoja, jotka muuttavat tilaa (paitsi `pull` käyttäjän pyynnöstä), äläkä tuo sieltä koodia buildiin. Generointiskriptit (`pnpm gen:entities`) saavat lukea `ext/`:tä, mutta niiden tuotos commitoidaan, eikä build, testit tai CI saa riippua `ext/`:stä. Lainattu koodi kopioidaan `src/`- tai `tools/`-hakemistoon ja alkuperä merkitään.
-- **Haku `ext/`-hakemistosta:** ripgrep ja siihen perustuvat hakutyökalut noudattavat `.gitignore`a, joten projektin juuresta tehty haku ohittaa `ext/`:n. Hae antamalla polku eksplisiittisesti (esim. `rg TextureAxisFromPlane ext/Quake-2-Tools`) tai käytä `--no-ignore`-valitsinta. Vastaavasti `ext/`:n tulokset eivät saa sotkea Joolen omaa koodia koskevia hakuja.
-- Kun viittaat dokumentaatiossa `ext/`:n koodiin, käytä repon juuresta laskettua polkua ja funktion nimeä (esim. `bsp/qbsp3/textures.c`, `TextureAxisFromPlane`). Rivinumerot vanhenevat.
-- Älä muuta turvallisuusasetuksia (`minimumReleaseAge`, COOP/COEP-käytäntö) build- tai CI-ongelman kiertämiseksi, vaan kysy ensin.
-- Kun teet päätöksen, jota dokumentaatio ei kata, kirjaa se oikeaan dokumenttiin ja mainitse se yhteenvedossa.
+- Read the relevant sections of the spec and the stack before a change. Do not assume an API, version or format detail: check it from the source code, documentation or npm.
+- Solid 2 was released in November 2026. Solid examples in training data are most likely Solid 1's API, so use Solid 2's documentation and the agent guidance that ships with it.
+- TypeScript 7's `tsc` is a native binary with no stable JS API. Do not import the `typescript` package in runtime code.
+- Do not download, extract or commit Q2 game data.
+- **`ext/` is read-only.** Do not modify its files, do not run `git` commands there that change state (except `pull` at the user's request), and do not import code from it into the build. Generator scripts (`pnpm gen:entities`) may read `ext/`, but their output is committed, and the build, tests and CI must not depend on `ext/`. Borrowed code is copied into `src/` or `tools/` and its origin is recorded.
+- **Searching `ext/`:** ripgrep and the search tools based on it honour `.gitignore`, so a search from the project root skips `ext/`. Search by giving the path explicitly (for example `rg TextureAxisFromPlane ext/Quake-2-Tools`) or use the `--no-ignore` option. Likewise, results from `ext/` must not clutter searches about Joole's own code.
+- When you refer to code in `ext/` in documentation, use the path from the repository root plus the function name (for example `bsp/qbsp3/textures.c`, `TextureAxisFromPlane`). Line numbers go stale.
+- Do not change security settings (`minimumReleaseAge`, the COOP/COEP policy) to work around a build or CI problem; ask first.
+- When you make a decision that the documentation does not cover, record it in the right document and mention it in your summary.

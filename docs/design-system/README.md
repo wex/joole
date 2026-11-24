@@ -1,4 +1,4 @@
-This system defines the user interface of Q2 Web Editor, a browser-based Quake 2 map editor modeled on Qoole. The viewports follow Qoole's established color conventions, so anyone who has used Qoole or another Q2 editor recognizes them at once. The window chrome is flat and compact, replacing Qoole's Windows 9x bevels and MFC docking.
+This system defines the user interface of Joole, a browser-based Quake 2 map editor modeled on Qoole. The viewports follow Qoole's established color conventions, so anyone who has used Qoole or another Q2 editor recognizes them at once. The window chrome is flat and compact, replacing Qoole's Windows 9x bevels and MFC docking.
 
 Write components as CSS Modules that read every value from the `tokens.css` variables. Never hard-code colors, spacing or fonts in a component. Ready-made classes live in `components/bundle.css` (prefixed `q2-`) and are the shared starting point for previews and implementation.
 
@@ -29,13 +29,13 @@ Colors fall into two groups that are never mixed.
 - `vp-bg` is the ground, `vp-grid-minor` the grid at the current size and `vp-grid-major` every 8th line. `vp-axis` marks the world origin axes.
 - `vp-brush` is an unselected wireframe, `vp-select` a selected one and `vp-entity` a point entity that has no color of its own in the entity definitions.
 - `vp-handle` colors handles and clip plane points, `vp-target` draws target link lines dashed, `vp-leak` the leak path and `vp-scope-dim` the rest of the map while inside a group.
-- `vp-invalid` (a dashed orange line) marks a rejected move. The spec says "red" here, but red is reserved for selection; the proposal is to update the spec.
+- `vp-invalid` (a dashed orange line) marks a rejected move. It is not red, because red is reserved for selection; the spec follows this.
 - In the 3D view, `vp-sky` colors SURF_SKY faces and `vp-toolface` colors NODRAW, clip and hint faces at 35% opacity.
 - The renderer reads the `vp-*` values with `getComputedStyle` at startup and whenever the theme changes, so WebGL and the panels share one source.
 
 ## Typography
 
-- The UI uses IBM Plex Sans (`--font-ui`) and data uses IBM Plex Mono (`--font-mono`). Both load from Google Fonts; copy them into the project before release so the PWA works offline.
+- The UI uses IBM Plex Sans (`--font-ui`) and data uses IBM Plex Mono (`--font-mono`). The application self-hosts both fonts, because it makes no external requests (see AGENTS.md). Only the previews in this folder load them from Google Fonts (`components/bundle.css`).
 - `ui-body` (12/16) is the default, and the UI is deliberately dense like a desktop editor. Use `ui-title` in panel title bars, `ui-heading` in floating window titles, `ui-small` in tabs and tooltips, and `ui-label` (uppercase, 0.06em tracking) for group labels such as "SPAWNFLAGS".
 - Use `mono-small` for texture names, coordinates and grid size, and `mono-body` for key–value tables and the log. Set numerals tabular.
 
@@ -53,7 +53,7 @@ Colors fall into two groups that are never mixed.
 
 ## Iconography
 
-In the source material (Qoole screenshots) the icons are Qoole's own bitmaps, and they are not copied. The previews use simple 16 × 16 line icons (1.5px stroke, `currentColor`) as placeholders only. The icon system is not chosen yet. The recommendation is Lucide, which is MIT-licensed and GPLv2-compatible, extended with custom icons for CSG Subtract, Hollow and Clip. No emoji.
+In the source material (Qoole screenshots) the icons are Qoole's own bitmaps, and they are not copied. The icon system is Lucide (`lucide-static`, ISC; the icons derived from Feather are MIT, both GPLv2-compatible): 16 × 16 line icons with a 1.5px stroke in `currentColor`, extended with custom icons for CSG Subtract, Hollow and Clip in the same style. The previews use simple placeholder icons. No emoji.
 
 ## Layout
 

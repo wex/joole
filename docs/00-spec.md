@@ -1,182 +1,184 @@
-# Joole – tekninen määrittely
+# Joole – Technical specification
 
 Nov 24, 2026 · @Niko Hujanen
 
-## Tausta ja tavoitteet
+## Background and goals
 
-Rakennetaan selaimessa toimiva brush-pohjainen karttaeditori Quake 2:lle TypeScriptillä ja WebGL2:lla. Toiminnallinen esikuva on Qoole 99 (v0.99, GPL), jonka [lähdekoodi](https://github.com/demoth/qoole) on noin 150 C++-tiedostoa MFC:n päällä. Editori julkaistaan GNU GPL v2.0 tai myöhemmän version lisenssillä (`GPL-2.0-or-later`). Qoolen koodi on lisensoitu "GPL v2 tai myöhempi", joten sitä saa käyttää suoraan. Ensisijaisesti Qoolesta otetaan kuitenkin käyttöön sen todetut ratkaisut: objektipuu, CSG-operaatiot, pelikohtainen abstraktio ja 2D/3D-näkymäjako.
+We are building a browser-based, brush-based map editor for Quake 2 in TypeScript and WebGL2. The functional model is Qoole 99 (v0.99, GPL), whose [source code](https://github.com/demoth/qoole) is about 150 C++ files on top of MFC. The editor is released under GNU GPL v2.0 or later (`GPL-2.0-or-later`). Qoole's code is licensed "GPL v2 or later", so it may be used directly. Primarily, however, we adopt Qoole's proven solutions: the object tree, the CSG operations, the game-specific abstraction and the 2D/3D view split.
 
-Tavoitteet:
+Goals:
 
-1. **Täysi Q2-kenttäkierros selaimessa.** Avataan `.map`, muokataan, tallennetaan `.map` ja testataan se kääntäjällä. Tavoitteena on, että mikä tahansa vanilla-Q2:n kenttä aukeaa ja tallentuu ilman häviöitä.
-2. **Ei asennusta.** Käyttäjä valitsee pelikansionsa tai `baseq2/pak0.pak`:n, ja tekstuurit ja entiteetit luetaan sieltä. Mitään ei lähetetä palvelimelle.
-3. **Qoolen tasoinen työnkulku.** Mukana ovat neljän näkymän asettelu, brushien luonti ja muokkaus, CSG-vähennys, ontoksi tekeminen, leikkaus tasolla, entiteettien ominaisuudet, tekstuuriselain ja prefabit.
-4. **Moderni perusta.** Mukana ovat rajaton undo, automaattinen tallennus selaimen tallennustilaan ja yksikkötestattu geometriaydin, joka ei riipu UI:sta.
+1. **A full Q2 level round trip in the browser.** Open a `.map`, edit it, save the `.map` and test it with the compiler. The aim is that any vanilla Q2 level opens and saves without loss.
+2. **No installation.** The user selects their game folder or `baseq2/pak0.pak`, and textures and entities are read from there. Nothing is sent to a server.
+3. **A Qoole-level workflow.** This includes the four-view layout, creating and editing brushes, CSG subtract, hollowing, clipping with a plane, entity properties, a texture browser and prefabs.
+4. **A modern foundation.** This includes unlimited undo, autosave to browser storage and a unit-tested geometry core that does not depend on the UI.
 
-## Rajaus
+## Scope
 
-V1 tukee vain Quake 2:ta. Qoolen `Game`-abstraktio (Quake, Hexen II, Half-Life, Sin, Heretic II) jätetään pois, mutta pelikohtaiset asiat eristetään silti yhteen moduuliin (`game/q2`). Näin uuden pelin lisääminen myöhemmin ei vaadi ytimen muutoksia.
+V1 supports Quake 2 only. Qoole's `Game` abstraction (Quake, Hexen II, Half-Life, Sin, Heretic II) is left out, but game-specific things are still isolated in one module (`game/q2`). That way, adding a new game later requires no changes to the core.
 
-| Mukana v1:ssä | Ei mukana v1:ssä |
+| In v1 | Not in v1 |
 | --- | --- |
-| Q2 `.map` luku ja kirjoitus (id:n alkuperäinen formaatti) | Valve 220 -tekstuuriformaatti, Quake 3 -patchit ja curvet |
-| Oma JSON-projektiformaatti ensisijaisena tallennusmuotona | Qoolen `.qle`-tiedostojen tuonti (myöhempi vaihe) |
-| `.wal`-tekstuurit `pak`- ja `pkz`-paketeista ja irtohakemistoista, myös Q2-modien pelihakemistoista | `.wad`-tekstuurit, Qoolen pelien välinen karttamuunnos |
-| Brushit, entiteetit, ryhmät, prefabit | Terrain-työkalut, mallieditori |
-| CSG: vähennys, leikkaus, onton tekeminen, tasoleikkaus, peilaus | BSP-tiedoston avaaminen muokattavaksi (dekompilointi) |
-| Entiteettien ominaisuudet määritystiedoston pohjalta, md2-mallit rautalankana (muut piste-entiteetit laatikkona) | Valaistuksen esikatselu (qrad3-tulosta vastaava) |
-| Kääntäjäajo ja vuotopistetiedoston (`.pts`) näyttäminen | Moninpelieditointi (reaaliaikainen yhteismuokkaus) |
-| Chromium-selaimet täydellä tiedostotuella, Firefox ja Safari lataus-/tallennuspohjaisesti | Mobiili- ja kosketuskäyttö |
+| Reading and writing Q2 `.map` (id's original format) | The Valve 220 texture format, Quake 3 patches and curves |
+| An own JSON project format as the primary save format | Importing Qoole `.qle` files (a later phase) |
+| `.wal` textures from `pak` and `pkz` packages and loose directories, including Q2 mod game directories | `.wad` textures, Qoole's cross-game map conversion |
+| Brushes, entities, groups, prefabs | Terrain tools, a model editor |
+| CSG: subtract, intersect, hollow, plane clip, mirror | Opening a BSP file for editing (decompiling) |
+| Entity properties based on a definition file, md2 models as wireframes (other point entities as boxes) | Lighting preview (equivalent to qrad3 output) |
+| Running the compiler and displaying the leak file (`.pts`) | Multi-user editing (real-time collaborative editing) |
+| Chromium browsers with full file support, Firefox and Safari with load/download-based files | Mobile and touch use |
 
-Qoolen omat Windows-erityispiirteet, kuten Glide-, DirectX- ja MGL-renderöijät sekä MFC:n telakoituvat ikkunat, korvataan WebGL2:lla ja selaimen omalla paneeliasettelulla.
+Qoole's Windows-specific features, such as the Glide, DirectX and MGL renderers and MFC's docking windows, are replaced by WebGL2 and the browser's own panel layout.
 
-## Arkkitehtuuri
+## Architecture
 
-Sovellus jaetaan neljään kerrokseen. Kerros saa riippua vain itseään alemmista kerroksista ja ytimestä. Ytimessä ei ole selainriippuvuuksia, joten geometriaa, formaatteja ja komentoja voi testata Nodessa. Laatikoissa näkyy myös, mihin Qoolen moduuliin kukin osa vastaa.
+The application is divided into four layers. A layer may depend only on layers below it and on the core. The core has no browser dependencies, so geometry, formats and commands can be tested in Node. The boxes also show which Qoole module each part corresponds to.
 
 ```mermaid
 flowchart TB
   subgraph UI["UI · ui/"]
-    panels["Paneelit<br/>puu, ominaisuudet, tekstuurit, loki<br/><i>Qoole: QProp*, QTrView, QTexView</i>"]
-    views["Näkymät<br/>syöte, kamerat<br/><i>Qoole: QView, QVFrame</i>"]
+    panels["Panels<br/>tree, properties, textures, log<br/><i>Qoole: QProp*, QTrView, QTexView</i>"]
+    views["Views<br/>input, cameras<br/><i>Qoole: QView, QVFrame</i>"]
   end
-  subgraph APP["Sovellus · app/"]
-    bus["CommandBus ja undo<br/>kaikki muutokset Patch-olioina<br/><i>Qoole: OpManager, QooleOp</i>"]
-    sel["Valinta ja scope<br/>valinta, ryhmän sisälle meneminen<br/><i>Qoole: Selector, OpScopeChange</i>"]
-    tools["Työkalujen logiikka<br/>työkalutilat, raahaus → komento"]
+  subgraph APP["Application · app/"]
+    bus["CommandBus and undo<br/>all changes as Patch objects<br/><i>Qoole: OpManager, QooleOp</i>"]
+    sel["Selection and scope<br/>selection, entering a group<br/><i>Qoole: Selector, OpScopeChange</i>"]
+    tools["Tool logic<br/>tool modes, drag → command"]
   end
-  subgraph PLATFORM["Alusta (selain) · render/, platform/, workers/"]
-    gl["WebGL2-renderöijä<br/>4 näkymää, 1 canvas<br/><i>Qoole: QDraw*, View</i>"]
-    files["Tiedostot<br/>FS Access, OPFS, IDB<br/><i>Qoole: LFile</i>"]
-    workers["Workerit<br/>tekstuurit, qbsp3 (WASM)<br/><i>Qoole: QCompile</i>"]
+  subgraph PLATFORM["Platform (browser) · render/, platform/, workers/"]
+    gl["WebGL2 renderer<br/>4 views, 1 canvas<br/><i>Qoole: QDraw*, View</i>"]
+    files["Files<br/>FS Access, OPFS, IDB<br/><i>Qoole: LFile</i>"]
+    workers["Workers<br/>textures, qbsp3 (WASM)<br/><i>Qoole: QCompile</i>"]
   end
-  subgraph CORE["Ydin · core/ (ei DOM- eikä WebGL-riippuvuuksia)"]
-    types["Jaetut tyypit<br/>core/types"]
-    geom["Geometria<br/>tasot, CSG, poiminta<br/><i>Qoole: Geometry.cpp</i>"]
-    doc["Dokumenttimalli<br/>solmupuu, muuttumaton<br/><i>Qoole: Objects, Entity</i>"]
-    formats["Formaatit<br/>map pak wal pcx md2<br/><i>Qoole: MapIO, Texture</i>"]
+  subgraph CORE["Core · core/ (no DOM or WebGL dependencies)"]
+    types["Shared types<br/>core/types"]
+    geom["Geometry<br/>planes, CSG, picking<br/><i>Qoole: Geometry.cpp</i>"]
+    doc["Document model<br/>node tree, immutable<br/><i>Qoole: Objects, Entity</i>"]
+    formats["Formats<br/>map pak wal pcx md2<br/><i>Qoole: MapIO, Texture</i>"]
   end
-  game["game/q2<br/>paletti, liput, polut, profiilit,<br/>entiteettioletukset<br/><i>Qoole: Quake2.cpp</i>"]
+  game["game/q2<br/>palette, flags, paths, profiles,<br/>entity defaults<br/><i>Qoole: Quake2.cpp</i>"]
 
-  UI -->|kutsuu| APP
-  APP -->|muuttaa komennoilla| CORE
-  PLATFORM -->|lukee mallia ja formaatteja| CORE
+  UI -->|calls| APP
+  APP -->|changes via commands| CORE
+  PLATFORM -->|reads model and formats| CORE
   game --> CORE
-  UI -.->|käyttää| PLATFORM
-  APP -.->|käyttää| PLATFORM
+  UI -.->|uses| PLATFORM
+  APP -.->|uses| PLATFORM
 ```
 
-*Kuva 1. Kerrosarkkitehtuuri: neljä kerrosta ja pelimoduuli. Katkoviivanuolet, `core/types` ja Työkalujen logiikka -laatikko ovat 24.11.2026 tehtyjä tarkennuksia alkuperäiseen kaavioon.*
+*Figure 1. Layered architecture: four layers and the game module. The dashed arrows, `core/types` and the Tool logic box are refinements to the original diagram made on 24.11.2026.*
 
-Pelikohtaiset tiedot (paletti, pintaliput, hakemistopolut, käännösprofiilit ja oletustekstuuri `e2u1/mine10_1` kuten Qoolessa) ovat `game/q2`-moduulissa. Se vastaa Qoolen `Game`-luokan `Quake2`-toteutusta, mutta toisia pelejä ei v1:ssä ole.
+Game-specific data (the palette, surface flags, directory paths, compile profiles and the default texture `e2u1/mine10_1`, as in Qoole) lives in the `game/q2` module. It corresponds to the `Quake2` implementation of Qoole's `Game` class, but v1 has no other games.
 
-**Teknologiat:** TypeScript (`strict`), Vite, raaka WebGL2 ilman 3D-kirjastoa (renderöinti on kapea ja hallittu), Solid 2 paneeleihin, Vitest ja Playwright testeihin sekä Emscripten Q2-työkaluille. Matematiikka on omaa koodia: float64 ytimessä ja `Float32Array` vasta GPU-puskureissa. Versiot, käyttötarkoitukset ja rajoitukset on kuvattu tiedostossa [10-stack.md](10-stack.md).
+**Technologies:** TypeScript (`strict`), Vite, raw WebGL2 without a 3D library (the rendering is narrow and fully controlled), Solid 2 for the panels, Vitest and Playwright for tests, and Emscripten for the Q2 tools. The math is our own code: float64 in the core, and `Float32Array` only in GPU buffers. Versions, purposes and constraints are described in [10-stack.md](10-stack.md).
 
 ```text
 src/
-  main.ts         käynnistys: luo kerrosten oliot ja kytkee ne toisiinsa
-  core/types/     tietomallin jaetut tyypit (vain tyyppimäärittelyjä)
-  core/geom/      tasot, windingit, CSG, poiminta, BVH
-  core/doc/       dokumenttimalli, komennot, patchit
-  core/formats/   map, pak, pkz, wal, pcx, md2, def, pts, projekti
-  game/q2/        Q2-vakiot ja -oletukset
-  app/            CommandBus ja undo, valinta ja scope, asetukset, työkalujen logiikka
-  render/         WebGL2, varjostimet, näkymien piirto
-  platform/       tiedostot, OPFS, IndexedDB, worker-asiakkaat
-  ui/             paneelit, näkymien syöte ja kamerat
-workers/          tekstuurimuunnos, qbsp3/qvis3/qrad3.wasm
+  main.ts         start-up: creates the layer objects and wires them together
+  core/types/     shared data model types (type declarations only)
+  core/geom/      planes, windings, CSG, picking, BVH
+  core/doc/       document model, commands, patches
+  core/formats/   map, pak, pkz, wal, pcx, md2, def, pts, project
+  game/q2/        Q2 constants and defaults
+  app/            CommandBus and undo, selection and scope, settings, tool logic
+  render/         WebGL2, shaders, view drawing
+  platform/       files, OPFS, IndexedDB, worker clients
+  ui/             panels, view input and cameras
+workers/          texture conversion, qbsp3/qvis3/qrad3.wasm
+tools/            C source of the Q2 compilers and their Emscripten build
+tests/            E2E tests and test data
 ```
 
-### Kerrosjärjestys ja riippuvuussäännöt
+### Layer order and dependency rules
 
-Kaavio piirtää alustan ytimen alle, koska alusta on ydintä lähempänä selainta. Riippuvuuksien kannalta järjestys on ylhäältä alas **UI → sovellus → alusta → ydin**, ja pelimoduuli on ytimen yläpuolella mutta muiden kerrosten alapuolella. Säännön "ja ytimestä" -lisäys tarkoittaa, että jokainen kerros saa käyttää ydintä suoraan.
+The diagram draws the platform below the core because the platform is closer to the browser than the core is. In terms of dependencies, the order from top to bottom is **UI → application → platform → core**, and the game module sits above the core but below the other layers. The "and on the core" part of the rule means that every layer may use the core directly.
 
-| Kerros | Hakemistot | Saa tuoda | Ei saa tuoda |
+| Layer | Directories | May import | May not import |
 | --- | --- | --- | --- |
-| UI | `ui/` | `app/`, `render/`, `platform/`, `game/q2/`, `core/` | `workers/` (vain viesteillä) |
-| Sovellus | `app/` | `render/`, `platform/`, `game/q2/`, `core/` | `ui/`, `workers/` |
-| Alusta | `render/`, `platform/`, `workers/` | `game/q2/`, `core/` (sisäiset rajat alla) | `app/`, `ui/` |
-| Pelimoduuli | `game/q2/` | `core/` | kaikki muut |
-| Ydin | `core/` | vain `core/` (sisäinen järjestys alla) | kaikki muut |
+| UI | `ui/` | `app/`, `render/`, `platform/`, `game/q2/`, `core/` | `workers/` (messages only) |
+| Application | `app/` | `render/`, `platform/`, `game/q2/`, `core/` | `ui/`, `workers/` |
+| Platform | `render/`, `platform/`, `workers/` | `game/q2/`, `core/` (internal limits below) | `app/`, `ui/` |
+| Game module | `game/q2/` | `core/` | everything else |
+| Core | `core/` | only `core/` (internal order below) | everything else |
 
-- **Alustan sisällä** `render/` saa tuoda `platform/`-hakemistoa (esim. tekstuurien välimuisti OPFS:ssä), mutta ei päinvastoin. `workers/` on oma bundlensa: se saa tuoda `core/`- ja `game/q2/`-moduuleja (esim. `wal`- ja `pcx`-jäsentäjät ja paletti), mutta ei `app/`-, `ui/`- eikä `render/`-hakemistoja. Muut kerrokset eivät tuo worker-koodia, vaan käynnistävät workerin (`new Worker(new URL(…))`) ja kommunikoivat sen kanssa viesteillä `platform/`-hakemiston worker-asiakkaiden kautta.
-- **Ytimen sisäinen järjestys** on `core/types` ← `core/geom` ← `core/doc` ← `core/formats`. Ilman sitä syntyisi kehä: komennot (`core/doc`) ajavat CSG:tä (`core/geom`), ja CSG käyttää dokumenttimallin tyyppejä (`Plane`, `Face`, `FaceTexture`). Siksi tietomallin tyypit ovat `core/types`-moduulissa, jossa on vain tyyppimäärittelyjä ja jota tuodaan `import type` -muodossa. `core/formats` on ylimpänä, koska jäsentäjät tuottavat `MapDocument`-olion.
-- **Kerroksen sisällä** tuonnit ovat vapaita (esim. `ui/`:n paneelit ja näkymät keskenään), lukuun ottamatta yllä lueteltuja alustan ja ytimen sisäisiä rajoja.
-- **Käynnistys:** `src/main.ts` on Viten entry ja ainoa tiedosto, joka saa tuoda kaikkia kerroksia. Se luo CommandBusin, renderöijän ja tiedostopalvelut ja kytkee ne toisiinsa.
-- **Patchit renderöijälle:** renderöijän rajapinta ottaa vastaan vain ytimen tyyppejä (`MapDocument`, `Patch`, kameran tiedot). Sovellus ilmoittaa muutoksista tilauksena, ja `main.ts` (tai UI:n näkymä) kytkee renderöijän tilaajaksi. `render/` ei siis tuo `app/`-hakemistoa.
-- **Työkalut jaetaan kahteen osaan.** Työkalutilojen tilakone ja logiikka, eli mitä komentoa raahaus tai napsautus tuottaa ja mitä esikatselu näyttää, ovat `app/`-hakemistossa ja testattavissa Nodessa. `ui/`:n näkymät muuntavat osoitin- ja näppäintapahtumat maailmakoordinaateiksi, hoitavat kamerat ja välittävät tapahtumat aktiiviselle työkalulle.
-- **Valvonta:** säännöt valvotaan ESLintin polkupohjaisella importtirajoituksella. Lisäksi `core/` ja `game/q2/` käännetään tsconfig-projektina ilman `DOM`-kirjastoa ja ilman globaaleja `@types`-paketteja, koska DOM- ja WebGL-tyypit ovat globaaleja eivätkä tule importeista. Työkalut ja asetukset on kuvattu tiedostossa [10-stack.md](10-stack.md).
+- **Within the platform**, `render/` may import `platform/` (for example the texture cache in OPFS), but not the other way round. `workers/` is a bundle of its own: it may import `core/` and `game/q2/` modules (for example the `wal` and `pcx` parsers and the palette), but not `app/`, `ui/` or `render/`. Other layers do not import worker code. They start the worker (`new Worker(new URL(…))`) and talk to it with messages through the worker clients in `platform/`.
+- **The core's internal order** is `core/types` ← `core/geom` ← `core/doc` ← `core/formats`. Without it there would be a cycle: commands (`core/doc`) run CSG (`core/geom`), and CSG uses the document model's types (`Plane`, `Face`, `FaceTexture`). That is why the data model types live in the `core/types` module, which contains type declarations only and is imported with `import type`. `core/formats` is at the top because the parsers produce a `MapDocument`.
+- **Within a layer**, imports are free (for example between `ui/` panels and views), except for the platform and core limits listed above.
+- **Start-up:** `src/main.ts` is the Vite entry and the only file that may import every layer. It creates the CommandBus, the renderer and the file services, and wires them together.
+- **Patches to the renderer:** the renderer's interface accepts only core types (`MapDocument`, `Patch`, camera data). The application reports changes as a subscription, and `main.ts` (or a UI view) subscribes the renderer. So `render/` does not import `app/`.
+- **Tools are split in two.** The tool modes' state machine and logic, that is, which command a drag or click produces and what the preview shows, live in `app/` and can be tested in Node. The `ui/` views convert pointer and key events into world coordinates, handle the cameras and pass the events to the active tool.
+- **Enforcement:** the rules are enforced by ESLint's path-based import restriction. In addition, `core/` and `game/q2/` are compiled as a tsconfig project without the `DOM` library and without global `@types` packages, because DOM and WebGL types are global and do not come from imports. The tools and their settings are described in [10-stack.md](10-stack.md).
 
-## Tietomalli
+## Data model
 
-Dokumentti on puu, jonka solmut ovat ryhmiä, entiteettejä tai brusheja. Ratkaisu on sama kuin Qoolessa, jossa yksi `Object`-luokka voi sisältää lapsia, brushin (`Geometry`) tai entiteetin (`Entity`). Selainversiossa solmutyypit erotetaan tyyppiturvallisiksi muodoiksi. Jokaisella solmulla on pysyvä tunniste, jota undo, valinta ja renderöinnin välimuisti käyttävät. Alla olevat tyypit ovat moduulissa `core/types`.
+The document is a tree whose nodes are groups, entities or brushes. The solution is the same as in Qoole, where one `Object` class can contain children, a brush (`Geometry`) or an entity (`Entity`). In the browser version, the node kinds are separated into type-safe shapes. Each node has a persistent id that undo, selection and the render cache use. The types below live in the `core/types` module.
 
 ```typescript
-type Id = string;               // nanoid, pysyy samana tallennusten yli
-type Vec3 = [number, number, number];   // float64, Q2-koordinaatit (Z ylös)
+type Id = string;               // nanoid, stays the same across saves
+type Vec3 = [number, number, number];   // float64, Q2 coordinates (Z up)
 
-interface Plane { n: Vec3; d: number }  // n·p = d, normaali osoittaa ulospäin
+interface Plane { n: Vec3; d: number }  // n·p = d, normal points outwards
 
 interface FaceTexture {
-  name: string;                 // esim. "e1u1/floor1_3" ilman .wal-päätettä
+  name: string;                 // e.g. "e1u1/floor1_3" without the .wal extension
   offset: [number, number];     // xoff yoff
-  rotation: number;             // asteina
+  rotation: number;             // degrees
   scale: [number, number];      // xscale yscale
-  contents: number;             // CONTENTS_*-bittikenttä
-  flags: number;                // SURF_*-bittikenttä
-  value: number;                // esim. valon voimakkuus
-  attribsInFile: boolean;       // contents flags value olivat luetussa .map-tiedostossa
+  contents: number;             // CONTENTS_* bit field
+  flags: number;                // SURF_* bit field
+  value: number;                // e.g. light intensity
+  attribsInFile: boolean;       // contents flags value were present in the .map that was read
 }
 
 interface Face {
-  points: [Vec3, Vec3, Vec3];   // määrittävät tason kuten .map:ssa
+  points: [Vec3, Vec3, Vec3];   // define the plane as in .map
   tex: FaceTexture;
 }
 
 interface BrushNode   { kind: 'brush';  id: Id; faces: Face[] }
 interface EntityNode  { kind: 'entity'; id: Id; props: [string, string][]; children: Id[] }
-interface GroupNode   { kind: 'group';  id: Id; name: string; props: [string, string][]; children: Id[]; locked?: boolean; hidden?: boolean }  // props: func_groupin muut avaimet
+interface GroupNode   { kind: 'group';  id: Id; name: string; props: [string, string][]; children: Id[]; locked?: boolean; hidden?: boolean }  // props: other keys of the func_group
 type MapNode = BrushNode | EntityNode | GroupNode;
 
 interface MapDocument {
   nodes: Map<Id, MapNode>;
   parent: Map<Id, Id>;
-  worldspawn: Id;               // aina olemassa, juurisolmu
+  worldspawn: Id;               // always present, root node
 }
 ```
 
-Suunnittelupäätökset:
+Design decisions:
 
-- **Brushin totuus on tasojoukko, ei verteksit.** Tallennettavat tiedot ovat kolme pistettä per sivu, kuten `.map`-tiedostossa. Polygonit, verteksit ja reunat ovat johdettua välimuistia, joka lasketaan leikkaamalla iso kuutio tasoilla. Qoole tallentaa B-rep-mallin (verteksit, reunat, polygonit ja tasot) ja ylläpitää sen eheyttä erikseen (`IntegrityCheck`). Tasomalli poistaa tämän virhelähteen, ja tallennus ilman häviöitä tulee ilmaiseksi.
-- **Ominaisuudet järjestettynä listana.** Entiteettien avain–arvo-parit säilytetään alkuperäisessä järjestyksessä ja myös tuntemattomat avaimet. Silloin tiedoston avaaminen ja tallentaminen ei muuta mitään.
-- **Ei paikallisia muunnosmatriiseja.** Qoolessa jokaisella solmulla on oma `TransSpace`, ja koordinaatit muunnetaan absoluuttisiksi vasta tallennuksessa (`TransObj2Abs`). Selainversiossa kaikki koordinaatit ovat maailmakoordinaatteja, mikä yksinkertaistaa CSG:tä ja poimintaa. Ryhmän siirto on komento, joka siirtää jokaisen lapsen.
-- **Ryhmät `.map`-tiedostossa `func_group`-entiteetteinä.** Q2:n `.map` ei tunne ryhmiä, mutta qbsp3 siirtää `func_group`-entiteetin brushit worldspawniin (`bsp/qbsp3/map.c`), ja pelikoodi käsittelee luokan kuten `info_null`in. Myös muut editorit tunnistavat tämän käytännön. Jokainen ryhmä kirjoitetaan omana `func_group`-entiteettinään, jonka sisällä ovat ryhmän suorat brushit. Editorin tiedot ovat alaviivalla alkavissa avaimissa, jotka peli ohittaa (`g_spawn.c`): `_joole_id`, `_joole_name`, `_joole_parent` (sisäkkäisen ryhmän vanhempi), `_joole_locked` ja `_joole_hidden`. Ryhmään kuuluvat entiteetit saavat avaimen `_joole_group`. Luettaessa avaimet muutetaan takaisin puurakenteeksi. `func_group`, jossa niitä ei ole (esim. toisesta editorista), tuodaan ryhmänä, ja sen muut avaimet säilyvät `GroupNode.props`-listassa. Ensisijainen tallennusmuoto on kuitenkin oma JSON-projektiformaatti, joka säilyttää kaiken editorin tiedon (ks. Tiedostoformaatit).
-- **Brush-entiteetit** (`func_door` ym.) ovat `EntityNode`ja, joiden lapsina on brusheja. Piste-entiteeteillä ei ole lapsia, ja niiden sijainti on `origin`-ominaisuudessa.
+- **A brush's truth is its set of planes, not its vertices.** The stored data is three points per face, as in the `.map` file. Polygons, vertices and edges are a derived cache, computed by clipping a large cube with the planes. Qoole stores a B-rep model (vertices, edges, polygons and planes) and maintains its integrity separately (`IntegrityCheck`). The plane model removes that source of errors, and lossless saving comes for free.
+- **Properties as an ordered list.** Entity key–value pairs are kept in their original order, including unknown keys. Opening and saving a file then changes nothing.
+- **No local transform matrices.** In Qoole every node has its own `TransSpace`, and coordinates are converted to absolute only when saving (`TransObj2Abs`). In the browser version all coordinates are world coordinates, which simplifies CSG and picking. Moving a group is a command that moves every child.
+- **Groups in `.map` files as `func_group` entities.** Q2's `.map` format has no groups, but qbsp3 moves the brushes of a `func_group` entity into worldspawn (`bsp/qbsp3/map.c`), and the game code treats the class like `info_null`. Other editors recognise the same convention. Each group is written as its own `func_group` entity containing the group's direct brushes. The editor's data is stored in keys that start with an underscore, which the game ignores (`g_spawn.c`): `_joole_id`, `_joole_name`, `_joole_parent` (the parent of a nested group), `_joole_locked` and `_joole_hidden`. Entities that belong to a group get the key `_joole_group`. When reading, the keys are turned back into the tree structure. A `func_group` without these keys (for example from another editor) is imported as a group, and its other keys are kept in the `GroupNode.props` list. The primary save format is still the own JSON project format, which keeps all editor data (see File formats).
+- **Brush entities** (`func_door` etc.) are `EntityNode`s with brushes as children. Point entities have no children, and their position is in the `origin` property.
 
-## Tiedostoformaatit
+## File formats
 
-Editori lukee alla lueteltuja binääri- ja tekstiformaatteja sekä omaa projektiformaattiaan, ja se kirjoittaa `.map`- ja projektitiedostoja. Kaikki jäsentäjät ovat puhtaita TypeScript-funktioita (`ArrayBuffer` tai `string` sisään, tietorakenne ulos), joten niitä voi testata Nodessa ilman selainta. Binääriformaatit ovat little-endian-muotoisia.
+The editor reads the binary and text formats listed below plus its own project format, and it writes `.map` and project files. All parsers are pure TypeScript functions (an `ArrayBuffer` or `string` in, a data structure out), so they can be tested in Node without a browser. The binary formats are little-endian.
 
-| Formaatti | Suunta | Rakenne | Huomiot |
+| Format | Direction | Structure | Notes |
 | --- | --- | --- | --- |
-| `.map` | luku + kirjoitus | Tekstiä: entiteetit `{ "avain" "arvo" … { brush } }`, brushin sivu `( x y z ) ( x y z ) ( x y z ) tekstuuri xoff yoff rot xscale yscale [contents flags value]` | Kolme viimeistä kenttää ovat valinnaisia. Jos ne puuttuvat, qbsp3 ottaa oletukset `.wal`-otsakkeesta. Editori kirjoittaa ne, jos ne olivat luetussa tiedostossa (`attribsInFile`), jos ne poikkeavat tekstuurin oletuksista tai jos tekstuuria ei löydy, jolloin oletuksia ei tiedetä. qbsp3 lukee tasopisteet sekä `xoff`-, `yoff`- ja `rot`-arvot kokonaislukuina (`atoi`) mutta skaalan liukulukuna (`bsp/qbsp3/map.c`), ks. alla. `//`-kommentit sallitaan. |
-| `.pak` | luku | Otsake `PACK`, hakemiston offset (int32), hakemiston pituus (int32). Merkintä on 64 tavua: nimi (56 tavua), sijainti (int32), pituus (int32). | Pakkaamaton, joten tiedostot luetaan suoraan `Blob.slice`-kutsulla ilman koko pakin lataamista muistiin. Tiedostot haetaan samassa järjestyksessä kuin pelimoottorissa (ks. Modit alla). |
-| `.pkz` | luku | ZIP-arkisto (q2pro:n laajennus). Keskushakemisto luetaan tiedoston lopusta, ja tiedostot ovat pakkaamattomia (stored) tai deflate-pakattuja. | Hakemiston ja otsakkeiden jäsennys on puhdasta ydinkoodia. Deflate-purku tehdään alustakerroksessa selaimen `DecompressionStream('deflate-raw')`-rajapinnalla, ja purkufunktio annetaan jäsentäjälle parametrina, koska ydin ei käytä selainrajapintoja. Tiedosto luetaan osina `Blob.slice`-kutsulla kuten `.pak`. ZIP64 ja salatut arkistot eivät ole tuettuja. |
-| `.wal` | luku | 100-tavuinen otsake: nimi (32), leveys, korkeus, 4 mip-offsetia, animaatioketjun seuraava nimi (32), flags, contents, value. Sen jälkeen 8-bittiset indeksoidut pikselit. | Editori käyttää vain mip 0:aa ja antaa WebGL:n generoida mipmapit. Otsakkeen flags, contents ja value ovat sivun oletusarvot. |
-| `pics/colormap.pcx` | luku | PCX:n 768 viimeistä tavua ovat 256 värin RGB-paletti. | Paletti muuntaa `.wal`-tekstuurit RGBA8-muotoon. Indeksi 255 ei ole läpinäkyvä Q2:ssa, joten alfakanavaa ei käytetä. |
-| `.md2` | luku | Otsake `IDP2`, versio 8, kehykset ja GL-komennot | Valinnainen. Näytetään piste-entiteettien esikatseluna rautalankana (kehys 0, ks. md2-esikatselu alla). Qoole näytti md2-mallit rautalankana (`Quake2::LoadModel`). |
-| entiteettimääritykset | luku | Radiantin `/*QUAKED luokka (r g b) (min) (max) LIPPU1 LIPPU2 … kuvaus */` -lohkot. Q2:n määritykset generoidaan pelikoodista (ks. Entiteettimääritykset alla). | Ominaisuuspaneeli, värit, laatikoiden koot ja spawnflags-valintaruudut tulevat tästä. Qoolessa vastaava on oma tyypitetty formaatti (`EntList`: VEC, INT, STR, FLAGDEF, COLOR …), joten editorin sisäinen malli tukee samoja tyyppejä. |
-| `.pts` | luku | Rivejä muodossa `x y z` | qbsp3:n vuotopolku, joka näytetään viivana kaikissa näkymissä (vrt. Qoolen `LoadLeakFile`). |
+| `.map` | read + write | Text: entities `{ "key" "value" … { brush } }`, a brush face `( x y z ) ( x y z ) ( x y z ) texture xoff yoff rot xscale yscale [contents flags value]` | The last three fields are optional. If they are missing, qbsp3 takes the defaults from the `.wal` header. The editor writes them if they were in the file that was read (`attribsInFile`), if they differ from the texture's defaults, or if the texture cannot be found, in which case the defaults are unknown. qbsp3 reads the plane points and the `xoff`, `yoff` and `rot` values as integers (`atoi`) but the scale as a float (`bsp/qbsp3/map.c`), see below. `//` comments are allowed. |
+| `.pak` | read | Header `PACK`, directory offset (int32), directory length (int32). An entry is 64 bytes: name (56 bytes), position (int32), length (int32). | Uncompressed, so files are read directly with `Blob.slice` without loading the whole pak into memory. Files are looked up in the same order as in the game engine (see Mods below). |
+| `.pkz` | read | A ZIP archive (a q2pro extension). The central directory is read from the end of the file, and files are uncompressed (stored) or deflate-compressed. | Parsing the directory and headers is pure core code. Deflate decompression is done in the platform layer with the browser's `DecompressionStream('deflate-raw')` API, and the decompression function is passed to the parser as a parameter, because the core does not use browser APIs. The file is read in chunks with `Blob.slice`, like `.pak`. ZIP64 and encrypted archives are not supported. |
+| `.wal` | read | A 100-byte header: name (32), width, height, 4 mip offsets, next name in the animation chain (32), flags, contents, value. Then 8-bit indexed pixels. | The editor uses only mip 0 and lets WebGL generate the mipmaps. The header's flags, contents and value are the face defaults. |
+| `pics/colormap.pcx` | read | The last 768 bytes of the PCX are a 256-colour RGB palette. | The palette converts `.wal` textures to RGBA8. Index 255 is not transparent in Q2, so no alpha channel is used. |
+| `.md2` | read | Header `IDP2`, version 8, frames and GL commands | Optional. Shown as a wireframe preview of point entities (frame 0, see md2 preview below). Qoole showed md2 models as wireframes (`Quake2::LoadModel`). |
+| entity definitions | read | Radiant's `/*QUAKED class (r g b) (min) (max) FLAG1 FLAG2 … description */` blocks. The Q2 definitions are generated from the game code (see Entity definitions below). | The properties panel, colours, box sizes and spawnflag checkboxes come from here. Qoole's equivalent is its own typed format (`EntList`: VEC, INT, STR, FLAGDEF, COLOR …), so the editor's internal model supports the same types. |
+| `.pts` | read | Lines of the form `x y z` | qbsp3's leak path, shown as a line in every view (compare Qoole's `LoadLeakFile`). |
 
-`.map`-kirjoittaja muuntaa luvut tekstiksi näin: kokonaisluvut ilman desimaaleja ja muut enintään kuudella desimaalilla ilman peränollia. Kirjoittajan tuottamaa muotoa kutsutaan *kanoniseksi*. Hilaan kohdistettu brush tuottaa siis samat rivit kuin alkuperäinen tiedosto, jos tiedosto oli jo kanonisessa muodossa.
+The `.map` writer turns numbers into text like this: integers without decimals, and other numbers with at most six decimals and no trailing zeros. The writer's output form is called *canonical*. A grid-aligned brush therefore produces the same lines as the original file, if the file was already in canonical form.
 
-**Kokonaislukupisteet.** Alkuperäinen qbsp3 lukee tasopisteet `atoi`-funktiolla, joten desimaalit katkeavat ja käännetty brush voi poiketa editorin brushista tai rikkoutua. Tietomalli ja projektitiedosto säilyttävät pisteet float64-tarkkuudella. `.map`-tiedostoon vienti ja käännös kuitenkin muuntavat jokaisen sivun, jonka pisteet eivät ole kokonaislukuja, kolmeksi kokonaislukupisteeksi, jotka määrittävät mahdollisimman lähellä alkuperäistä olevan tason. Muunnettu brush tarkistetaan (validi ja kupera). Jos muunnos rikkoo brushin tai siirtää sen verteksejä yli `POINT_EPS`-toleranssin, brush merkitään ja käyttäjä näkee varoituksen ennen vientiä. Leikepöytä ja prefabit säilyttävät täyden tarkkuuden (enintään kuusi desimaalia), koska muut editorit hyväksyvät desimaalit. Joolen WASM-qbsp3:een tehdään lisäksi dokumentoitu korjaus, joka lukee pisteet liukulukuina (`atof`). Vienti ei kuitenkaan luota siihen, jotta kartat kääntyvät myös alkuperäisillä työkaluilla.
+**Integer plane points.** The original qbsp3 reads plane points with `atoi`, so decimals are truncated, and the compiled brush may differ from the editor's brush or break. The data model and the project file keep points at float64 precision. Export to a `.map` file and compilation, however, convert every face whose points are not integers into three integer points that define the plane closest to the original. The converted brush is checked (valid and convex). If the conversion breaks the brush or moves its vertices by more than the `POINT_EPS` tolerance, the brush is flagged and the user sees a warning before the export. The clipboard and prefabs keep full precision (at most six decimals), because other editors accept decimals. In addition, Joole's WASM qbsp3 gets a documented fix that reads the points as floats (`atof`). The export does not rely on it, though, so that maps also compile with the original tools.
 
-**Tekstuurin siirto ja kierto.** qbsp3 katkaisee `xoff`-, `yoff`- ja `rot`-arvojen desimaalit. Luetut arvot säilytetään sellaisinaan, jotta tallennus on häviötön, mutta renderöinti ja tekstuurityökalut käyttävät katkaistua arvoa, jotta editori näyttää saman kuin peli. Sivuista, joiden arvoissa on desimaaleja, näytetään varoitus. Editorin omat operaatiot, myös tekstuurilukko, tuottavat aina kokonaislukuja, ja niiden pyöristysvirhe lasketaan mukaan tekstuurilukon 0,5 tekselin virherajaan.
+**Texture offset and rotation.** qbsp3 truncates the decimals of the `xoff`, `yoff` and `rot` values. The values that were read are kept as they are, so that saving is lossless, but rendering and the texture tools use the truncated value, so that the editor shows the same as the game. A warning is shown for faces whose values have decimals. The editor's own operations, including texture lock, always produce integers, and their rounding error counts towards texture lock's 0.5-texel error limit.
 
-**Kierrostestin kriteeri** (luku → kirjoitus → luku): tietorakenteen täytyy olla identtinen kaikille testikartoille. Tekstin täytyy olla rivitasolla sama kommentteja ja välilyöntejä lukuun ottamatta, kun tiedosto on jo kanonisessa muodossa ja sen tasopisteet ovat kokonaislukuja (kuten kaikissa kartoissa, jotka kääntyvät oikein alkuperäisellä qbsp3:lla). Muut tiedostot normalisoituvat ensimmäisellä tallennuksella, minkä jälkeen kierros tuottaa saman tekstin.
+**Round-trip criterion** (read → write → read): the data structure must be identical for every test map. The text must be the same line by line, apart from comments and whitespace, when the file is already in canonical form and its plane points are integers (as in every map that compiles correctly with the original qbsp3). Other files are normalised on the first save, after which the round trip produces the same text.
 
-**Oma projektiformaatti (`.joole.json`).** Projekti on ensisijainen tallennusmuoto, ja `.map` on vientiformaatti kääntäjälle ja muille editoreille. Ctrl+S tallentaa projektin. `.map` kirjoitetaan erikseen *Vie*-komennolla ja automaattisesti ennen käännöstä. Projekti tallentaa kaiken, mikä `.map`-tiedostosta katoaa:
+**Own project format (`.joole.json`).** The project is the primary save format, and `.map` is an export format for the compiler and other editors. Ctrl+S saves the project. The `.map` is written separately with the *Export* command and automatically before compiling. The project stores everything that a `.map` file loses:
 
 ```json
 {
@@ -187,7 +189,7 @@ Editori lukee alla lueteltuja binääri- ja tekstiformaatteja sekä omaa projekt
     "worldspawn": "w0",
     "nodes": [
       { "kind": "entity", "id": "w0", "props": [["classname", "worldspawn"]], "children": ["g1"] },
-      { "kind": "group", "id": "g1", "name": "Eteinen", "props": [], "children": ["b1"], "locked": false, "hidden": false },
+      { "kind": "group", "id": "g1", "name": "Entrance", "props": [], "children": ["b1"], "locked": false, "hidden": false },
       { "kind": "brush", "id": "b1", "faces": [ { "points": [[0,0,0],[0,64,0],[64,0,0]], "tex": { "name": "e1u1/floor1_3", "offset": [0,0], "rotation": 0, "scale": [1,1], "contents": 0, "flags": 0, "value": 0, "attribsInFile": false } } ] }
     ]
   },
@@ -195,191 +197,193 @@ Editori lukee alla lueteltuja binääri- ja tekstiformaatteja sekä omaa projekt
 }
 ```
 
-- Solmut ovat tasaisena listana, ja puun rakenne tulee `children`-kentistä. Muoto vastaa suoraan tietomallin `MapDocument`ia.
-- Luvut tallennetaan JavaScriptin oletusmuunnoksella, joka säilyttää float64-arvon tarkasti, joten avaus ja tallennus ei muuta mitään.
-- `version` kasvaa jokaisessa yhteensopimattomassa muutoksessa. Lukija ajaa siirtofunktiot vanhasta versiosta uusimpaan, ja jokaiselle versiolle on testitiedosto.
-- Tekstuureja ei upoteta projektiin, vaan niihin viitataan nimellä pelihakemistosta.
-- `.map`-vienti kirjoittaa ryhmät `func_group`-entiteetteinä (ks. Tietomalli), joten `.map` voidaan myös tuoda ilman, että ryhmät katoavat.
+- The nodes are a flat list, and the tree structure comes from the `children` fields. The format corresponds directly to the data model's `MapDocument`.
+- Numbers are stored with JavaScript's default conversion, which keeps a float64 value exactly, so opening and saving changes nothing.
+- `version` increases with every incompatible change. The reader runs migration functions from the old version to the newest, and there is a test file for every version.
+- Textures are not embedded in the project. They are referenced by name from the game directory.
+- The `.map` export writes groups as `func_group` entities (see Data model), so a `.map` can also be imported without losing the groups.
 
-**Modit.** Pelin asetuksissa annetaan `baseq2` ja valinnainen modin hakemisto (esim. `rogue`, `xatrix` tai oma). Tiedostot haetaan q2pro:n järjestyksessä (`ext/q2pro/src/common/files.c`, `add_game_dir` ja `pakcmp`). Se on vanilla-Q2:n järjestyksen yläjoukko: ensin modin paketit, sitten modin irtotiedostot, sitten `baseq2`:n paketit ja lopuksi `baseq2`:n irtotiedostot. Hakemiston sisällä paketit lajitellaan niin, että `pak`-alkuiset `.pak`- ja `.pkz`-tiedostot tulevat ensin numerojärjestyksessä ja muut sen jälkeen aakkosjärjestyksessä (kirjainkoosta riippumatta). Haku tehdään käänteisessä järjestyksessä, eli viimeisenä lajiteltu paketti haetaan ensin. Vanilla-Q2 (`ext/Quake-2/qcommon/files.c`, `FS_AddGameDirectory`) lukee vain tiedostot `pak0`–`pak9` ja hakee suurimman numeron ensin, joten vanilla-asennuksissa tulos on sama. Järjestykset on tarkistettu 24.11.2026. Tekstuuriselain näyttää modin tekstuurit omana juurikansionaan ja merkitsee, mistä lähteestä kukin tekstuuri tulee.
+**Mods.** The game settings specify `baseq2` and an optional mod directory (for example `rogue`, `xatrix` or one's own). Files are looked up in q2pro's order (`ext/q2pro/src/common/files.c`, `add_game_dir` and `pakcmp`). It is a superset of vanilla Q2's order: first the mod's packages, then the mod's loose files, then `baseq2`'s packages and finally `baseq2`'s loose files. Within a directory, packages are sorted so that `.pak` and `.pkz` files whose names start with `pak` come first in numerical order, and the rest follow in alphabetical order (case-insensitive). The lookup runs in reverse order, so the package sorted last is searched first. Vanilla Q2 (`ext/Quake-2/qcommon/files.c`, `FS_AddGameDirectory`) reads only the files `pak0` to `pak9` and searches the highest number first, so the result is the same on vanilla installations. The orders were verified on 24.11.2026. The texture browser shows the mod's textures as a root folder of their own and marks which source each texture comes from.
 
-**Entiteettimääritykset.** Vanilla-Q2:n määritystiedosto `q2.def` generoidaan skriptillä id:n GPL-lisensoidusta pelikoodista (`ext/Quake-2/game/*.c`, 148 `/*QUAKED*/`-lohkoa). Tapa on sama kuin id:n QuakeEdissä, joka luki määritykset suoraan pelin lähdekoodista (`ext/Quake-2-Tools/qe4/eclass.c`, `Eclass_InitForSourceDirectory`). Generoitu tiedosto commitoidaan `game/q2/`-hakemistoon alkuperämerkinnöin, ja q2pro:n pelikoodia (`ext/q2pro/src/game`) käytetään vertailuna. Modia varten käyttäjä voi ladata oman `.def`-tiedoston tai valita modin `.c`-lähdekoodit, joista lohkot poimitaan samalla jäsentäjällä. Modin määritykset korvaavat samannimiset vanilla-luokat.
+**Entity definitions.** Vanilla Q2's definition file `q2.def` is generated with a script from id's GPL-licensed game code (`ext/Quake-2/game/*.c`, 148 `/*QUAKED*/` blocks). The approach is the same as in id's QuakeEd, which read the definitions directly from the game's source code (`ext/Quake-2-Tools/qe4/eclass.c`, `Eclass_InitForSourceDirectory`). The generated file is committed to the `game/q2/` directory with provenance notes, and q2pro's game code (`ext/q2pro/src/game`) is used for comparison. For a mod, the user can load their own `.def` file or select the mod's `.c` source files, from which the blocks are extracted with the same parser. A mod's definitions override vanilla classes with the same name.
 
-**md2-esikatselu.** QUAKED-lohkoissa ei ole mallin polkua. Siksi `game/q2` sisältää vanilla-luokille taulukon luokasta malliin, ja se kootaan pelikoodin spawn-funktioista (`gi.modelindex("models/…")`). Malli näytetään rautalankana kehyksestä 0 kuten Qoolessa, ja muut luokat näytetään määrityksen kokoisena laatikkona.
+**md2 preview.** QUAKED blocks do not contain a model path. That is why `game/q2` contains a class-to-model table for the vanilla classes, compiled from the spawn functions in the game code (`gi.modelindex("models/…")`). The model is shown as a wireframe of frame 0, as in Qoole, and other classes are shown as a box of the size given in the definition.
 
-## Geometriaydin
+## Geometry core
 
-Geometriaydin (`core/geom`) on riippuvuudeton TypeScript-kirjasto, joka laskee float64-tarkkuudella ja jota ei kutsuta suoraan UI:sta, vaan aina komentojen kautta. Qoolessa vastaavat toiminnot ovat tiedostossa `Geometry.cpp` (noin 2 800 riviä). Algoritmien periaatteet otetaan sieltä, mutta toteutus perustuu tasomalliin.
+The geometry core (`core/geom`) is a dependency-free TypeScript library that computes at float64 precision and is never called directly from the UI, always through commands. In Qoole, the equivalent functionality is in `Geometry.cpp` (about 2,800 lines). The principles of the algorithms are taken from there, but the implementation is based on the plane model.
 
-Toleranssit ovat vakioita yhdessä paikassa: `PLANE_EPS = 1e-4` (pisteen luokittelu tason suhteen) ja `POINT_EPS = 1e-3` (verteksien yhdistäminen). Brush on validi, kun sen tilavuus on yli 0, sillä on vähintään neljä sivua eikä yksikään sivu ole tarpeeton. Jokainen operaatio palauttaa joko validit brushit tai virheen, ei koskaan rikkinäistä geometriaa.
+The tolerances are constants in one place: `PLANE_EPS = 1e-4` (classifying a point against a plane) and `POINT_EPS = 1e-3` (merging vertices). A brush is valid when its volume is greater than 0, it has at least four faces and no face is redundant. Every operation returns either valid brushes or an error, never broken geometry.
 
-| Operaatio | Qoolen vastine | Algoritmi |
+| Operation | Qoole equivalent | Algorithm |
 | --- | --- | --- |
-| Polygonien muodostus | `ConstructEdgeList`, `ConstructPlaneList` | Jokaiselle tasolle luodaan iso neliö (winding), joka leikataan kaikilla muilla tasoilla. Tyhjäksi jäävä sivu on tarpeeton ja poistetaan. |
-| Uusi brush | prefabit, `MakeSegment` | Laatikko vedetään 2D-näkymässä, ja korkeus tulee toisesta näkymästä tai oletuksesta. Primitiivejä ovat laatikko, kiila, n-kulmainen lieriö, kartio ja pallon likiarvo. |
-| CSG-vähennys | `CSGSubtract` | Leikkurin jokaisella tasolla leikattava jaetaan kahtia: tason ulkopuolinen osa jää uudeksi brushiksi, ja sisäpuolinen osa jatkaa seuraavaan tasoon. Lopulta sisälle jäävä osa hävitetään. Uudet sivut saavat leikkurin tekstuurin. |
-| CSG-leikkaus | `CSGIntersect` | Brushien tasojoukot yhdistetään ja tarpeettomat sivut poistetaan. |
-| Onton tekeminen | `HollowInward`, `HollowOutBrush` | Jokaisesta sivusta tehdään kuori, jonka paksuus on d (oletus 8 yksikköä, kuten Qoolessa), joko sisään- tai ulospäin. Toteutus on vähennys: alkuperäisestä vähennetään sen sisään siirretty kopio. |
-| Tasoleikkaus | `PlaneClip` | Taso annetaan 2D-näkymässä kahdella pisteellä ja näkymän syvyysakselilla. Tilat: säilytä etupuoli, takapuoli tai molemmat erillisinä brusheina. |
-| Peilaus ja kääntö | `OpPlaneMirror`, `OpPlaneFlip` | Pisteet peilataan, ja jokaisen sivun pisteiden järjestys käännetään, jotta normaali osoittaa yhä ulospäin. |
-| Verteksi-, reuna- ja sivumuokkaus | `MoveVertex`, `MoveEdge`, `MoveFace`, `BreakPlanes` | Liikutetaan johdettua verteksiä, ja koskettavien sivujen tasot lasketaan uudelleen. Jos sivu ei ole enää tasomainen, se jaetaan kolmioiksi, kuten Qoolen `BreakPlanes`. Lopuksi tarkistetaan kuperuus. Jos tulos ei ole kupera, siirto hylätään ja näkymä näyttää sen punaisena. |
-| Siirto, kierto, skaalaus | `OpSelectionMove`, `Rotate`, `Scale` | Kaikkiin sivujen pisteisiin sovelletaan 4×4-matriisia. Tekstuurilukon ollessa päällä tekstuurin parametrit lasketaan uudelleen (ks. Tekstuurit). |
+| Building polygons | `ConstructEdgeList`, `ConstructPlaneList` | For each plane, a large square (winding) is created and clipped by all the other planes. A face that ends up empty is redundant and is removed. |
+| New brush | prefabs, `MakeSegment` | A box is dragged in a 2D view, and its height comes from another view or from a default. The primitives are box, wedge, n-sided cylinder, cone and an approximate sphere. |
+| CSG subtract | `CSGSubtract` | Each plane of the cutter splits the target in two: the part outside the plane becomes a new brush, and the part inside continues to the next plane. Finally, the part left inside is discarded. New faces get the cutter's texture. |
+| CSG intersect | `CSGIntersect` | The brushes' plane sets are merged and redundant faces are removed. |
+| Hollow | `HollowInward`, `HollowOutBrush` | Each face becomes a shell of thickness d (8 units by default, as in Qoole), either inwards or outwards. The implementation is a subtraction: a copy moved inwards is subtracted from the original. |
+| Plane clip | `PlaneClip` | The plane is given in a 2D view by two points and the view's depth axis. Modes: keep the front side, the back side, or both as separate brushes. |
+| Mirror and flip | `OpPlaneMirror`, `OpPlaneFlip` | The points are mirrored, and the point order of each face is reversed so that the normal still points outwards. |
+| Vertex, edge and face editing | `MoveVertex`, `MoveEdge`, `MoveFace`, `BreakPlanes` | A derived vertex is moved, and the planes of the touching faces are recomputed. If a face is no longer planar, it is split into triangles, as in Qoole's `BreakPlanes`. Finally, convexity is checked. If the result is not convex, the move is rejected and the view shows it as a dashed `vp-invalid` line (orange, because red is reserved for selection). |
+| Move, rotate, scale | `OpSelectionMove`, `Rotate`, `Scale` | A 4×4 matrix is applied to all face points. With texture lock on, the texture parameters are recomputed (see Textures). |
 
-Pisteen paikka 2D-näkymissä kohdistetaan hilaan (1, 2, 4 … 256 yksikköä, oletus 8). Hilaan kohdistetut brushit kirjoitetaan kokonaislukupisteinä, mikä välttää qbsp3:n tarkkuusongelmat. Kierron jälkeen tasopisteet pyöristetään hilaan vain, jos käyttäjä valitsee *Snap to grid* -komennon, koska automaattinen pyöristys voi tehdä brushista epäkuperan.
+In the 2D views, a point's position snaps to the grid (1, 2, 4 … 256 units, 8 by default). Grid-aligned brushes are written as integer points, which avoids qbsp3's precision problems. After a rotation, the plane points are rounded to the grid only if the user chooses the *Snap to grid* command, because automatic rounding can make a brush non-convex.
 
-## Renderöinti WebGL2:lla
+## Rendering with WebGL2
 
-Kaikki neljä näkymää piirretään yhteen WebGL2-kontekstiin ja yhteen `<canvas>`-elementtiin `gl.scissor`- ja `gl.viewport`-kutsuilla. Silloin tekstuurit ja puskurit jaetaan näkymien kesken eikä selaimen konteksteja kulu neljää. Qoolen `QDraw`-abstraktio (OpenGL, Glide, DirectX, MGL, ohjelmistopiirto) korvautuu yhdellä renderöijällä.
+All four views are drawn into one WebGL2 context and one `<canvas>` element using `gl.scissor` and `gl.viewport`. Textures and buffers are then shared between the views, and four browser contexts are not used up. Qoole's `QDraw` abstraction (OpenGL, Glide, DirectX, MGL, software rendering) is replaced by a single renderer.
 
-**Geometrian välimuisti.** Jokaisesta brushista lasketaan polygonit kerran muutoksen jälkeen (likainen-lippu brushin tunnisteen mukaan). Polygonit kolmioidaan viuhkaksi ja kootaan tekstuureittain eriteltyihin VBO-puskureihin. Muutos päivittää vain kyseisen brushin osuuden (`bufferSubData` ja vapaiden välien lista). Verteksiformaatti: sijainti (3×f32), UV (2×f32), normaali (3×i8), brushin indeksi (u32) poimintaa ja valintakorostusta varten.
+**Geometry cache.** Each brush's polygons are computed once after a change (a dirty flag keyed by the brush id). The polygons are fan-triangulated and collected into VBOs separated by texture. A change updates only that brush's share (`bufferSubData` and a free-range list). Vertex format: position (3×f32), UV (2×f32), normal (3×i8), brush index (u32) for picking and selection highlighting.
 
-**2D-näkymät (ylä, etu, sivu).** Ortografinen projektio akseleille XY, XZ ja YZ. Hila piirretään proseduraalisesti fragmenttivarjostimessa koko näkymän kokoisena neliönä, ja hilaviivat himmenevät, kun niiden väli on alle 4 pikseliä. Brushit piirretään rautalankana reunalistoista, entiteetit määritystiedoston värillä ja valitut punaisella. Viivanleveys tehdään instansoiduilla nelikulmioilla, koska `gl.lineWidth` on useimmilla alustoilla rajattu yhteen pikseliin.
+**2D views (top, front, side).** Orthographic projection on the XY, XZ and YZ axes. The grid is drawn procedurally in a fragment shader as a view-sized quad, and grid lines fade out when their spacing is under 4 pixels. Brushes are drawn as wireframes from the edge lists, entities in the colour from the definition file and selected objects in red. Line width is done with instanced quads, because `gl.lineWidth` is limited to one pixel on most platforms.
 
-**3D-näkymä.** Perspektiivikamera ja lentokamera (WASD ja hiiren katselu). Lentotila on päällä vain hiiren oikean painikkeen ollessa pohjassa tai osoittimen lukituksen aikana, joten WASD ei törmää työkalujen pikanäppäimiin (esim. S = valinta). Tilat: rautalanka, tasaväriä ja tekstuurit. Tekstuuritilassa sivun kirkkaus riippuu sen normaalista, jotta muodot erottuvat ilman valaistusta. `SURF_TRANS33`- ja `SURF_TRANS66`-sivut piirretään läpinäkyvinä viimeisenä, `SURF_SKY` taivaanvärillä ja `SURF_NODRAW`, clip ja hint himmeänä tai piilotettuina asetuksen mukaan. Kaukaiset brushit karsitaan näkyvyyskartiolla brushien rajauslaatikoiden perusteella.
+**3D view.** A perspective camera and a fly camera (WASD and mouse look). Fly mode is active only while the right mouse button is held down or the pointer is locked, so WASD does not clash with the tool shortcuts (for example S = select). Modes: wireframe, flat colour and textured. In textured mode, a face's brightness depends on its normal so that shapes stand out without lighting. `SURF_TRANS33` and `SURF_TRANS66` faces are drawn transparent and last, `SURF_SKY` in a sky colour, and `SURF_NODRAW`, clip and hint dimmed or hidden depending on a setting. Distant brushes are culled by the view frustum using the brushes' bounding boxes.
 
-**Tekstuurit.** `.wal` muunnetaan paletin avulla RGBA8-muotoon Web Workerissa ja ladataan erillisinä `WebGLTexture`-olioina (`REPEAT`, mipmapit, `NEAREST_MIPMAP_LINEAR` aidon Q2-tuntuman vuoksi). Tekstuurit ladataan laiskasti: vasta kun niitä tarvitaan näkymässä tai tekstuuriselaimessa. Siihen asti käytetään ruudukkokuviota. Muunnetut tekstuurit tallennetaan välimuistiin OPFS:ään.
+**Textures.** A `.wal` is converted to RGBA8 with the palette in a Web Worker and uploaded as a separate `WebGLTexture` (`REPEAT`, mipmaps, `NEAREST_MIPMAP_LINEAR` for an authentic Q2 feel). Textures are loaded lazily: only when they are needed in a view or in the texture browser. Until then, a checker pattern is used. Converted textures are cached in OPFS.
 
-**Poiminta.** Poiminta tehdään prosessorilla. Säde leikataan brushin tasojen puoliavaruuksilla (sama periaate kuin Qoolen `HitGeometry`). Brushit haetaan dynaamisesta BVH-puusta, joka päivitetään muutosten yhteydessä. 2D-näkymissä osuma tarkoittaa lähintä reunaa 4 pikselin säteellä tai sisältävää brushia. Toistuva napsautus samassa kohdassa kiertää päällekkäisiä brusheja (Qoolen `Selector`). Prosessoripoiminta valitaan GPU:n ID-puskurin sijaan, koska sama koodi palvelee myös verteksi- ja sivumuokkausta sekä testejä.
+**Picking.** Picking is done on the CPU. A ray is intersected with the half-spaces of the brush's planes (the same principle as Qoole's `HitGeometry`). Brushes are fetched from a dynamic BVH that is updated with the changes. In the 2D views, a hit means the nearest edge within 4 pixels or the brush that contains the point. Repeated clicks at the same spot cycle through overlapping brushes (Qoole's `Selector`). CPU picking is chosen over a GPU id buffer because the same code also serves vertex and face editing and the tests.
 
-**Kehyssilmukka.** Piirto tehdään vain, kun jokin muuttuu (dokumentti, kamera tai osoitin), ei jatkuvasti `requestAnimationFrame`-silmukassa. Näin kannettavan akku ei tyhjene editorin ollessa auki.
+**Frame loop.** Drawing happens only when something changes (the document, a camera or the pointer), not continuously in a `requestAnimationFrame` loop. That way a laptop's battery does not drain while the editor is open.
 
-## Tekstuurit ja pintojen ominaisuudet
+## Textures and surface properties
 
-UV-koordinaatit lasketaan täsmälleen kuten qbsp3:ssa, jotta editorin näkymä ja peli näyttävät saman. Sivun normaalia lähimpänä oleva perusakseli valitaan kuuden akselin taulukosta (lattia, katto ja neljä seinää). Sen jälkeen akselit kierretään `rotation`-kulmalla, jaetaan `scale`-arvoilla ja siirretään `offset`-arvoilla. Lopuksi tulos jaetaan tekstuurin leveydellä ja korkeudella. Funktio `texAxes(plane, tex)` on ytimessä, ja sitä käyttävät sekä renderöijä että tekstuurilukko.
+UV coordinates are computed exactly as in qbsp3, so that the editor's view and the game show the same thing. The base axis closest to the face normal is chosen from a table of six axes (floor, ceiling and four walls). The axes are then rotated by the `rotation` angle, divided by the `scale` values and shifted by the `offset` values. Finally, the result is divided by the texture's width and height. The function `texAxes(plane, tex)` is in the core, and both the renderer and texture lock use it.
 
-**Tekstuurilukko.** Siirrossa ja kierrossa vanhat tekstuuriakselit muunnetaan samalla matriisilla, ja niistä ratkaistaan uudet `offset`-, `rotation`- ja `scale`-arvot (vrt. Qoolen `FaceTex::Transform` ja `lockTex`). Quaken parametrimuoto ei pysty esittämään vinoutusta. Jos ratkaisun virhe ylittää 0,5 tekseliä, sivu merkitään ja käyttäjä näkee varoituksen. Siirto lukon kanssa on tarkka, kun uusi siirtymä on kokonaisluku (esim. hilaan kohdistettu siirto skaalalla 1 tai 0,5). Muuten siirtymä pyöristetään qbsp3:n kokonaislukumuotoon, ja virhe näkyy samalla varoituksella (ks. Tekstuurin siirto ja kierto).
+**Texture lock.** On move and rotate, the old texture axes are transformed with the same matrix, and new `offset`, `rotation` and `scale` values are solved from them (compare Qoole's `FaceTex::Transform` and `lockTex`). Quake's parameter form cannot represent shear. If the solution's error exceeds 0.5 texels, the face is flagged and the user sees a warning. A move with lock on is exact when the new offset is an integer (for example a grid-aligned move with scale 1 or 0.5). Otherwise the offset is rounded to qbsp3's integer form, and the error is shown with the same warning (see Texture offset and rotation).
 
-**Tekstuurityökalut** (Qoolen `OpTextureApply`, `ApplyFace`, `FaceManip`, `BrushManip`):
+**Texture tools** (Qoole's `OpTextureApply`, `ApplyFace`, `FaceManip`, `BrushManip`):
 
-- tekstuurin asetus koko brushille tai valituille sivuille, ja tekstuurin poiminta sivulta pipetillä
-- siirto ja kierto nuolinäppäimillä hilan mukaan, sovita sivuun (fit), tasaa reunaan (justify), palauta oletukset
-- tekstuuriselain: kansiopuu (`textures/e1u1` …), haku nimellä, käytössä olevat tekstuurit -suodatin, esikatselu ja koko
+- setting the texture for a whole brush or the selected faces, and picking a texture from a face with an eyedropper
+- shifting and rotating with the arrow keys by the grid step, fit to face, justify to an edge, reset to defaults
+- texture browser: a folder tree (`textures/e1u1` …), search by name, an in-use filter, previews and sizes
 
-**Pinnan ominaisuudet** muokataan sivukohtaisessa paneelissa valintaruutuina. Arvot ovat Q2:n `qfiles.h`:n vakioita. Paneeli näyttää, poikkeaako arvo `.wal`-tekstuurin oletuksesta (Qoolen `OpModSurfaceAttrib` ja `OpModContentAttrib`).
+**Surface properties** are edited in a per-face panel as checkboxes. The values are constants from Q2's `qfiles.h`. The panel shows whether a value differs from the `.wal` texture's default (Qoole's `OpModSurfaceAttrib` and `OpModContentAttrib`).
 
-| Ryhmä | Liput (heksadesimaaliarvo) |
+| Group | Flags (hexadecimal value) |
 | --- | --- |
 | Surface flags | LIGHT 0x1, SLICK 0x2, SKY 0x4, WARP 0x8, TRANS33 0x10, TRANS66 0x20, FLOWING 0x40, NODRAW 0x80, HINT 0x100, SKIP 0x200 |
 | Contents | SOLID 0x1, WINDOW 0x2, AUX 0x4, LAVA 0x8, SLIME 0x10, WATER 0x20, MIST 0x40, AREAPORTAL 0x8000, PLAYERCLIP 0x10000, MONSTERCLIP 0x20000, CURRENT\_0…CURRENT\_DOWN 0x40000–0x800000, ORIGIN 0x1000000, DETAIL 0x8000000, TRANSLUCENT 0x10000000, LADDER 0x20000000 |
-| Value | kokonaisluku, LIGHT-lipun kanssa valon voimakkuus |
+| Value | an integer; with the LIGHT flag, the light intensity |
 
-Arvot on tarkistettu 24.11.2026 Quake-2-Toolsin tiedostosta `common/qfiles.h`, ja ne vastaavat sitä. Taulukosta puuttuvat vain `CONTENTS_MONSTER` (0x2000000) ja `CONTENTS_DEADMONSTER` (0x4000000). Ne ovat pelin ajonaikaisia arvoja, eikä niitä aseteta brusheille, joten editori ei näytä niitä.
+The values were verified on 24.11.2026 against Quake-2-Tools' `common/qfiles.h`, and they match it. Only `CONTENTS_MONSTER` (0x2000000) and `CONTENTS_DEADMONSTER` (0x4000000) are missing from the table. They are runtime values of the game and are not set on brushes, so the editor does not show them.
 
-## Editoritoiminnot ja käyttöliittymä
+## Editor features and UI
 
-Oletusasettelussa on neljä näkymää 2×2-ruudukossa (3D, ylä, etu, sivu), oikealla ominaisuuspaneeli ja alhaalla tekstuuriselain ja lokiruutu. Paneelien rajoja voi siirtää, ja yksittäisen näkymän voi suurentaa koko ruudulle. Qoolen MFC-telakat (`Interface2/`) korvautuvat CSS Gridillä. Paneelit ovat Solid 2 -komponentteja. Näkymät ovat yksi canvas, jota UI-kirjasto ei renderöi.
+The default layout has four views in a 2×2 grid (3D, top, front, side), a properties panel on the right, and a texture browser and log pane at the bottom. The top of the properties panel shows the selection's texture (or "Multiple textures"). The panel borders can be moved, and a single view can be maximised to fill the workspace with F1–F4 (3D, Top, Front, Side); the same key restores the grid. Qoole's MFC docking (`Interface2/`) is replaced by CSS Grid. The panels are Solid 2 components. The views are one canvas that the UI library does not render. The UI's look, components, colours, and language and voice are defined in the design system ([design-system/README.md](design-system/README.md)), and the UI text is in English.
 
-**Työkalutilat** (yksi kerrallaan, pikanäppäin suluissa):
+**Tool modes** (one at a time, shortcut in parentheses):
 
-| Tila | Toiminta | Qoolen vastine |
+| Mode | Behaviour | Qoole equivalent |
 | --- | --- | --- |
-| Valinta (S) | napsautus, Shift lisää valintaan, alueen raahaus, siirto raahaamalla, kahvat skaalaukseen, Ctrl+raahaus kiertää | `OpSelect*`, `OpSelectionMove/Rotate/Scale` |
-| Brush (B) | raahaus 2D-näkymässä luo valitun primitiivin | prefabit, `QPrefbVw` |
-| Entiteetti (E) | napsautus luo valitun luokan entiteetin. Brush-luokka (`func_*`, `trigger_*`) muuttaa valitut brushit entiteetiksi | `QEntSel` |
-| Leikkaus (C) | kaksi pistettä 2D-näkymässä, Enter leikkaa, Tab vaihtaa säilytettävän puolen | `OpPlaneClip` (scissors-ikoni) |
-| Verteksi ja reuna (V, uusi painallus vaihtaa), sivu (F) | kahvat johdetuille elementeille, raahaus hilaan kohdistettuna | `MoveVertex`, `MoveEdge`, `MoveFace` |
-| Tekstuuri (T) | sivun valinta 3D-näkymässä, tekstuurin asetus ja säätö | `QPropSrf`, `QPropTex` |
+| Select (S) | click, Shift adds to the selection, box drag, move by dragging, handles for scaling, Ctrl+drag rotates | `OpSelect*`, `OpSelectionMove/Rotate/Scale` |
+| Brush (B) | dragging in a 2D view creates the chosen primitive | prefabs, `QPrefbVw` |
+| Entity (E) | a click creates an entity of the chosen class. A brush class (`func_*`, `trigger_*`) turns the selected brushes into an entity | `QEntSel` |
+| Clip (C) | two points in a 2D view, Enter clips, Tab switches the side to keep | `OpPlaneClip` (scissors icon) |
+| Vertex and edge (V, pressing again switches), face (F) | handles for the derived elements, dragging snaps to the grid | `MoveVertex`, `MoveEdge`, `MoveFace` |
+| Texture (T) | selecting a face in the 3D view, setting and adjusting its texture | `QPropSrf`, `QPropTex` |
 
-**Komennot valikoissa ja pikanäppäiminä:** leikkaa, kopioi, liitä ja monista (leikepöydällä `.map`-tekstinä, jolloin siirto toiseen editoriin toimii). Lisäksi CSG-vähennys, CSG-leikkaus, onton tekeminen sisään ja ulos, peilaus X/Y/Z, kierto 90°, ryhmittely ja purku, piilota ja näytä, lukitse sekä hilan koko \[ ja \].
+**Commands in menus and as shortcuts:** cut, copy, paste and duplicate (as `.map` text on the clipboard, so transfer to another editor works). Also CSG subtract, CSG intersect, hollow inwards and outwards, mirror X/Y/Z, rotate 90°, group and ungroup, hide and show, lock, and grid size \[ and \]. The views have a right-click context menu with Add Brush, Add Entity and Apply Entity → category → class.
 
-**Puunäkymä ja ryhmän sisälle meneminen.** Sivupaneelin puu näyttää worldspawnin, entiteetit ja ryhmät, ja solmuja voi siirtää raahaamalla (Qoolen `QTrView` ja `OpTreeViewDragMove`). Kaksoisnapsautus vie ryhmän sisälle, jolloin valinta ja uudet brushit rajautuvat siihen ja muu kartta himmenee. Tämä on Qoolen *scope*-käsite (`OpScopeChange`).
+**Tree view and entering a group.** The side panel's tree shows worldspawn, entities and groups, and nodes can be moved by dragging (Qoole's `QTrView` and `OpTreeViewDragMove`). Double-clicking enters a group, so that selection and new brushes are limited to it and the rest of the map is dimmed. This is Qoole's *scope* concept (`OpScopeChange`).
 
-**Entiteettipaneeli.** Lomake määritystiedoston mukaan: `spawnflags` valintaruutuina, `_color` värinvalitsimena, `angle` kompassina ja `target`/`targetname` pudotusvalikkona kartan olemassa olevista nimistä. Lomakkeen alla on raaka avain–arvo-taulukko, jolla tuntemattomia avaimia voi muokata. Kohteiden väliset `target`-yhteydet piirretään viivoina 2D-näkymiin.
+**Entity panel.** A class picker in two steps, a category and then a class, as in Qoole. The categories come from the class-name prefix (in vanilla Q2: `ammo_`, `func_`, `info_`, `item_`, `key_`, `light`, `misc_`, `monster_`, `path_`, `point_`, `target_`, `trigger_`, `turret_`, `weapon_`; classes without a prefix, such as `worldspawn` and `viewthing`, go under Misc), and classes are listed by their definition names (for example `func_door_secret`). Choosing a brush class turns the selected brushes into that entity. Below it is a form based on the definition file: `spawnflags` as checkboxes, `_color` as a colour picker, `angle` as a compass and `target`/`targetname` as a drop-down of the names that exist in the map. Below the form is a raw key–value table for editing unknown keys. `target` links between entities are drawn as lines in the 2D views.
 
-**Prefabit.** Valinnan voi tallentaa prefabiksi (`.map`-pätkä OPFS:ään) ja raahata prefabiselaimesta näkymään (Qoolen `QPrefMgr`).
+**Prefabs.** The selection can be saved as a prefab (a `.map` snippet in OPFS) and dragged from the prefab browser into a view (Qoole's `QPrefMgr`).
 
-## Komennot, undo/redo ja tiedostojen käsittely
+## Commands, undo/redo and file handling
 
-Kaikki dokumentin muutokset kulkevat yhden `CommandBus`-väylän kautta, eikä mikään UI-koodi muuta dokumenttia suoraan. Qoolessa on noin 30 `Operation`-aliluokkaa ja `OpManager`, ja suurin osa niistä tallentaa vanhat objektit ja vaihtaa ne undossa takaisin (`OpObjModification::SwapObjs`). Selainversio yleistää saman mallin yhdeksi mekanismiksi.
+All document changes go through a single `CommandBus`, and no UI code changes the document directly. Qoole has about 30 `Operation` subclasses and an `OpManager`, and most of them store the old objects and swap them back on undo (`OpObjModification::SwapObjs`). The browser version generalises the same model into a single mechanism.
 
 ```typescript
-interface Patch {                // yhden komennon vaikutus
-  before: Map<Id, MapNode | null>;   // null = solmua ei ollut
-  after:  Map<Id, MapNode | null>;   // null = solmu poistettiin
+interface Patch {                // the effect of one command
+  before: Map<Id, MapNode | null>;   // null = the node did not exist
+  after:  Map<Id, MapNode | null>;   // null = the node was removed
   parentBefore: Map<Id, Id | null>;
   parentAfter:  Map<Id, Id | null>;
 }
 interface Command { label: string; mergeKey?: string; run(doc: Readonly<MapDocument>): Patch }
 ```
 
-- **Undo** soveltaa `before`-tilan ja **redo** `after`-tilan. Solmut ovat muuttumattomia olioita, joten tilannekuva on halpa: muuttumattomia solmuja ei kopioida.
-- **Yhdistäminen:** saman raahauksen aikana syntyvät komennot, joilla on sama `mergeKey`, yhdistetään yhdeksi undo-askeleeksi.
-- **Historia** on rajaton, mutta muistin käytölle asetetaan yläraja (oletus 256 Mt arvioituna). Vanhimmat askeleet poistetaan.
-- **Valinta** ei ole osa dokumenttia eikä undo-historiaa, mutta undo palauttaa komentoa edeltäneen valinnan (vrt. Qoolen `OpSelectNewObjs`).
-- Patchit menevät myös renderöijälle, BVH:lle ja puunäkymälle muutosilmoituksina, jolloin vain muuttuneet osat lasketaan uudelleen.
+- **Undo** applies the `before` state and **redo** the `after` state. Nodes are immutable objects, so a snapshot is cheap: unchanged nodes are not copied.
+- **Merging:** commands produced during the same drag that share a `mergeKey` are merged into one undo step.
+- **History** is unlimited, but memory use is capped (256 MB estimated by default). The oldest steps are dropped.
+- **Selection** is not part of the document or the undo history, but undo restores the selection from before the command (compare Qoole's `OpSelectNewObjs`).
+- Patches also go to the renderer, the BVH and the tree view as change notifications, so only the changed parts are recomputed.
 
-**Tiedostojen käsittely selaimessa:**
+**File handling in the browser:**
 
-| Tarve | Chromium (Chrome, Edge) | Firefox, Safari |
+| Need | Chromium (Chrome, Edge) | Firefox, Safari |
 | --- | --- | --- |
-| Pelikansion valinta | File System Access API: `showDirectoryPicker()`, kahva tallennetaan IndexedDB:hen, ja lupa pyydetään uudelleen seuraavalla käynnistyskerralla | `<input type=file webkitdirectory>` tai yksittäinen `pak0.pak` |
-| Kartan avaus | `showOpenFilePicker()`, ja tiedostokahva muistetaan | `<input type=file>` tai raahaus |
-| Tallennus | Kirjoitus suoraan samaan tiedostoon (`createWritable`) | Lataus (`<a download>`) |
-| Automaattinen tallennus | OPFS 30 sekunnin välein ja ennen sivun sulkemista | OPFS |
-| Asetukset, viimeisimmät tiedostot | IndexedDB | IndexedDB |
+| Choosing the game folder | File System Access API: `showDirectoryPicker()`, the handle is stored in IndexedDB, and permission is requested again on the next start | `<input type=file webkitdirectory>` or a single `pak0.pak` |
+| Opening a map | `showOpenFilePicker()`, and the file handle is remembered | `<input type=file>` or drag and drop |
+| Saving | Writing directly to the same file (`createWritable`) | Download (`<a download>`) |
+| Autosave | OPFS every 30 seconds and before the page closes | OPFS |
+| Settings, recent files | IndexedDB | IndexedDB |
 
-Automaattinen tallennus kirjaa, onko dokumentissa tallentamattomia muutoksia viimeisimmän tallennuksen tai latauksen jälkeen. Jos OPFS:ssä on käynnistyksen aikaan automaattinen tallennus, jossa tämä lippu on päällä, käyttäjältä kysytään, palautetaanko se. Tapa toimii samoin kaikissa selaimissa, myös latauspohjaisessa tallennuksessa, jossa tiedoston aikaleimaa ei saada. Sovellus on PWA ja toimii myös ilman verkkoyhteyttä.
+Autosave records whether the document has unsaved changes since the last save or download. If OPFS holds an autosave with this flag set at start-up, the user is asked whether to restore it. This works the same way in every browser, including download-based saving, where no file timestamp is available. The application is a PWA and also works offline.
 
-## Kartan kääntäminen ja testaus pelissä
+## Compiling and testing in the game
 
-V1:ssä käännös tehdään selaimessa WebAssemblyksi käännetyillä qbsp3-, qvis3- ja qrad3-työkaluilla. Varavaihtoehtona `.map` vietään käyttäjän omalle koneelle käännettäväksi. Qoole ajoi samat kolme ohjelmaa ulkoisina prosesseina parametrilla `%file%` ja käynnisti pelin parametrilla `+map %file%` (`Quake2::Quake2`, `QCompile`). Selaimessa ulkoisia prosesseja ei ole, joten:
+In v1, compiling is done in the browser with qbsp3, qvis3 and qrad3 compiled to WebAssembly. As a fallback, the `.map` is exported for compiling on the user's own machine. Qoole ran the same three programs as external processes with the parameter `%file%` and started the game with `+map %file%` (`Quake2::Quake2`, `QCompile`). A browser has no external processes, so:
 
-1. **WASM-käännös.** Työkalujen C-koodi käännetään Emscriptenillä, ja jokainen työkalu ajetaan omassa Web Workerissaan. Syöte ja tuloste välitetään Emscriptenin muistitiedostojärjestelmän kautta: `.map` sisään, `.bsp`, `.pts` ja `.prt` ulos. Tekstuurien `.wal`-otsakkeet annetaan työkaluille pakista. Stdout ohjataan lokiruutuun reaaliajassa. qvis3 ja qrad3 voivat kestää isoilla kartoilla minuutteja, joten käyttäjä valitsee profiilin: *nopea* (qbsp3, qvis3 `-fast`, ei qrad3:a), *normaali* tai *lopullinen* (qrad3 `-extra`).
-2. **Säikeistys.** qvis3 ja qrad3 ovat monisäikeisiä. WASM-säikeet vaativat `SharedArrayBuffer`in, joka puolestaan vaatii COOP- ja COEP-otsakkeet. Isännöinnin täytyy lähettää ne, ja ilman niitä käytetään yhden säikeen käännöstä.
-3. **Vuodot.** Jos qbsp3 löytää vuodon, `.pts` ladataan automaattisesti ja polku näytetään kaikissa näkymissä. Komento *Seuraava vuotopiste* siirtää kameran polkua pitkin.
-4. **Testaus pelissä.** Valmis `.bsp` tallennetaan pelikansion `baseq2/maps/`-hakemistoon (Chromium) tai ladataan. Peliä ei voi käynnistää selaimesta, joten editori näyttää kopioitavan komennon `+map <nimi>`. Selaimessa toimivan Q2-portin upottaminen esikatseluun on v2:n asia.
+1. **WASM compilation.** The tools' C code is compiled with Emscripten, and each tool runs in its own Web Worker. Input and output pass through Emscripten's in-memory filesystem: the `.map` goes in, and `.bsp`, `.pts` and `.prt` come out. The textures' `.wal` headers are given to the tools from the pak. Stdout is streamed to the log pane in real time. qvis3 and qrad3 can take minutes on large maps, so the user chooses a profile: *fast* (qbsp3, qvis3 `-fast`, no qrad3), *normal* or *final* (qrad3 `-extra`).
+2. **Threads.** qvis3 and qrad3 are multithreaded. WASM threads require `SharedArrayBuffer`, which in turn requires the COOP and COEP headers. The hosting must send them, and without them a single-threaded build is used.
+3. **Leaks.** If qbsp3 finds a leak, the `.pts` is loaded automatically and the path is shown in every view. The *Next leak point* command (N) moves the camera along the path.
+4. **Testing in the game.** The finished `.bsp` is saved to the game folder's `baseq2/maps/` directory (Chromium) or downloaded. The game cannot be started from the browser, so the editor shows the command `+map <name>` to copy. Embedding a browser-based Q2 port as a preview is a v2 matter.
 
-Työkalut käännetään id:n alkuperäisestä Quake-2-Tools-lähdekoodista (`ext/Quake-2-Tools`). Sen tiedostojen otsakkeissa lisenssi on "GPL v2 tai myöhempi", mikä on yhteensopiva Joolen `GPL-2.0-or-later`-lisenssin kanssa (tarkistettu 24.11.2026). Koodiin tehdään vain Emscripten-käännöksen vaatimat muutokset ja välttämättömät bugikorjaukset (esim. tasopisteiden luku `atof`-funktiolla, ks. Kokonaislukupisteet), ja ne kirjataan `tools/`-hakemiston README:hen. Yksisäikeinen qbsp3-build Nodelle tehdään jo vaiheessa 2 testejä ja CI:tä varten.
+The tools are compiled from id's original Quake-2-Tools source code (`ext/Quake-2-Tools`). Its file headers give the licence as "GPL v2 or later", which is compatible with Joole's `GPL-2.0-or-later` licence (verified on 24.11.2026). Only the changes Emscripten compilation requires and necessary bug fixes are made to the code (for example reading plane points with `atof`, see Integer plane points), and they are recorded in the README of the `tools/` directory. A single-threaded qbsp3 build for Node is made as early as phase 2, for tests and CI.
 
-## Suorituskyky, testaus ja laatu
+## Performance, testing and quality
 
-Tavoitteet on mitoitettu niin, että iso Q2-kartta toimii integroidulla näytönohjaimella. Ne ovat lähtöoletuksia, jotka tarkistetaan ensimmäisellä prototyypillä.
+The targets are sized so that a large Q2 map works on an integrated GPU. They are starting assumptions that will be checked with the first prototype.
 
-| Mittari | Tavoite | Mittaustapa |
+| Metric | Target | Measured with |
 | --- | --- | --- |
-| 3D-näkymän kuvataajuus, 20 000 brushia, tekstuurit päällä | ≥ 60 fps | Kannettava, jossa integroitu näytönohjain, Chrome |
-| `.map`-tiedoston avaus, 5 000 brushia, näkymät valmiina | < 2 s | Suorituskykytesti Playwrightilla |
-| Yksittäisen brushin muokkauksen viive (raahaus) | < 8 ms per kehys | Performance-aikajana |
-| CSG-vähennys, 1 leikkuri ja 50 leikattavaa | < 50 ms | Vitest-benchmark |
-| Muistinkäyttö ilman tekstuureja, 20 000 brushia | < 300 Mt | Chromen muistiprofiili |
+| 3D view frame rate, 20,000 brushes, textures on | ≥ 60 fps | A laptop with an integrated GPU, Chrome |
+| Opening a `.map`, 5,000 brushes, views ready | < 2 s | A Playwright performance test |
+| Latency of editing a single brush (drag) | < 8 ms per frame | The Performance timeline |
+| CSG subtract, 1 cutter and 50 targets | < 50 ms | A Vitest benchmark |
+| Memory use without textures, 20,000 brushes | < 300 MB | Chrome's memory profiler |
 
-**Testaus:**
+**Testing:**
 
-- **Yksikkötestit (Vitest)** geometriaytimelle ja jäsentäjille, tavoitteena vähintään 90 % rivikattavuus `core/`-kansiossa. Jokaiselle CSG-operaatiolle ominaisuuspohjaiset testit (fast-check): satunnaisista kuperista brusheista tuloksen pitää olla validi, ja vähennyksessä tilavuuksien summan pitää täsmätä toleranssin rajoissa.
-- **Kierrostestit:** jokainen testiaineiston `.map` luetaan, kirjoitetaan ja luetaan uudelleen. Kriteeri on kuvattu kohdassa Tiedostoformaatit: tietorakenne on aina identtinen, ja teksti on identtinen, kun tiedosto on kanonisessa muodossa.
-- **Testiaineisto:** repoon (`tests/fixtures/`) lisätään vain itse tehtyjä pieniä karttoja sekä synteettisiä `.pak`-, `.pkz`-, `.wal`- ja `.pcx`-tiedostoja, ja CI ajaa testit niillä. id:n pelidataa (vanilla-kartat, `pak0.pak`, tekstuurit) ei commitoida. Sitä käyttävät testit lukevat Q2-asennuksen polun ympäristömuuttujasta `JOOLE_Q2_DIR`, ja ne ohitetaan, jos muuttujaa ei ole asetettu.
-- **Kääntäjätesti:** CI kirjoittaa testikartat ja ajaa qbsp3:n WASM-versiona Nodessa. Testi epäonnistuu, jos kääntäjä varoittaa virheellisistä brusheista.
-- **E2E (Playwright)** päätyönkulkuihin: avaa, luo brush, vähennä, undo, tallenna. Lisäksi kuvavertailutestit näkymille (pikselivertailu SwiftShader-ohjelmistorenderöinnillä).
+- **Unit tests (Vitest)** for the geometry core and the parsers, with a target of at least 90 % line coverage in the `core/` folder. Every CSG operation gets property-based tests (fast-check): for random convex brushes, the result must be valid, and in subtraction the sum of the volumes must match within tolerance.
+- **Round-trip tests:** every `.map` in the test data is read, written and read again. The criterion is described in the File formats section: the data structure is always identical, and the text is identical when the file is in canonical form.
+- **Test data:** only small self-made maps and synthetic `.pak`, `.pkz`, `.wal` and `.pcx` files are added to the repository (`tests/fixtures/`), and CI runs the tests with them. id's game data (vanilla maps, `pak0.pak`, textures) is not committed. Tests that use it read the path of a Q2 installation from the environment variable `JOOLE_Q2_DIR`, and they are skipped if the variable is not set.
+- **Compiler test:** CI writes the test maps and runs the WASM version of qbsp3 in Node. The test fails if the compiler warns about invalid brushes.
+- **E2E (Playwright)** for the main workflows: open, create a brush, subtract, undo, save. Plus screenshot comparison tests for the views (pixel comparison with SwiftShader software rendering).
 
-**Koodin laatu:** TypeScriptin `strict`-tila, ESLint ja Prettier. `core/` ei saa tuoda mitään DOM- tai WebGL-tyyppejä. Sääntö valvotaan ESLintin import-rajoituksella ja ytimen omalla tsconfig-projektilla ilman `DOM`-kirjastoa. Muut kerrosrajat on kuvattu kohdassa *Kerrosjärjestys ja riippuvuussäännöt*.
+**Code quality:** TypeScript's `strict` mode, ESLint and Prettier. `core/` must not import any DOM or WebGL types. The rule is enforced by ESLint's import restriction and by the core's own tsconfig project without the `DOM` library. The other layer boundaries are described in the *Layer order and dependency rules* section.
 
-## Toteutusvaiheet ja päätökset
+## Implementation phases and decisions
 
-Toteutus etenee viitenä vaiheena. Jokaisen vaiheen lopussa on käyttökelpoinen versio, ja seuraava vaihe alkaa vasta, kun edellisen hyväksymiskriteeri täyttyy.
+The implementation proceeds in five phases. Each phase ends with a usable version, and the next phase starts only when the previous one's acceptance criterion is met. The detailed work breakdown is in [PLAN.md](../PLAN.md).
 
-1. **Lukija ja katselin.** Pak-, pkz-, wal- ja paletti-jäsentäjät, modihakemistojen hakujärjestys, `.map`-lukija ja -kirjoittaja, polygonien muodostus, neljä näkymää ja kamerat. *Valmis, kun* vanilla-Q2:n kartta aukeaa tekstuureineen ja kierrostesti menee läpi.
-2. **Brushien muokkaus.** CommandBus ja undo, valinta, siirto, kierto ja skaalaus, uusi brush, hila, JSON-projektin tallennus, .map-vienti, automaattinen tallennus sekä yksisäikeinen qbsp3.wasm Nodelle kääntäjätestiä varten. *Valmis, kun* yksinkertaisen huoneen voi rakentaa tyhjästä ja tallentaa, ja qbsp3 hyväksyy sen ilman varoituksia.
-3. **CSG ja tekstuurit.** Vähennys, leikkaus, onton tekeminen, tasoleikkaus, peilaus, verteksi-, reuna- ja sivumuokkaus, tekstuurityökalut ja -lukko sekä pinnan liput. *Valmis, kun* ominaisuuspohjaiset CSG-testit menevät läpi ja tekstuurit näkyvät editorissa ja pelissä samoin.
-4. **Entiteetit ja rakenne.** Määritystiedoston jäsennin, entiteettipaneeli, brush-entiteetit, puunäkymä, ryhmät ja ryhmän sisälle meneminen, prefabit, md2-esikatselu ja `target`-viivat. *Valmis, kun* toimiva yksinpelikenttä (pelaajan aloituspiste, ovi, nappi, vihollinen) voidaan tehdä alusta loppuun.
-5. **Käännös ja viimeistely.** WASM-työkalut selaimessa (qbsp3, qvis3 ja qrad3 workereissa, säikeistys), vuotopolku, käännösprofiilit, PWA, suorituskykytavoitteet ja Firefox/Safari-tuki. *Valmis, kun* suorituskykytaulukon tavoitteet täyttyvät ja kartta kääntyy pelattavaksi BSP-tiedostoksi poistumatta selaimesta.
+1. **Reader and viewer.** Pak, pkz, wal and palette parsers, the search order of mod directories, the `.map` reader and writer, building polygons, the four views and the cameras. *Done when* a vanilla Q2 map opens with its textures and the round-trip test passes.
+2. **Brush editing.** CommandBus and undo, selection, move, rotate and scale, new brush, grid, saving the JSON project, `.map` export, autosave, and a single-threaded qbsp3.wasm for Node for the compiler test. *Done when* a simple room can be built from scratch and saved, and qbsp3 accepts it without warnings.
+3. **CSG and textures.** Subtract, intersect, hollow, plane clip, mirror, vertex, edge and face editing, texture tools and lock, and surface flags. *Done when* the property-based CSG tests pass and textures look the same in the editor and in the game.
+4. **Entities and structure.** The definition file parser, the entity panel, brush entities, the tree view, groups and entering a group, prefabs, md2 preview and `target` lines. *Done when* a working single-player level (player start, door, button, enemy) can be made from start to finish.
+5. **Compilation and polish.** WASM tools in the browser (qbsp3, qvis3 and qrad3 in workers, threads), the leak path, compile profiles, PWA, the performance targets and Firefox/Safari support. *Done when* the targets in the performance table are met and a map compiles to a playable BSP file without leaving the browser.
 
-**Päätökset 24.11.2026:**
+**Decisions 24.11.2026:**
 
-- **Lisenssi:** GNU General Public License v2.0 tai myöhempi (`GPL-2.0-or-later`), sama kuin kaikilla lähdeprojekteilla. Qoolen, q2pro:n, Q2:n ja Q2-työkalujen koodia saa käyttää.
-- **Projektiformaatti:** oma JSON-formaatti (`"format": "joole-project"`, pääte `.joole.json`) on ensisijainen tallennusmuoto, ja `.map` on vientiformaatti.
-- **Modit:** Q2-modien tekstuurit ja pelihakemistot tuetaan v1:ssä. Paketit haetaan q2pro:n säännöillä, ja myös `.pkz`-zipit tuetaan.
-- **`.map`-kirjoitus:** kierrostestin kriteeri on häviötön tietorakenne ja kanoninen teksti. Valinnaisten pintakenttien läsnäolo muistetaan. Tekstuurin siirto ja kierto näytetään kuten qbsp3 ne tulkitsee, ja editorin omat arvot ovat kokonaislukuja.
-- **Tasopisteet `.map`-viennissä:** aina kokonaislukuja. Muunnettu brush tarkistetaan ja siitä varoitetaan tarvittaessa. Leikepöytä ja prefabit säilyttävät täyden tarkkuuden, ja Joolen qbsp3 lukee pisteet liukulukuina varmuuden vuoksi.
-- **Ryhmät `.map`-tiedostossa:** `func_group`-entiteetteinä `_joole_*`-avaimin, ei kommentteina.
-- **Kääntäjät:** id:n alkuperäinen Quake-2-Tools. Yksisäikeinen qbsp3.wasm Nodelle tehdään jo vaiheessa 2.
-- **Entiteettimääritykset:** generoidaan id:n GPL-pelikoodista. md2-mallien polut ovat `game/q2`:n taulukossa.
-- **Testiaineisto:** repoon vain itse tehtyä tai synteettistä aineistoa. id:n data luetaan paikallisesti ympäristömuuttujan `JOOLE_Q2_DIR` kautta.
-- **Pikanäppäimet:** WASD toimii vain lentotilassa. V vaihtaa verteksi- ja reunamuokkauksen välillä.
-- **Automaattisen tallennuksen palautus:** perustuu tallentamattomien muutosten lippuun eikä aikaleimoihin.
-- **Qoolen `.qle`-tuonti** siirtyy v1:n jälkeiseen vaiheeseen. Lukija voidaan tehdä lähdekoodin `LoadObjFile`- ja `ReadBoundGeometry`-funktioiden pohjalta.
-- **Teknologiapino:** UI-kirjasto on Solid 2, kieli TypeScript 7 (natiivi `tsc`), kehitysympäristö Node 26 LTS ja paketinhallinta pnpm. Perustelut ja versiot ovat tiedostossa [10-stack.md](10-stack.md).
-- **Kerrosarkkitehtuuri:** kerrosjärjestys, riippuvuussäännöt, `core/types`-moduuli, `src/main.ts` ja työkalujen jako `app/`- ja `ui/`-kerroksiin tarkennettiin (ks. Arkkitehtuuri).
+- **Licence:** GNU General Public License v2.0 or later (`GPL-2.0-or-later`), the same as all source projects. Code from Qoole, q2pro, Q2 and the Q2 tools may be used.
+- **Project format:** the own JSON format (`"format": "joole-project"`, extension `.joole.json`) is the primary save format, and `.map` is the export format.
+- **Mods:** Q2 mod textures and game directories are supported in v1. Packages are looked up with q2pro's rules, and `.pkz` zips are also supported.
+- **`.map` writing:** the round-trip criterion is a lossless data structure and canonical text. The presence of the optional surface fields is remembered. Texture offset and rotation are shown the way qbsp3 interprets them, and the editor's own values are integers.
+- **Plane points in `.map` export:** always integers. The converted brush is checked, with a warning when needed. The clipboard and prefabs keep full precision, and Joole's qbsp3 reads points as floats as a safety net.
+- **Groups in `.map` files:** as `func_group` entities with `_joole_*` keys, not as comments.
+- **Compilers:** id's original Quake-2-Tools. A single-threaded qbsp3.wasm for Node is made as early as phase 2.
+- **Entity definitions:** generated from id's GPL game code. The md2 model paths are in a table in `game/q2`.
+- **Test data:** only self-made or synthetic data in the repository. id's data is read locally through the `JOOLE_Q2_DIR` environment variable.
+- **Shortcuts:** WASD works only in fly mode. V switches between vertex and edge editing.
+- **Autosave recovery:** based on an unsaved-changes flag, not on timestamps.
+- **Qoole `.qle` import** moves to a phase after v1. The reader can be based on the source code's `LoadObjFile` and `ReadBoundGeometry` functions.
+- **Technology stack:** the UI library is Solid 2, the language TypeScript 7 (native `tsc`), the development environment Node 26 LTS and the package manager pnpm. The reasoning and versions are in [10-stack.md](10-stack.md).
+- **Layered architecture:** the layer order, dependency rules, the `core/types` module, `src/main.ts` and the split of tools between the `app/` and `ui/` layers were refined (see Architecture).
+- **Documentation language:** all project documentation is written in English.
+- **UI details from the design system:** rejected moves are shown as a dashed `vp-invalid` line instead of red, F1–F4 maximise a view, N steps to the next leak point, entity classes are picked by category, and the views have a context menu. The properties panel shows the selection's texture. The design system and the UI are named Joole.
 
-**Tarkennetaan myöhemmin:**
+**To be refined later:**
 
-- [ ] Undo-historian muistinkäytön arviointitapa (oletusraja 256 Mt). Päätös tarvitaan vaiheessa 2.
+- [ ] How undo history memory use is estimated (default limit 256 MB). The decision is needed in phase 2.

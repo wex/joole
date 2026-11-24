@@ -106,7 +106,7 @@ color: #3a4049;
 | `--vp-entity` | #3ccaff | #3ccaff | Point entities in the 2D views when the entity definition gives no color. |
 | `--vp-target` | #1c86b3 | #1c86b3 | target/targetname link lines in the 2D views, dashed. |
 | `--vp-handle` | #ffd60a | #ffd60a | Vertex, edge and face handles, and clip plane points. |
-| `--vp-invalid` | #ff9f0a | #ff9f0a | Rejected move (non-convex result). Departs from the spec, which says red: red is reserved for selection. |
+| `--vp-invalid` | #ff9f0a | #ff9f0a | Rejected move (non-convex result), drawn dashed. Not red, because red is reserved for selection. |
 | `--vp-leak` | #e040fb | #e040fb | qbsp3 leak path (.pts) in every view. |
 | `--vp-sky` | #5f7898 | #5f7898 | SURF_SKY faces in the 3D view. |
 | `--vp-toolface` | #7a52c7 | #7a52c7 | SURF_NODRAW, clip and hint faces in the 3D view, dimmed (drawn at 35% opacity). |

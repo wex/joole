@@ -1,14 +1,14 @@
-# Lähteet
+# Sources
 
-Tämä dokumentti sisältää linkkejä projektiin liittyviin lähteisiin, ja kuvaukset niiden sisällöstä ja käyttötarkoituksesta.
+This document lists the sources related to the project, with descriptions of their contents and what they are used for.
 
-## Paikalliset kopiot (`ext/`)
+## Local copies (`ext/`)
 
-Kaikki alla listatut Git-repot kloonataan projektin `ext/`-hakemistoon, jolloin niiden koodia voi lukea ja hakea paikallisesti. Hakemiston nimi on repon nimi.
+All Git repositories listed below are cloned into the project's `ext/` directory, so their code can be read and searched locally. Each directory is named after its repository.
 
-- `ext/` on `.gitignore`-tiedostossa, eikä sitä tai sen sisältöä koskaan lisätä Joolen Git-repoon (ei myöskään alimoduuleina).
-- `ext/` on vain luettavaksi tarkoitettua viitekoodia. Siellä olevia tiedostoja ei muokata, eikä Joolen koodi tuo niitä tai viittaa niihin buildissa. Generointiskriptit (esim. `q2.def` pelikoodista) saavat lukea `ext/`:tä, mutta niiden tuotos commitoidaan, joten build, testit ja CI eivät tarvitse `ext/`:tä. Jos koodia lainataan, se kopioidaan `src/`- tai `tools/`-hakemistoon ja alkuperä merkitään (ks. AGENTS.md, *Lisenssi ja lainattu koodi*).
-- Kloonaus uudelle koneelle:
+- `ext/` is in `.gitignore`, and neither it nor its contents are ever added to Joole's Git repository (not as submodules either).
+- `ext/` is read-only reference code. Its files are not modified, and Joole's code does not import them or refer to them in the build. Generator scripts (for example generating `q2.def` from the game code) may read `ext/`, but their output is committed, so the build, tests and CI do not need `ext/`. If code is borrowed, it is copied into `src/` or `tools/` and its origin is recorded (see AGENTS.md, *License and borrowed code*).
+- Cloning on a new machine:
 
   ```sh
   mkdir -p ext && cd ext
@@ -19,9 +19,9 @@ Kaikki alla listatut Git-repot kloonataan projektin `ext/`-hakemistoon, jolloin 
   git clone https://github.com/id-Software/Quake-2.git
   ```
 
-- Päivitys: `git -C ext/<repo> pull`. Kun dokumentaatio viittaa tiettyyn kohtaan lähdekoodissa, viitattu commit voidaan kirjata dokumenttiin (`git -C ext/<repo> log -1 --format=%h`).
+- Updating: `git -C ext/<repo> pull`. When the documentation refers to a specific place in the source code, the commit it refers to can be recorded in the document (`git -C ext/<repo> log -1 --format=%h`).
 
-| Hakemisto | Haara | Commit 24.11.2026 |
+| Directory | Branch | Commit on 24.11.2026 |
 | --- | --- | --- |
 | `ext/q2pro` | `master` | `601a8df8` (2025-12-11) |
 | `ext/qoole` | `master` | `6e61028` (2019-09-21) |
@@ -29,31 +29,32 @@ Kaikki alla listatut Git-repot kloonataan projektin `ext/`-hakemistoon, jolloin 
 | `ext/Quake-2-Tools` | `master` | `707e849` (2012-01-31) |
 | `ext/Quake-2` | `master` | `372afde` (2012-01-31) |
 
-## Repot
+## Repositories
 
 - https://github.com/q2pro/q2pro (`ext/q2pro`)
-  - Moderni Quake 2-client
-  - Sisältää tarvittavat tietomallit ja logiikan mm. tekstuurien, karttojen ja modelien käsittelyyn
-  - Käytetyt kielet: C/C++
+  - A modern Quake 2 client
+  - Contains the data models and logic needed for handling textures, maps and models, among other things
+  - Languages: C
 
 - https://github.com/demoth/qoole (`ext/qoole`)
-  - Editorin esikuva: Qoole
-  - Työpöytäohjelma, jolla voidaan suunnitella, teksturoida ja renderöidä Quake 2 -karttoja
-  - Käytetyt kielet: C/C++
+  - The editor's model: Qoole
+  - A desktop program for designing, texturing and rendering Quake 2 maps
+  - Languages: C/C++
 
 - https://github.com/drdator/q3edit (`ext/q3edit`)
-  - Vastaavanlainen selaintoteutus Quake 3 -karttojen editoimiseen
-  - Eteenkin WebGL-toteutus on hyödyllinen lähde
+  - A similar browser implementation for editing Quake 3 maps
+  - The WebGL implementation in particular is a useful reference
+  - Languages: TypeScript, C (the q3map and bspc compilers)
 
 - https://github.com/id-Software/Quake-2-Tools (`ext/Quake-2-Tools`)
-  - id Softwaren alkuperäiset Quake 2 -karttatyökalut: qbsp3, qvis3 ja qrad3 (GPL v2 tai myöhempi)
-  - Sisältää `common/qfiles.h`:n pinta- ja contents-lippujen vakiot sekä kääntäjän UV-laskennan (`bsp/qbsp3/textures.c`) ja `.map`-jäsennyksen (`bsp/qbsp3/map.c`)
-  - Lähdekoodi käännetään Emscriptenillä WebAssemblyksi selaimessa ajettavaa käännöstä varten
-  - `qe4/` sisältää id:n oman Q2-karttaeditorin QuakeEd 4:n lähdekoodin: entiteettimääritysten (`/*QUAKED … */`) jäsennys, CSG, onton tekeminen, `.map`-luku ja -kirjoitus sekä vuotopistetiedoston näyttäminen
-  - Käytetyt kielet: C
+  - id Software's original Quake 2 map tools: qbsp3, qvis3 and qrad3 (GPL v2 or later)
+  - Contains the surface and contents flag constants in `common/qfiles.h`, the compiler's UV computation (`bsp/qbsp3/textures.c`) and `.map` parsing (`bsp/qbsp3/map.c`)
+  - The source code is compiled to WebAssembly with Emscripten for compiling in the browser
+  - `qe4/` contains the source code of id's own Q2 map editor, QuakeEd 4: parsing entity definitions (`/*QUAKED … */`), CSG, hollowing, reading and writing `.map`, and displaying the leak file
+  - Languages: C
 
 - https://github.com/id-Software/Quake-2 (`ext/Quake-2`)
-  - id Softwaren alkuperäinen Quake 2 -moottori ja pelikoodi (GPL v2 tai myöhempi, julkaistu 21.12.2001)
-  - Totuuden lähde vanilla-käytökselle: tiedostojärjestelmän hakujärjestys (`qcommon/files.c`, `FS_AddGameDirectory`) ja formaattien määrittelyt (`qcommon/qfiles.h`)
-  - `game/*.c` sisältää 148 `/*QUAKED*/`-lohkoa, joista vanilla-entiteettimääritykset generoidaan, sekä spawn-funktiot, joista md2-mallien polut kootaan. `ctf/` on esimerkki modin lähdekoodista ja määrityksistä.
-  - Käytetyt kielet: C
+  - id Software's original Quake 2 engine and game code (GPL v2 or later, released on 21.12.2001)
+  - The source of truth for vanilla behaviour: the filesystem search order (`qcommon/files.c`, `FS_AddGameDirectory`) and the format definitions (`qcommon/qfiles.h`)
+  - `game/*.c` contains 148 `/*QUAKED*/` blocks, from which the vanilla entity definitions are generated, and the spawn functions, from which the md2 model paths are collected. `ctf/` is an example of a mod's source code and definitions.
+  - Languages: C
