@@ -73,10 +73,12 @@ If a change requires a new dependency direction, the spec's rule table, the Merm
 ## Development environment
 
 - **Node.js 26 LTS** (`.nvmrc`) and **pnpm 12** (the `packageManager` field). Corepack is not bundled with Node 26, so pnpm is installed separately.
-- **A Chromium-based browser** (Chrome or Edge) for development, because the File System Access API works only there. The Firefox and Safari paths are tested separately.
+- **A Chromium-based browser** (Chrome or Edge) for development, because the File System Access API works only there. The Firefox and Safari paths are tested separately. The supported browsers are the latest two major versions of Chrome/Edge, Firefox and Safari.
 - **emsdk** (or Docker and the `emscripten/emsdk` image) is needed only when the Q2 compilers (`tools/`) are changed. The finished `.wasm` files are in the repository.
 - **Source projects:** clone the repositories listed in `docs/20-sources.md` into `ext/` (the commands are in that file). They are needed for reading source code, but not for the build or tests.
 - **`JOOLE_Q2_DIR`:** the path of a local Q2 installation (the directory containing `baseq2/`) for tests that use game data.
+- **`JOOLE_MAPS_DIR`:** the directory of id's released Q2 map sources (base1–base3 from `base100.zip`, the CTF and match map packs) for the round-trip tests on vanilla maps. They are not part of the game installation.
+- **q2pro** for testing compiled maps in the game. It is the reference engine.
 - **Q2 game data:** testing requires your own legal Quake 2 installation (`baseq2/pak0.pak`). The game data is not GPL-licensed, and it is never added to the repository (see Test data).
 
 ## Commands (target state)
@@ -87,7 +89,7 @@ If a change requires a new dependency direction, the spec's rule table, the Merm
 | `pnpm dev` | Vite dev server with the COOP/COEP headers |
 | `pnpm build` | Production build into `dist/` |
 | `pnpm preview` | Run the production build locally |
-| `pnpm typecheck` | `tsc -b --noEmit` with TypeScript 7, all tsconfig projects |
+| `pnpm typecheck` | TypeScript 7 (`node node_modules/typescript7/bin/tsc -b --noEmit`), all tsconfig projects |
 | `pnpm lint` / `pnpm lint:fix` | ESLint, including the layer boundaries |
 | `pnpm format` / `pnpm format:check` | Prettier |
 | `pnpm test` | Vitest, single run |
@@ -147,7 +149,7 @@ A single change is made like this:
 - Panel logic (validation, conversions) lives in the `app/` layer, and `ui/` only presents and forwards events.
 - Styles are written as CSS Modules files (`Component.module.css`) next to the component. Colours and dimensions come from the theme's CSS variables (`docs/design-system/tokens.css`) and are never hard-coded. The UI follows the design system, including its language and voice rules.
 
-**Privacy:** the user's files are not sent anywhere. No telemetry, no analytics and no external runtime requests (CDN fonts, third-party scripts). The application must work offline.
+**Privacy:** the user's files are not sent anywhere. No telemetry, no analytics and no external runtime requests (CDN fonts, third-party scripts). The application must work offline. In production, a strict Content-Security-Policy enforces this (see the stack), so inline scripts and inline `style` attributes do not work; set styles through classes or the CSSOM.
 
 ## Testing and test data
 
@@ -158,12 +160,13 @@ A single change is made like this:
 - **E2E (Playwright):** the main workflows (open, create a brush, subtract, undo, save), performance tests and screenshot comparison of the views with SwiftShader. Reference screenshots are updated only for an intentional visual change, and the reason is recorded in the commit message.
 - **Test data:**
   - Only self-made or GPL-compatibly licensed maps and textures are added to the repository (`tests/fixtures/`).
-  - id Software's game data (`pak0.pak`, `.wal` textures, vanilla maps, `colormap.pcx`) is not committed. Tests that use it read the path of a Q2 installation from the `JOOLE_Q2_DIR` environment variable, and they are skipped if the variable is not set. CI runs only with the repository's own data.
+  - id Software's game data (`pak0.pak`, `.wal` textures, vanilla maps, `colormap.pcx`) is not committed. Tests that use it read the path of a Q2 installation from `JOOLE_Q2_DIR` and the directory of id's map sources from `JOOLE_MAPS_DIR`, and they are skipped if the variable is not set. CI runs only with the repository's own data.
   - Small synthetic test files are made of the palette and the `.wal` structure, so that the basic tests work without game data.
 
 ## Git and commits
 
-- The main branch is `main`. Changes are made in small, single-purpose units.
+- The repository is `github.com/<owner>/joole` (public). The main branch is `main`, and it is protected: changes arrive only through pull requests with green CI, without force-pushes. Changes are made in small, single-purpose units.
+- Pull requests are squash-merged. The PR title becomes the commit message on `main`, so it must follow Conventional Commits (CI checks it).
 - Commit messages follow the Conventional Commits format in English (`feat:`, `fix:`, `refactor:`, `test:`, `docs:`, `chore:`, `perf:`), for example `feat(geom): add CSG subtract`. The scope is the directory name: `geom`, `formats`, `doc`, `q2`, `app`, `render`, `platform`, `ui`, `tools`.
 - `pnpm check` passes before a commit. CI (GitHub Actions) runs the same, plus the E2E tests and the WASM build reproducibility check, for every pull request. Hooks are not bypassed (`--no-verify`).
 - The lockfile (`pnpm-lock.yaml`) is committed. Build outputs (`dist/`, coverage reports, Playwright reports), local game data and `ext/` are in `.gitignore`.
@@ -176,16 +179,16 @@ A single change is made like this:
   - the origin (project, file, function) and the original copyright notices are recorded at the top of the file
   - the source is added to `THIRD_PARTY_NOTICES.md` (created with the first borrowing)
   - a new source project is added to `docs/20-sources.md`.
-- The licence of added code and data must allow Joole to be distributed under GPLv2. For example, MIT, BSD, ISC, LGPL and GPL-2.0-or-later allow it. GPLv3-only or Apache-2.0 code would force the whole work to GPLv3, so such code is not added without a separate decision.
+- The licence of added code and data must allow Joole to be distributed under GPLv2. For example, MIT, BSD, ISC, LGPL and GPL-2.0-or-later allow it. Font files may also be OFL-1.1 (the IBM Plex fonts), because they are separate files distributed alongside the code, with their licence included. GPLv3-only or Apache-2.0 code would force the whole work to GPLv3, so such code is not added without a separate decision.
 
 ## Instructions for coding agents
 
 - Read the relevant sections of the spec and the stack before a change. Do not assume an API, version or format detail: check it from the source code, documentation or npm.
 - Solid 2 was released in November 2026. Solid examples in training data are most likely Solid 1's API, so use Solid 2's documentation and the agent guidance that ships with it.
-- TypeScript 7's `tsc` is a native binary with no stable JS API. Do not import the `typescript` package in runtime code.
+- TypeScript 7's `tsc` is a native binary with no stable JS API, installed as the `typescript7` alias. The `typescript` package is TS 6.0 and exists only for typescript-eslint and the editor. Do not import either in runtime code, and never call a bare `tsc` in scripts.
 - Do not download, extract or commit Q2 game data.
 - **`ext/` is read-only.** Do not modify its files, do not run `git` commands there that change state (except `pull` at the user's request), and do not import code from it into the build. Generator scripts (`pnpm gen:entities`) may read `ext/`, but their output is committed, and the build, tests and CI must not depend on `ext/`. Borrowed code is copied into `src/` or `tools/` and its origin is recorded.
 - **Searching `ext/`:** ripgrep and the search tools based on it honour `.gitignore`, so a search from the project root skips `ext/`. Search by giving the path explicitly (for example `rg TextureAxisFromPlane ext/Quake-2-Tools`) or use the `--no-ignore` option. Likewise, results from `ext/` must not clutter searches about Joole's own code.
 - When you refer to code in `ext/` in documentation, use the path from the repository root plus the function name (for example `bsp/qbsp3/textures.c`, `TextureAxisFromPlane`). Line numbers go stale.
-- Do not change security settings (`minimumReleaseAge`, the COOP/COEP policy) to work around a build or CI problem; ask first.
+- Do not change security settings (`minimumReleaseAge`, the COOP/COEP policy, the Content-Security-Policy) to work around a build or CI problem; ask first.
 - When you make a decision that the documentation does not cover, record it in the right document and mention it in your summary.

@@ -30,7 +30,7 @@ Status: draft, 24.11.2026. The normative sources are [docs/00-spec.md](docs/00-s
 | Phase | Goal | Gate (from spec) | Main risks |
 | --- | --- | --- | --- |
 | 0 Foundations | Repository, toolchain, CI, layer enforcement | `pnpm check` and `pnpm e2e` are green locally and in CI, and the layer canary tests fail on forbidden imports | TS 7 combined with typescript-eslint, Solid 2 being brand new |
-| 1 Reader and viewer | Parse Q2 data, show a map in four views | A vanilla Q2 map opens with textures, and the round-trip test passes | `.map` fidelity, render performance |
+| 1 Reader and viewer | Parse Q2 data, show a map in four views | id's released Q2 map sources open with textures, and the round-trip test passes | `.map` fidelity, render performance |
 | 2 Brush editing | Commands, undo, selection, transforms, saving, qbsp3 in Node | A simple room can be built from scratch and saved, and qbsp3 accepts it with no warnings | Porting qbsp3 to WASM, undo memory |
 | 3 CSG and textures | CSG operations, vertex editing, texture tools and lock, surface flags | The property-based CSG tests pass, and textures look the same in the editor and in the game | CSG robustness, exact UV parity |
 | 4 Entities and structure | Entity definitions, panels, tree, groups, scope, prefabs, md2 | A working single-player level (player start, door, button, monster) can be made from start to finish | Inferring key types from QUAKED text |
@@ -60,12 +60,13 @@ Goal: a repository in which every later WP can follow the normal workflow (write
 
 - **Goal:** create the remote repository and the legal and housekeeping files.
 - **Scope:**
-  - The GitHub repository. Creating it is the owner's action; until then CI is run locally.
+  - The GitHub repository `github.com/<owner>/joole` on the owner's personal account, public. Creating it is the owner's action; until then CI is run locally.
+  - Repository settings: squash merge only (PR title as the commit message), and branch protection for `main` (PR required, CI checks required, linear history, no force-pushes, no required review).
   - `LICENSE` (GPL-2.0 text with an "or later" notice) and a short `README.md` that points to `docs/`.
   - `THIRD_PARTY_NOTICES.md` (empty skeleton), `.editorconfig` and `.nvmrc` (`26`).
   - The existing `.gitignore` (`/ext/`) extended with `node_modules/`, `dist/`, `coverage/`, `playwright-report/` and `test-results/`.
 - **Depends on:** –
-- **Done when:** the remote exists, `main` is protected (PR plus green CI), and `git status` never shows `ext/`.
+- **Done when:** the remote exists, `main` is protected as above, the existing local history is pushed, and `git status` never shows `ext/`.
 
 ### [ ] P0.2 Package scaffold
 
@@ -74,7 +75,7 @@ Goal: a repository in which every later WP can follow the normal workflow (write
   - `package.json` with `type: module`, `engines.node >=26`, `packageManager: pnpm@12.x` and `license: GPL-2.0-or-later`.
   - `pnpm-workspace.yaml` containing settings only: `minimumReleaseAge: 10080` and no `packages`.
   - Runtime dependencies: `solid-js@2`, `@solidjs/web@2`, `nanoid@6` and `lucide-static@1`.
-  - Dev dependencies: `vite@8`, `@solidjs/vite-plugin@3`, `typescript@7`, `vitest@5`, `@vitest/coverage-v8@5`, `fast-check@4`, `@playwright/test@1`, `eslint@10`, `typescript-eslint@8`, `eslint-plugin-import-x@4`, `eslint-import-resolver-typescript@4`, `eslint-plugin-solid`, `eslint-config-prettier`, `prettier@3`, `@types/node`, and `vite-plugin-pwa@2`, which is installed now but configured in P5.4.
+  - Dev dependencies: `vite@8`, `@solidjs/vite-plugin@3`, `typescript@6.0` (for typescript-eslint and the editor), `typescript7` as an alias for `npm:typescript@7`, `vitest@5`, `@vitest/coverage-v8@5`, `fast-check@4`, `@playwright/test@1`, `eslint@10`, `typescript-eslint@8`, `eslint-plugin-import-x@4`, `eslint-import-resolver-typescript@4`, `eslint-plugin-solid`, `eslint-config-prettier`, `prettier@3`, `@types/node`, and `vite-plugin-pwa@2`, which is installed now but configured in P5.4.
   - `index.html`, a placeholder `src/main.ts`, and the empty layer directories with `index.ts` barrels.
   - Install everything with `pnpm add`. Every version must be at least 7 days old.
 - **Depends on:** P0.1
@@ -91,10 +92,10 @@ Goal: a repository in which every later WP can follow the normal workflow (write
   - `tsconfig.test.json` with Vitest and Node types.
   - A root `tsconfig.json` with references, and the path aliases `@core/*` … `@ui/*`.
   - `src/env.d.ts` for the `?raw`, `?url` and `*.module.css` imports.
-  - **Resolve the stack's open item:** choose how TS 6 is installed next to TS 7 for typescript-eslint (an alias or `packageExtensions`), record the choice in `docs/10-stack.md`, and tick the item off.
-- **Tests:** a canary script compiles a temporary core file that uses `document`, and it must fail.
+  - TS 6.0 is the `typescript` package and TS 7.0 the `typescript7` alias, as decided in the stack. `pnpm typecheck` calls `typescript7/bin/tsc` by path.
+- **Tests:** a canary script compiles a temporary core file that uses `document`, and it must fail. A lint canary runs one type-aware typescript-eslint rule, to prove that typescript-eslint loads TS 6 and not TS 7.
 - **Depends on:** P0.2
-- **Done when:** `pnpm typecheck` (TS 7 `tsc -b --noEmit`) passes, and the canary fails as expected.
+- **Done when:** `pnpm typecheck` (TS 7 `tsc -b --noEmit`) passes, the DOM canary fails as expected, and the type-aware lint canary runs.
 
 ### [ ] P0.4 Lint, format and layer enforcement
 
@@ -118,11 +119,11 @@ Goal: a repository in which every later WP can follow the normal workflow (write
 - **Goal:** set up a dev server and build that are ready for workers, WASM and threads.
 - **Scope:** `vite.config.ts` with:
   - `@solidjs/vite-plugin` and aliases
-  - `server.headers` and `preview.headers` with COOP `same-origin` and COEP `require-corp`
+  - `server.headers` and `preview.headers` with COOP `same-origin` and COEP `require-corp`, and the production Content-Security-Policy in `preview.headers` only
   - `optimizeDeps.entries: ['index.html']`
   - `server.watch.ignored: ['**/ext/**']`
   - `worker.format: 'es'`
-- **Tests:** an E2E smoke test asserts that `crossOriginIsolated === true` in both `pnpm dev` and `pnpm preview`.
+- **Tests:** an E2E smoke test asserts that `crossOriginIsolated === true` in both `pnpm dev` and `pnpm preview`, and that the preview build logs no CSP violations.
 - **Depends on:** P0.2
 - **Done when:** the smoke test passes, and `pnpm build` produces `dist/`.
 
@@ -139,7 +140,7 @@ Goal: a repository in which every later WP can follow the normal workflow (write
     - `testDir: tests/e2e` and a Chromium project with `--use-angle=swiftshader`.
     - A `webServer` that runs `pnpm build && pnpm preview`.
     - Firefox and WebKit projects defined but disabled until P5.5.
-  - `tests/helpers/q2dir.ts`, which skips tests when `JOOLE_Q2_DIR` is not set.
+  - `tests/helpers/localdata.ts`, which skips tests when `JOOLE_Q2_DIR` (game installation) or `JOOLE_MAPS_DIR` (id's map sources) is not set.
 - **Depends on:** P0.2
 - **Done when:** `pnpm test`, `pnpm test:coverage`, `pnpm bench` and `pnpm e2e` each run at least one trivial test.
 
@@ -152,14 +153,15 @@ Goal: a repository in which every later WP can follow the normal workflow (write
   - Caches the pnpm store.
   - Runs `pnpm install --frozen-lockfile`, then `pnpm check`, then `pnpm exec playwright install --with-deps chromium`, then `pnpm e2e`.
   - Uploads the Playwright report when a run fails.
+  - Checks that the PR title follows Conventional Commits, because squash merge turns it into the commit message (a small script, no third-party action).
   - The WASM reproducibility job is added in P2.11.
 - **Depends on:** P0.1, P0.4 to P0.6
 - **Done when:** a PR shows a green CI run, and a deliberately broken PR (a layer violation) shows a red one.
 
-### [ ] P0.8 Preview hosting (Cloudflare Pages) ⇄
+### [ ] P0.8 Preview hosting (Cloudflare Workers) ⇄
 
 - **Goal:** get early preview deployments with the production headers.
-- **Scope:** `public/_headers` (COOP and COEP for `/*`), a Cloudflare Pages project connected to the repository, and a preview URL for each PR. Connecting the account is the owner's action.
+- **Scope:** `public/_headers` (COOP, COEP and the Content-Security-Policy for `/*`), `wrangler.jsonc` (static assets from `dist/`, no Worker script), and Cloudflare's Git integration (Workers Builds) connected to the repository: `main` deploys to `joole.<account>.workers.dev`, and each PR branch gets a preview URL. Connecting the account is the owner's action.
 - **Depends on:** P0.1, P0.5
 - **Done when:** the preview deployment reports `crossOriginIsolated === true`. This WP may slip to P5.7 without blocking anything.
 
@@ -247,7 +249,7 @@ Goal: read Q2 game data and `.map` files without loss, and show the map in four 
     2. *clipboard* (clipboard and prefabs): full precision.
 - **Tests:**
   - the round-trip criterion from the spec, on self-made fixtures
-  - local vanilla maps when `JOOLE_Q2_DIR` points to map sources
+  - id's released map sources from `JOOLE_MAPS_DIR` (base1–base3, the CTF and match packs)
   - unit tests for `attribsInFile`, func_group mapping, nesting, and unknown keys on `func_group`s from other editors
 - **Depends on:** P1.1, P1.2
 - **Done when:** all fixtures round-trip under the spec's criterion.
@@ -336,7 +338,7 @@ Goal: read Q2 game data and `.map` files without loss, and show the map in four 
 - **Goal:** build the application frame around the renderer.
 - **Scope:**
   - A Solid app shell laid out with CSS Grid: the 2×2 views, a right-hand properties panel and a bottom log panel, with resizable splitters and view maximise. It implements the design system's `Workspace`, `ViewportPane`, `Toolbar` and `PanelTabs`. Styles use CSS Modules that read only `tokens.css` variables. The dark theme is the primary one and the light theme the secondary one.
-  - Fonts (IBM Plex Sans and Mono) are self-hosted under `public/fonts/` (the design system's previews load them from Google Fonts, the app never does).
+  - Fonts (IBM Plex Sans and Mono, OFL-1.1, with the licence file) are self-hosted under `public/fonts/` (the design system's previews load them from Google Fonts, the app never does).
   - Icons from `lucide-static`, imported per icon as SVG strings, plus the custom CSG Subtract, Hollow and Clip icons in `src/ui/icons/`.
   - F1–F4 maximise a view (3D, Top, Front, Side), and the same key restores the grid.
   - File menu: open game folder, open map.
@@ -355,12 +357,13 @@ Goal: read Q2 game data and `.map` files without loss, and show the map in four 
 - **Scope:**
   - A synthetic map generator for 5 000 and 20 000 brushes, written to `tests/fixtures/generated/` at test time and not committed.
   - A Playwright test that opens a 5 000-brush map in under 2 s.
-  - 3D frame-rate and memory measurement.
-  - The measured numbers are recorded in the spec's performance section, because the spec says the targets are checked on the first prototype.
+  - The map-open test and the CSG benchmark run in CI with 2× thresholds.
+  - 3D frame rate, drag latency and memory are measured by hand on the spec's reference hardware.
+  - The measured numbers are recorded in the spec's performance section with the model, the Chrome version and the date, because the spec says the targets are checked on the first prototype.
 - **Depends on:** P1.10, P1.11
 - **Done when:** the numbers are recorded, and any target that is clearly at risk has a mitigation WP added to phase 5.
 
-**[ ] Gate 1:** a vanilla Q2 map opens with its textures (verified locally with `JOOLE_Q2_DIR`), and the round-trip test passes for all fixtures and the local vanilla maps.
+**[ ] Gate 1:** id's released Q2 map sources open with their textures (verified locally with `JOOLE_Q2_DIR` and `JOOLE_MAPS_DIR`), and the round-trip test passes for all fixtures and all of id's map sources.
 
 ---
 
@@ -374,15 +377,15 @@ Goal: editing through commands with unlimited undo, project files and autosave, 
 - **Scope:**
   - Command helpers in `core/doc` (add, remove, replace and reparent nodes) that produce patches with structural sharing.
   - `CommandBus` in `app`: execute, undo and redo, `mergeKey` merging during a drag, and change notifications as a subscription that carries the `Patch`.
-  - The history memory limit (256 MB by default), with the oldest steps dropped first.
-  - **Resolve the spec's open item:** choose the memory estimation method (for example bytes per face and node, summed over the nodes that are unique to each step), record it in the spec and tick it off.
+  - The history memory limit (256 MB by default), with the oldest steps dropped first and the newest step always kept.
+  - The spec's structural memory estimate: each step is charged for the node versions in its patch that are not in the current document. The formula's constants live in one module and are calibrated once against a Chrome heap snapshot, with the result recorded in the spec.
 - **Tests:**
   - unit tests
   - fast-check property: a random sequence of commands, then undo of all, gives the original document, and redo of all gives the final one
   - a merge test
-  - a memory-limit test
+  - memory-limit tests: the estimate formula, dropping the oldest steps, and keeping an oversized newest step
 - **Depends on:** P1.7
-- **Done when:** the properties hold, and the open item is closed in the spec.
+- **Done when:** the properties hold, and the calibrated constants are recorded in the spec.
 
 ### [ ] P2.2 Selection and selection restore (`app`)
 
@@ -424,7 +427,7 @@ Goal: editing through commands with unlimited undo, project files and autosave, 
 - **Goal:** tool logic that can be tested in Node, with the UI only translating input.
 - **Scope:**
   - A tool interface in `app`: neutral pointer and key events in world coordinates plus modifiers in, commands and preview state out.
-  - A keyboard shortcut map (S, B, E, C, V, F, T and grid keys) that respects fly mode.
+  - A keyboard shortcut map (S, B, E, C, V, F, T, grid keys, F1–F4, N) that respects fly mode. The shortcuts the spec leaves open (undo and redo, save, copy and paste, hide, lock, CSG commands) are defined here following platform conventions (Ctrl/Cmd+Z, Ctrl/Cmd+Shift+Z, Ctrl/Cmd+S …), and the full map is recorded in the spec.
   - The viewport `ContextMenu` from the design system, starting with Add Brush. The Add Entity and Apply Entity entries arrive in P4.4.
   - The Select tool: click, Shift to add, box select, drag to move, handles to scale, Ctrl+drag to rotate.
   - `ui` views convert DOM events into tool events.
@@ -617,7 +620,7 @@ Goal: Qoole-level geometry operations, and textures that look exactly the same i
 - **Goal:** prove the gate's "textures look the same in the editor and in the game".
 - **Scope:** a test that compiles fixture maps with qbsp3.wasm, parses the texinfo lump of the `.bsp` (`ext/Quake-2/qcommon/qfiles.h`), and compares its `vecs` with `texAxes` for every face, within a small epsilon. The fixtures include decimal offsets and rotations so that the truncation rule is exercised.
 - **Depends on:** P2.11, P3.7
-- **Done when:** the test is green in CI, and one map has been checked in the game by hand, with the result recorded.
+- **Done when:** the test is green in CI, and one map has been checked in q2pro by hand, with the result recorded.
 
 **[ ] Gate 3:** every CSG property test passes, and textures match in the editor and the game (P3.11 plus the manual in-game check).
 
@@ -712,7 +715,7 @@ Goal: everything needed to build a complete playable single-player level.
 - **Depends on:** P4.2, P1.8
 - **Done when:** vanilla monsters and items show their models.
 
-**[ ] Gate 4:** a single-player sample level made entirely in Joole is committed as a self-made fixture (`tests/fixtures/maps/sp-sample.map`). It has a player start, a door, a button that opens the door, and a monster. It compiles without warnings, and it is played through in Q2 by hand, with the result recorded.
+**[ ] Gate 4:** a single-player sample level made entirely in Joole is committed as a self-made fixture (`tests/fixtures/maps/sp-sample.map`). It has a player start, a door, a button that opens the door, and a monster. It compiles without warnings, and it is played through in q2pro by hand, with the result recorded.
 
 ---
 
@@ -729,6 +732,7 @@ Goal: the full compile cycle in the browser, plus the performance targets, brows
   - Build a threaded and a single-threaded variant, chosen at runtime by `crossOriginIsolated`.
   - Run one worker per tool, stream stdout to the log panel, and support cancelling.
   - Extend the CI reproducibility job to all outputs.
+  - Verify that the pthread workers run under the production CSP. If they need `blob:` workers, record the exception in the stack.
 - **Tests:** a compiler test for each tool in Node (single-threaded), and an E2E test that compiles a fixture.
 - **Depends on:** P2.11
 - **Done when:** all three tools run in Chromium with threads.
@@ -757,7 +761,7 @@ Goal: the full compile cycle in the browser, plus the performance targets, brows
 ### [ ] P5.4 PWA
 
 - **Goal:** offline use and installability.
-- **Scope:** vite-plugin-pwa with Workbox precaching (the app, workers and `.wasm`), an update prompt, and a check that the service worker works with COOP and COEP.
+- **Scope:** vite-plugin-pwa with Workbox precaching (the app, workers and `.wasm`), an update prompt, and a check that the service worker works with COOP, COEP and the CSP.
 - **Tests:** an E2E offline test (the context is set offline and the app reloads).
 - **Depends on:** P5.1
 - **Done when:** the app starts and compiles while offline.
@@ -767,7 +771,7 @@ Goal: the full compile cycle in the browser, plus the performance targets, brows
 - **Goal:** load- and save-based workflows on non-Chromium browsers.
 - **Scope:** check every fallback path (folder input, downloads, autosave, clipboard), enable the Playwright Firefox and WebKit projects, and fix the gaps. The behaviour depends on feature detection, never on the browser's name.
 - **Depends on:** Phases 1 to 4
-- **Done when:** the E2E suite passes on all three engines, apart from features that are documented as Chromium-only.
+- **Done when:** the E2E suite passes on all three engines at the latest two major versions of each browser, apart from features that are documented as Chromium-only.
 
 ### [ ] P5.6 Performance targets
 
@@ -778,14 +782,14 @@ Goal: the full compile cycle in the browser, plus the performance targets, brows
   - dragging costs under 8 ms per frame
   - a CSG subtract with 50 targets takes under 50 ms
   - under 300 MB of memory for 20 000 brushes without textures
-- **Scope:** profiling and fixes. CI perf tests use thresholds loose enough to avoid flaky failures, and the strict targets are measured on reference hardware and recorded in the spec.
+- **Scope:** profiling and fixes. CI keeps the 2× thresholds for the CPU-bound metrics, and the strict targets are measured on the spec's reference hardware and recorded in the spec.
 - **Depends on:** P1.12 and all feature WPs
 - **Done when:** every target is met and recorded.
 
 ### [ ] P5.7 Production hosting
 
 - **Goal:** a public deployment.
-- **Scope:** a Cloudflare Pages production deployment of `main` with `_headers`, a check that `crossOriginIsolated` is true in production, and a custom domain if the owner provides one.
+- **Scope:** the production deployment of `main` on Cloudflare Workers with `_headers`, a check that `crossOriginIsolated` is true in production, and a custom domain if the owner wants one by then.
 - **Depends on:** P0.8, P5.4
 - **Done when:** production passes the smoke E2E test.
 
@@ -796,7 +800,7 @@ Goal: the full compile cycle in the browser, plus the performance targets, brows
 - **Depends on:** P5.1 to P5.7
 - **Done when:** the Gate 5 criteria are verified and the release is published.
 
-**[ ] Gate 5:** every target in the performance table is met, and the Gate 4 sample map compiles to a playable BSP without leaving the browser (verified in Q2).
+**[ ] Gate 5:** every target in the performance table is met, and the Gate 4 sample map compiles to a playable BSP without leaving the browser (verified in q2pro).
 
 ---
 
@@ -807,8 +811,8 @@ These run through every phase. They are not WPs of their own, but they are part 
 - **Documentation:** the spec, stack, AGENTS.md and this plan are updated in the same change as the code they describe. Decisions get a date in the spec's *Decisions* list.
 - **Licensing and provenance:** borrowed code (from Qoole, q2pro, Quake-2, Quake-2-Tools or q3edit) gets a header naming its origin, plus an entry in `THIRD_PARTY_NOTICES.md`. Only licences that are compatible with GPL-2.0-or-later are allowed.
 - **Dependencies:** new dependencies need a justification and an entry in the stack, and must be at least 7 days old. `minimumReleaseAge` is never bypassed.
-- **Test data:** only self-made or synthetic fixtures are committed. id game data is used only through `JOOLE_Q2_DIR`.
-- **Performance budget:** every WP that touches geometry, rendering or parsing records a benchmark delta in its PR description.
+- **Test data:** only self-made or synthetic fixtures are committed. id's data is used only through `JOOLE_Q2_DIR` and `JOOLE_MAPS_DIR`.
+- **Performance budget:** every WP that touches geometry, rendering or parsing records a benchmark delta in its PR description. From Gate 1 on, every gate also includes measuring the GPU-bound metrics (frame rate, drag latency, memory) on the reference hardware and recording them in the spec.
 - **Privacy:** no telemetry and no external runtime requests, including fonts. COEP enforces this as well.
 - **Design system:** UI components follow `docs/design-system/`. Hard-coded colours, spacing or fonts are review failures.
 
@@ -816,7 +820,7 @@ These run through every phase. They are not WPs of their own, but they are part 
 
 | Risk | Impact | Mitigation | Owner WP |
 | --- | --- | --- | --- |
-| TS 7 has no stable JS API, so typescript-eslint needs TS 6 | Lint setup is fragile | Install TS 6 next to it (P0.3). Fallback: drop the type-aware rules and keep only the syntactic and import rules | P0.3 |
+| TS 7 has no stable JS API, so typescript-eslint needs TS 6 | TS 6 and TS 7 could disagree on a type | TS 6 as `typescript` plus the `typescript7` alias (P0.3). TS 6.0 matches TS 7 semantics, and the type check that gates CI is TS 7. Revisit the `tsgo` backend when it is stable | P0.3 |
 | Solid 2 is weeks old | Framework bugs and few examples | Keep `ui/` thin and logic in `app/`, pin versions, use Solid's agent diagnostics, report bugs upstream | P1.11 |
 | qbsp3 under Emscripten (`exit()`, global state, file IO) | The compiler oracle is late | Start P2.11 right after P1.5, use a fresh module per run, follow q3edit's port as a template | P2.11 |
 | Non-deterministic WASM builds | The CI diff job is flaky | Pin the emsdk Docker image, strip timestamps and paths, verify on the first build | P2.11 |
@@ -831,6 +835,5 @@ These run through every phase. They are not WPs of their own, but they are part 
 
 | Item | Source | Resolved in |
 | --- | --- | --- |
-| How TS 6 is installed next to TS 7 for typescript-eslint | Stack, *Open technology decisions* | P0.3 |
-| How undo history memory is estimated | Spec, *To be refined later* | P2.1 |
-| Creating the remote repository and the Cloudflare account (owner actions) | Stack, *Hosting and CI* | P0.1, P0.8 |
+| Creating the remote repository (owner action, settings decided) | Stack, *Hosting and CI* | P0.1 |
+| Creating the Cloudflare account and connecting the repository (owner action, settings decided) | Stack, *Hosting and CI* | P0.8 |

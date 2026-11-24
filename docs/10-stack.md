@@ -8,7 +8,8 @@ Versions are recorded as major versions. Exact versions are locked in `package.j
 
 | Area | Technology | Major version | Purpose |
 | --- | --- | --- | --- |
-| Language | TypeScript (native `tsc`) | 7 | All application code, `strict` mode |
+| Language | TypeScript (native `tsc`) | 7 | All application code, `strict` mode, type checking |
+| Lint-time TypeScript API | TypeScript | 6 | The compiler API for typescript-eslint and the editor's language service |
 | Runtime (development, CI) | Node.js LTS | 26 | Tooling, tests, running the `core/` code without a browser |
 | Package manager | pnpm | 12 | Dependencies, scripts, lockfile |
 | Build and dev server | Vite | 8 | Dev server, production build, workers, static assets |
@@ -20,7 +21,7 @@ Versions are recorded as major versions. Exact versions are locked in `package.j
 | PWA | vite-plugin-pwa (Workbox) | 2 | Service worker and offline use (phase 5) |
 | Styles | CSS Modules (built into Vite) + CSS Grid | – | Panel styles and layout |
 | Icons | `lucide-static` | 1 | UI icons as static SVGs, plus custom CSG, Hollow and Clip icons |
-| Hosting | Cloudflare Pages | – | Static production hosting with the COOP and COEP headers |
+| Hosting | Cloudflare Workers (static assets) | – | Static production hosting with the COOP and COEP headers, preview per PR |
 | CI | GitHub Actions | – | Checks, E2E and WASM build reproducibility |
 | Unit tests | Vitest + `@vitest/coverage-v8` | 5 | The `core/` code, parsers, benchmarks, coverage |
 | Property-based tests | fast-check | 4 | CSG and geometry invariants |
@@ -38,8 +39,12 @@ TypeScript 7 is the native implementation written in Go, and its `tsc` is many t
   - `app/`, `render/`, `platform/` and `ui/`: the `DOM` library. `src/main.ts` belongs to the same project.
   - `workers/`: the `WebWorker` library, without `DOM`.
   - Tests (`*.test.ts`, `*.bench.ts`): a project of their own, with the Vitest and `@types/node` types. The source projects contain no test files, so test types do not leak into the core.
-- **Known limitation:** typescript-eslint 8 supports TypeScript's JS API only for versions below 6.1, and TS 7 does not offer a stable one yet. That is why TS 6.0 is installed alongside it for typescript-eslint's parser and type-aware rules (for example as a pnpm alias or with the `packageExtensions` setting), while type checking is done by TS 7. The mechanism is chosen and recorded here when the project scaffold is created. Once typescript-eslint supports TS 7, TS 6 is removed.
-- **Editor:** TS 7's native language server. In VS Code, the workspace's TypeScript version is used.
+- **Two TypeScript versions (decided 24.11.2026):** typescript-eslint 8 supports TypeScript's JS API only for versions below 6.1 (`typescript >=4.8.4 <6.1.0` in every `@typescript-eslint/*` package), and TS 7.0's root export has no compiler API. Therefore:
+  - `typescript` is TS 6.0. typescript-eslint's parser and type-aware rules, and the editor's language service, resolve it. TS 6.0 was designed to match TS 7's semantics, so the two rarely disagree.
+  - TS 7.0 is installed under the alias `typescript7` (`"typescript7": "npm:typescript@^7"`). Its `bin/tsc` is a Node launcher, so `pnpm typecheck` runs `node node_modules/typescript7/bin/tsc -b --noEmit`. Both packages provide a `tsc` bin, so scripts never call a bare `tsc`.
+  - The alias must not be named `@typescript/native`, because typescript-eslint treats that name as the opt-in for its experimental `tsgo` backend.
+  - **Not chosen: the experimental `tsgo` backend** (`projectService: { EXPERIMENTAL_backend: 'tsgo' }`, available since typescript-eslint 8.73.0). It is explicitly experimental, and a maintainer stated on 10.11.2026 that it "is not yet ready for use". It needs a TS 7.1 prerelease as `@typescript/native`, still requires TS 6, and is currently up to about 1.5× slower than the classic backend on large projects. Revisit it when it leaves experimental status. TS 6 is removed once typescript-eslint supports TS 7 directly.
+- **Editor:** the workspace's `typescript` (TS 6.0) by default. TS 7's native language server may be used if the editor supports it.
 
 ## Runtime and package management: Node.js 26 LTS and pnpm 12
 
@@ -62,7 +67,7 @@ Vite provides the dev server and the production build (Rolldown).
 
 - **Workers:** `new Worker(new URL('./x.worker.ts', import.meta.url), { type: 'module' })`. Vite bundles workers separately. Uses: converting `.wal` textures to RGBA8, and running qbsp3, qvis3 and qrad3.
 - **WASM and assets:** the `.wasm` files produced by Emscripten are loaded with a `?url` import, and shaders are loaded as strings with a `?raw` import.
-- **COOP/COEP:** `server.headers` and `preview.headers` set `Cross-Origin-Opener-Policy: same-origin` and `Cross-Origin-Embedder-Policy: require-corp`, so that `SharedArrayBuffer` and threaded WASM also work in development. In production, Cloudflare Pages sends the same headers based on the `public/_headers` file (see [Hosting and CI](#hosting-and-ci)).
+- **COOP/COEP:** `server.headers` and `preview.headers` set `Cross-Origin-Opener-Policy: same-origin` and `Cross-Origin-Embedder-Policy: require-corp`, so that `SharedArrayBuffer` and threaded WASM also work in development. In production, Cloudflare Workers sends the same headers based on the `public/_headers` file (see [Hosting and CI](#hosting-and-ci)).
 - **Path aliases** mirror the directory structure (`@core/*`, `@game/*`, `@app/*`, `@render/*`, `@platform/*`, `@ui/*`). The `workers/` directory gets no alias, because nothing imports it. The aliases are defined in both the `tsconfig` and the Vite settings.
 
 ## UI: Solid 2
@@ -118,6 +123,8 @@ The CommandBus, undo history (merging, memory limit) and selection live in the `
 | Service Worker | PWA, offline use | All |
 
 Feature support is checked at runtime (feature detection), not by the browser's name.
+
+**Supported browsers:** the latest two major versions of Chrome/Edge, Firefox and Safari. That comfortably covers WebGL2, OPFS, module workers and `DecompressionStream('deflate-raw')` (Chrome 103, Firefox 113 and Safari 16.4 onwards).
 
 ## Q2 compilers: Emscripten 7
 
@@ -179,7 +186,13 @@ The sources are described in [20-sources.md](20-sources.md), and their local cop
 
 ## Hosting and CI
 
-**Cloudflare Pages** hosts the production build (`dist/`). The `public/_headers` file sets `Cross-Origin-Opener-Policy: same-origin` and `Cross-Origin-Embedder-Policy: require-corp` for all paths, so that `SharedArrayBuffer` and threaded WASM work. COEP requires all resources to come from the same origin. This fits the principle that no external runtime requests are made. The PWA's service worker is served from the same origin. Deployment is done through the GitHub integration or from CI.
+**Cloudflare Workers static assets** hosts the production build (decided 24.11.2026). Cloudflare recommends Workers rather than Pages for new projects, and new features land there. `wrangler.jsonc` in the repository root sets `name: "joole"`, a `compatibility_date` and `assets.directory: "./dist"`; there is no Worker script. The `public/_headers` file (copied into `dist/` by Vite) sets `Cross-Origin-Opener-Policy: same-origin` and `Cross-Origin-Embedder-Policy: require-corp` for all paths, so that `SharedArrayBuffer` and threaded WASM work. COEP requires all resources to come from the same origin. This fits the principle that no external runtime requests are made. The PWA's service worker is served from the same origin.
+
+- **Content-Security-Policy:** `_headers` also sets `Content-Security-Policy: default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self'; style-src 'self'; img-src 'self' blob: data:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'`, which enforces the no-external-requests rule. `wasm-unsafe-eval` is needed to compile WebAssembly, and `blob:`/`data:` images are needed for texture thumbnails. Inline scripts and inline `style` attributes are not allowed. Styles set through the CSSOM, as Solid's `style` prop does, are allowed. `vite preview` sends the same CSP so that the E2E tests run under it; the dev server does not, because Vite's HMR needs inline scripts. If Emscripten's pthread workers turn out to need `blob:` workers (P5.1), `worker-src` gains `blob:` with the reason recorded here.
+
+- **Deployment:** Cloudflare's Git integration (Workers Builds) builds and deploys from GitHub: `main` goes to production, and other branches get a preview URL. No Cloudflare API token is stored in GitHub, and `wrangler` is not a project dependency. Because `main` accepts only PRs with green CI, production deploys only checked commits.
+- **Domain:** the Cloudflare subdomain (`joole.<account>.workers.dev`) for now. A custom domain can be added at release (P5.7).
+- Creating the Cloudflare account and connecting it to the repository is the owner's action.
 
 **GitHub Actions** runs CI for every pull request and for the `main` branch:
 
@@ -187,7 +200,7 @@ The sources are described in [20-sources.md](20-sources.md), and their local cop
 - WASM job: `tools/` is built with the `emscripten/emsdk` Docker image and compared with the committed `.wasm` files.
 - Third-party actions are pinned to a commit SHA, not a tag.
 
-The repository does not have a remote yet. It is created on GitHub before CI is taken into use.
+**Repository (decided 24.11.2026):** `github.com/<owner>/joole` under the owner's personal account (it can be transferred to an organization later), public from the start. Pull requests are squash-merged, so the PR title becomes the commit message on `main` and must follow Conventional Commits; CI checks the title with a small script. `main` is protected: no direct pushes or force-pushes, the CI checks must pass, and the history is linear. No approving review is required, so a solo developer can merge their own PRs. The repository is created before CI is taken into use (P0.1).
 
 ## Keeping reference code out of the tooling (`ext/`)
 
@@ -203,4 +216,4 @@ The repository does not have a remote yet. It is created on GitHub before CI is 
 
 ## Open technology decisions
 
-- [ ] **TS 7 and typescript-eslint:** how TS 6 is installed alongside it (an alias or `packageExtensions`). Decided when the project scaffold is created.
+None at the moment.

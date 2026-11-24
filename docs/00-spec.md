@@ -8,8 +8,8 @@ We are building a browser-based, brush-based map editor for Quake 2 in TypeScrip
 
 Goals:
 
-1. **A full Q2 level round trip in the browser.** Open a `.map`, edit it, save the `.map` and test it with the compiler. The aim is that any vanilla Q2 level opens and saves without loss.
-2. **No installation.** The user selects their game folder or `baseq2/pak0.pak`, and textures and entities are read from there. Nothing is sent to a server.
+1. **A full Q2 level round trip in the browser.** Open a `.map`, edit it, save the `.map` and test it with the compiler. The aim is that every Q2 map source id has released (base1–base3 in `base100.zip`, and the CTF and match map packs) opens and saves without loss. The game itself ships only compiled `.bsp` files, and decompiling is out of scope.
+2. **No installation.** The user selects their game folder or `baseq2/pak0.pak`, and textures and entities are read from there. Nothing is sent to a server, and in production a Content-Security-Policy enforces that the application makes no external requests.
 3. **A Qoole-level workflow.** This includes the four-view layout, creating and editing brushes, CSG subtract, hollowing, clipping with a plane, entity properties, a texture browser and prefabs.
 4. **A modern foundation.** This includes unlimited undo, autosave to browser storage and a unit-tested geometry core that does not depend on the UI.
 
@@ -26,7 +26,7 @@ V1 supports Quake 2 only. Qoole's `Game` abstraction (Quake, Hexen II, Half-Life
 | CSG: subtract, intersect, hollow, plane clip, mirror | Opening a BSP file for editing (decompiling) |
 | Entity properties based on a definition file, md2 models as wireframes (other point entities as boxes) | Lighting preview (equivalent to qrad3 output) |
 | Running the compiler and displaying the leak file (`.pts`) | Multi-user editing (real-time collaborative editing) |
-| Chromium browsers with full file support, Firefox and Safari with load/download-based files | Mobile and touch use |
+| Chromium browsers with full file support, Firefox and Safari with load/download-based files; the latest two major versions of each | Mobile and touch use |
 
 Qoole's Windows-specific features, such as the Glide, DirectX and MGL renderers and MFC's docking windows, are replaced by WebGL2 and the browser's own panel layout.
 
@@ -306,7 +306,8 @@ interface Command { label: string; mergeKey?: string; run(doc: Readonly<MapDocum
 
 - **Undo** applies the `before` state and **redo** the `after` state. Nodes are immutable objects, so a snapshot is cheap: unchanged nodes are not copied.
 - **Merging:** commands produced during the same drag that share a `mergeKey` are merged into one undo step.
-- **History** is unlimited, but memory use is capped (256 MB estimated by default). The oldest steps are dropped.
+- **History** is unlimited, but memory use is capped (256 MB estimated by default). The oldest steps are dropped, but the newest step is always kept, even if it alone exceeds the limit, so the last operation can always be undone.
+- **Memory estimate:** each step on the undo and redo stacks is charged for the node versions in its patch that are not in the current document (unchanged nodes shared with the document cost nothing). The bytes come from a fixed structural formula: a per-node overhead, plus per face (points, texture name, numeric fields) for brushes, plus the key and value string lengths for entities and groups. The constants are defined in one place and calibrated once against a Chrome heap snapshot. The estimate is deterministic and testable in Node; it is approximate by design.
 - **Selection** is not part of the document or the undo history, but undo restores the selection from before the command (compare Qoole's `OpSelectNewObjs`).
 - Patches also go to the renderer, the BVH and the tree view as change notifications, so only the changed parts are recomputed.
 
@@ -329,7 +330,7 @@ In v1, compiling is done in the browser with qbsp3, qvis3 and qrad3 compiled to 
 1. **WASM compilation.** The tools' C code is compiled with Emscripten, and each tool runs in its own Web Worker. Input and output pass through Emscripten's in-memory filesystem: the `.map` goes in, and `.bsp`, `.pts` and `.prt` come out. The textures' `.wal` headers are given to the tools from the pak. Stdout is streamed to the log pane in real time. qvis3 and qrad3 can take minutes on large maps, so the user chooses a profile: *fast* (qbsp3, qvis3 `-fast`, no qrad3), *normal* or *final* (qrad3 `-extra`).
 2. **Threads.** qvis3 and qrad3 are multithreaded. WASM threads require `SharedArrayBuffer`, which in turn requires the COOP and COEP headers. The hosting must send them, and without them a single-threaded build is used.
 3. **Leaks.** If qbsp3 finds a leak, the `.pts` is loaded automatically and the path is shown in every view. The *Next leak point* command (N) moves the camera along the path.
-4. **Testing in the game.** The finished `.bsp` is saved to the game folder's `baseq2/maps/` directory (Chromium) or downloaded. The game cannot be started from the browser, so the editor shows the command `+map <name>` to copy. Embedding a browser-based Q2 port as a preview is a v2 matter.
+4. **Testing in the game.** The finished `.bsp` is saved to the game folder's `baseq2/maps/` directory (Chromium) or downloaded. The game cannot be started from the browser, so the editor shows the command `+map <name>` to copy. The reference engine for in-game testing is q2pro (`ext/q2pro`). The compilers are id's original tools, so the BSP stays in the original format and within its limits, even though q2pro itself has higher limits. Embedding a browser-based Q2 port as a preview is a v2 matter.
 
 The tools are compiled from id's original Quake-2-Tools source code (`ext/Quake-2-Tools`). Its file headers give the licence as "GPL v2 or later", which is compatible with Joole's `GPL-2.0-or-later` licence (verified on 24.11.2026). Only the changes Emscripten compilation requires and necessary bug fixes are made to the code (for example reading plane points with `atof`, see Integer plane points), and they are recorded in the README of the `tools/` directory. A single-threaded qbsp3 build for Node is made as early as phase 2, for tests and CI.
 
@@ -337,19 +338,21 @@ The tools are compiled from id's original Quake-2-Tools source code (`ext/Quake-
 
 The targets are sized so that a large Q2 map works on an integrated GPU. They are starting assumptions that will be checked with the first prototype.
 
-| Metric | Target | Measured with |
-| --- | --- | --- |
-| 3D view frame rate, 20,000 brushes, textures on | ≥ 60 fps | A laptop with an integrated GPU, Chrome |
-| Opening a `.map`, 5,000 brushes, views ready | < 2 s | A Playwright performance test |
-| Latency of editing a single brush (drag) | < 8 ms per frame | The Performance timeline |
-| CSG subtract, 1 cutter and 50 targets | < 50 ms | A Vitest benchmark |
-| Memory use without textures, 20,000 brushes | < 300 MB | Chrome's memory profiler |
+| Metric | Target | Measured with | Where |
+| --- | --- | --- | --- |
+| 3D view frame rate, 20,000 brushes, textures on | ≥ 60 fps | Chrome on the reference hardware | Manual, at each phase gate |
+| Opening a `.map`, 5,000 brushes, views ready | < 2 s | A Playwright performance test | CI (loose threshold) and the reference hardware |
+| Latency of editing a single brush (drag) | < 8 ms per frame | The Performance timeline | Manual, at each phase gate |
+| CSG subtract, 1 cutter and 50 targets | < 50 ms | A Vitest benchmark | CI (loose threshold) and the reference hardware |
+| Memory use without textures, 20,000 brushes | < 300 MB | Chrome's memory profiler | Manual, at each phase gate |
+
+**Reference hardware:** a laptop with an Intel Iris Xe (11th–13th gen) or AMD Radeon 680M-class integrated GPU, 16 GB RAM, the current Chrome, on the balanced power profile. Every recorded result names the exact model, the Chrome version and the date. CI runs only the CPU-bound metrics (map opening and the CSG benchmark), with thresholds of twice the target, to catch regressions; the CI runners render with SwiftShader, so GPU-bound numbers there are meaningless. The GPU-bound metrics (frame rate, drag latency, memory) are measured by hand on the reference hardware at each phase gate.
 
 **Testing:**
 
 - **Unit tests (Vitest)** for the geometry core and the parsers, with a target of at least 90 % line coverage in the `core/` folder. Every CSG operation gets property-based tests (fast-check): for random convex brushes, the result must be valid, and in subtraction the sum of the volumes must match within tolerance.
 - **Round-trip tests:** every `.map` in the test data is read, written and read again. The criterion is described in the File formats section: the data structure is always identical, and the text is identical when the file is in canonical form.
-- **Test data:** only small self-made maps and synthetic `.pak`, `.pkz`, `.wal` and `.pcx` files are added to the repository (`tests/fixtures/`), and CI runs the tests with them. id's game data (vanilla maps, `pak0.pak`, textures) is not committed. Tests that use it read the path of a Q2 installation from the environment variable `JOOLE_Q2_DIR`, and they are skipped if the variable is not set.
+- **Test data:** only small self-made maps and synthetic `.pak`, `.pkz`, `.wal` and `.pcx` files are added to the repository (`tests/fixtures/`), and CI runs the tests with them. id's data (`pak0.pak`, textures and id's released map sources) is not committed. Tests that use it read the path of a Q2 installation from the environment variable `JOOLE_Q2_DIR` and the directory of id's map sources from `JOOLE_MAPS_DIR`, and they are skipped if the variable is not set.
 - **Compiler test:** CI writes the test maps and runs the WASM version of qbsp3 in Node. The test fails if the compiler warns about invalid brushes.
 - **E2E (Playwright)** for the main workflows: open, create a brush, subtract, undo, save. Plus screenshot comparison tests for the views (pixel comparison with SwiftShader software rendering).
 
@@ -359,7 +362,7 @@ The targets are sized so that a large Q2 map works on an integrated GPU. They ar
 
 The implementation proceeds in five phases. Each phase ends with a usable version, and the next phase starts only when the previous one's acceptance criterion is met. The detailed work breakdown is in [PLAN.md](../PLAN.md).
 
-1. **Reader and viewer.** Pak, pkz, wal and palette parsers, the search order of mod directories, the `.map` reader and writer, building polygons, the four views and the cameras. *Done when* a vanilla Q2 map opens with its textures and the round-trip test passes.
+1. **Reader and viewer.** Pak, pkz, wal and palette parsers, the search order of mod directories, the `.map` reader and writer, building polygons, the four views and the cameras. *Done when* id's released Q2 map sources open with their textures and the round-trip test passes.
 2. **Brush editing.** CommandBus and undo, selection, move, rotate and scale, new brush, grid, saving the JSON project, `.map` export, autosave, and a single-threaded qbsp3.wasm for Node for the compiler test. *Done when* a simple room can be built from scratch and saved, and qbsp3 accepts it without warnings.
 3. **CSG and textures.** Subtract, intersect, hollow, plane clip, mirror, vertex, edge and face editing, texture tools and lock, and surface flags. *Done when* the property-based CSG tests pass and textures look the same in the editor and in the game.
 4. **Entities and structure.** The definition file parser, the entity panel, brush entities, the tree view, groups and entering a group, prefabs, md2 preview and `target` lines. *Done when* a working single-player level (player start, door, button, enemy) can be made from start to finish.
@@ -375,15 +378,21 @@ The implementation proceeds in five phases. Each phase ends with a usable versio
 - **Groups in `.map` files:** as `func_group` entities with `_joole_*` keys, not as comments.
 - **Compilers:** id's original Quake-2-Tools. A single-threaded qbsp3.wasm for Node is made as early as phase 2.
 - **Entity definitions:** generated from id's GPL game code. The md2 model paths are in a table in `game/q2`.
-- **Test data:** only self-made or synthetic data in the repository. id's data is read locally through the `JOOLE_Q2_DIR` environment variable.
+- **Test data:** only self-made or synthetic data in the repository. id's data is read locally through the `JOOLE_Q2_DIR` (game installation) and `JOOLE_MAPS_DIR` (id's released map sources) environment variables.
+- **Vanilla map corpus:** the `.map` sources id has released (base1–base3 in `base100.zip`, the CTF and match map packs), used locally and never committed.
+- **In-game test engine:** q2pro.
+- **Browser baseline:** the latest two major versions of Chrome/Edge, Firefox and Safari.
+- **Content-Security-Policy:** a strict CSP in production enforces the no-external-requests rule.
 - **Shortcuts:** WASD works only in fly mode. V switches between vertex and edge editing.
 - **Autosave recovery:** based on an unsaved-changes flag, not on timestamps.
 - **Qoole `.qle` import** moves to a phase after v1. The reader can be based on the source code's `LoadObjFile` and `ReadBoundGeometry` functions.
 - **Technology stack:** the UI library is Solid 2, the language TypeScript 7 (native `tsc`), the development environment Node 26 LTS and the package manager pnpm. The reasoning and versions are in [10-stack.md](10-stack.md).
 - **Layered architecture:** the layer order, dependency rules, the `core/types` module, `src/main.ts` and the split of tools between the `app/` and `ui/` layers were refined (see Architecture).
 - **Documentation language:** all project documentation is written in English.
+- **Undo memory limit:** a structural estimate of the node versions held only by the history, and the newest step is always kept.
+- **Performance reference:** a defined integrated-GPU laptop class. CPU-bound metrics also run in CI with 2× thresholds, and GPU-bound metrics are measured by hand at the phase gates.
 - **UI details from the design system:** rejected moves are shown as a dashed `vp-invalid` line instead of red, F1–F4 maximise a view, N steps to the next leak point, entity classes are picked by category, and the views have a context menu. The properties panel shows the selection's texture. The design system and the UI are named Joole.
 
 **To be refined later:**
 
-- [ ] How undo history memory use is estimated (default limit 256 MB). The decision is needed in phase 2.
+None at the moment.
