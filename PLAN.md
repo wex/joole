@@ -220,7 +220,7 @@ Goal: read Q2 game data and `.map` files without loss, and show the map in four 
 - **Depends on:** P1.1
 - **Done when:** the search-order tests pass and match both reference implementations.
 
-### [ ] P1.4 Binary formats (`core/formats`) ⇄
+### [x] P1.4 Binary formats (`core/formats`) ⇄
 
 - **Goal:** read `.pak`, `.pkz`, `.wal` and the palette without loading whole archives into memory.
 - **Scope:**
