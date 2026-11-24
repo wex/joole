@@ -387,6 +387,7 @@ The implementation proceeds in five phases. Each phase ends with a usable versio
 - **Autosave recovery:** based on an unsaved-changes flag, not on timestamps.
 - **Qoole `.qle` import** moves to a phase after v1. The reader can be based on the source code's `LoadObjFile` and `ReadBoundGeometry` functions.
 - **Technology stack:** the UI library is Solid 2, the language TypeScript 7 (native `tsc`), the development environment Node 26 LTS and the package manager pnpm. The reasoning and versions are in [10-stack.md](10-stack.md).
+- **TypeScript project references:** TS 7.0 does not allow `--noEmit` in referenced composite projects (TS6310), so type checking emits declaration files only into the ignored `.tsbuild/` cache. The details are in [10-stack.md](10-stack.md).
 - **Layered architecture:** the layer order, dependency rules, the `core/types` module, `src/main.ts` and the split of tools between the `app/` and `ui/` layers were refined (see Architecture).
 - **Documentation language:** all project documentation is written in English.
 - **Undo memory limit:** a structural estimate of the node versions held only by the history, and the newest step is always kept.

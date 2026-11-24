@@ -1,0 +1,23 @@
+{
+  "compilerOptions": {
+    "target": "ES2023",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "verbatimModuleSyntax": true,
+    "isolatedModules": true,
+    "composite": true,
+    "declaration": true,
+    "emitDeclarationOnly": true,
+    "paths": {
+      "@core/*": ["./src/core/*"],
+      "@game/*": ["./src/game/*"],
+      "@app/*": ["./src/app/*"],
+      "@render/*": ["./src/render/*"],
+      "@platform/*": ["./src/platform/*"],
+      "@ui/*": ["./src/ui/*"]
+    }
+  }
+}

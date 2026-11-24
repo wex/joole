@@ -31,7 +31,7 @@ Versions are recorded as major versions. Exact versions are locked in `package.j
 
 ## Language and typing: TypeScript 7
 
-TypeScript 7 is the native implementation written in Go, and its `tsc` is many times faster than the 5.x and 6.x compilers. It is used only for type checking (`tsc -b --noEmit`). Vite and Vitest strip types with their own transform, so the build does not depend on `tsc`.
+TypeScript 7 is the native implementation written in Go, and its `tsc` is many times faster than the 5.x and 6.x compilers. It is used only for type checking (`tsc -b`). Vite and Vitest strip types with their own transform, so the application build does not depend on `tsc`. TS 7.0 does not allow `--noEmit` in referenced composite projects (TS6310), so each project uses `emitDeclarationOnly` and writes declarations into the ignored `.tsbuild/` cache. No JavaScript is emitted.
 
 - **Baseline options:** `strict`, `noUncheckedIndexedAccess`, `noImplicitOverride`, `verbatimModuleSyntax`, `isolatedModules`, `moduleResolution: "bundler"`, and `target`/`lib` at least ES2023.
 - **Per-layer `tsconfig` projects** (project references):
@@ -41,7 +41,7 @@ TypeScript 7 is the native implementation written in Go, and its `tsc` is many t
   - Tests (`*.test.ts`, `*.bench.ts`): a project of their own, with the Vitest and `@types/node` types. The source projects contain no test files, so test types do not leak into the core.
 - **Two TypeScript versions (decided 24.11.2026):** typescript-eslint 8 supports TypeScript's JS API only for versions below 6.1 (`typescript >=4.8.4 <6.1.0` in every `@typescript-eslint/*` package), and TS 7.0's root export has no compiler API. Therefore:
   - `typescript` is TS 6.0. typescript-eslint's parser and type-aware rules, and the editor's language service, resolve it. TS 6.0 was designed to match TS 7's semantics, so the two rarely disagree.
-  - TS 7.0 is installed under the alias `typescript7` (`"typescript7": "npm:typescript@^7"`). Its `bin/tsc` is a Node launcher, so `pnpm typecheck` runs `node node_modules/typescript7/bin/tsc -b --noEmit`. Both packages provide a `tsc` bin, so scripts never call a bare `tsc`.
+  - TS 7.0 is installed under the alias `typescript7` (`"typescript7": "npm:typescript@^7"`). Its `bin/tsc` is a Node launcher, so `pnpm typecheck` runs `node node_modules/typescript7/bin/tsc -b`. Both packages provide a `tsc` bin, so scripts never call a bare `tsc`.
   - The alias must not be named `@typescript/native`, because typescript-eslint treats that name as the opt-in for its experimental `tsgo` backend.
   - **Not chosen: the experimental `tsgo` backend** (`projectService: { EXPERIMENTAL_backend: 'tsgo' }`, available since typescript-eslint 8.73.0). It is explicitly experimental, and a maintainer stated on 10.11.2026 that it "is not yet ready for use". It needs a TS 7.1 prerelease as `@typescript/native`, still requires TS 6, and is currently up to about 1.5× slower than the classic backend on large projects. Revisit it when it leaves experimental status. TS 6 is removed once typescript-eslint supports TS 7 directly.
 - **Editor:** the workspace's `typescript` (TS 6.0) by default. TS 7's native language server may be used if the editor supports it.

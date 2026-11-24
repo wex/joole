@@ -92,10 +92,10 @@ Goal: a repository in which every later WP can follow the normal workflow (write
   - `tsconfig.test.json` with Vitest and Node types.
   - A root `tsconfig.json` with references, and the path aliases `@core/*` … `@ui/*`.
   - `src/env.d.ts` for the `?raw`, `?url` and `*.module.css` imports.
-  - TS 6.0 is the `typescript` package and TS 7.0 the `typescript7` alias, as decided in the stack. `pnpm typecheck` calls `typescript7/bin/tsc` by path.
+  - TS 6.0 is the `typescript` package and TS 7.0 the `typescript7` alias, as decided in the stack. `pnpm typecheck` calls `typescript7/bin/tsc` by path, with declarations emitted into the ignored `.tsbuild/` cache because TS 7.0 does not allow `--noEmit` in referenced composite projects.
 - **Tests:** a canary script compiles a temporary core file that uses `document`, and it must fail. A lint canary runs one type-aware typescript-eslint rule, to prove that typescript-eslint loads TS 6 and not TS 7.
 - **Depends on:** P0.2
-- **Done when:** `pnpm typecheck` (TS 7 `tsc -b --noEmit`) passes, the DOM canary fails as expected, and the type-aware lint canary runs.
+- **Done when:** `pnpm typecheck` (TS 7 `tsc -b`) passes, the DOM canary fails as expected, and the type-aware lint canary runs.
 
 ### [ ] P0.4 Lint, format and layer enforcement
 

@@ -89,7 +89,7 @@ If a change requires a new dependency direction, the spec's rule table, the Merm
 | `pnpm dev` | Vite dev server with the COOP/COEP headers |
 | `pnpm build` | Production build into `dist/` |
 | `pnpm preview` | Run the production build locally |
-| `pnpm typecheck` | TypeScript 7 (`node node_modules/typescript7/bin/tsc -b --noEmit`), all tsconfig projects |
+| `pnpm typecheck` | TypeScript 7 (`node node_modules/typescript7/bin/tsc -b`), all tsconfig projects |
 | `pnpm lint` / `pnpm lint:fix` | ESLint, including the layer boundaries |
 | `pnpm format` / `pnpm format:check` | Prettier |
 | `pnpm test` | Vitest, single run |
