@@ -56,7 +56,7 @@ The dotted edges are cross-phase dependencies that let the qbsp3 port start earl
 
 Goal: a repository in which every later WP can follow the normal workflow (write the test first, run `pnpm check`, get a green CI run) and in which the architecture rules are enforced by tools from the first commit.
 
-### [ ] P0.1 Repository and governance
+### [x] P0.1 Repository and governance
 
 - **Goal:** create the remote repository and the legal and housekeeping files.
 - **Scope:**
@@ -144,7 +144,7 @@ Goal: a repository in which every later WP can follow the normal workflow (write
 - **Depends on:** P0.2
 - **Done when:** `pnpm test`, `pnpm test:coverage`, `pnpm bench` and `pnpm e2e` each run at least one trivial test.
 
-### [ ] P0.7 CI (GitHub Actions)
+### [x] P0.7 CI (GitHub Actions)
 
 - **Goal:** enforce the workflow on every pull request.
 - **Scope:** `.github/workflows/ci.yml`:
@@ -165,14 +165,14 @@ Goal: a repository in which every later WP can follow the normal workflow (write
 - **Depends on:** P0.1, P0.5
 - **Done when:** the preview deployment reports `crossOriginIsolated === true`. This WP may slip to P5.7 without blocking anything.
 
-### [ ] P0.9 Documentation sync
+### [x] P0.9 Documentation sync
 
 - **Goal:** make the documents describe reality rather than the target state.
 - **Scope:** AGENTS.md (_Project status_, the command table, actual file names), the stack (the TS 6 mechanism), and this plan's status.
 - **Depends on:** P0.1 to P0.7
 - **Done when:** every command listed in AGENTS.md exists in `package.json`, or is marked with the phase that adds it.
 
-**[ ] Gate 0:** `pnpm check` and `pnpm e2e` are green locally and in CI, the layer and DOM canaries fail as expected, and `crossOriginIsolated` is true in dev and preview.
+**[x] Gate 0:** `pnpm check` and `pnpm e2e` are green locally and in CI, the layer and DOM canaries fail as expected, and `crossOriginIsolated` is true in dev and preview.
 
 ---
 
