@@ -1,0 +1,6 @@
+minimumReleaseAge: 10080
+permissions:
+  '@solidjs/web':
+    skills: true
+  solid-js:
+    skills: true
