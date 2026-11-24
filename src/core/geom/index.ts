@@ -4,3 +4,4 @@ export * from './mat4';
 export * from './plane';
 export * from './winding';
 export * from './brush';
+export * from './integerPoints';

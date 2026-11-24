@@ -254,7 +254,7 @@ Goal: read Q2 game data and `.map` files without loss, and show the map in four 
 - **Depends on:** P1.1, P1.2
 - **Done when:** all fixtures round-trip under the spec's criterion.
 
-### [ ] P1.6 Integer plane points for export (`core/geom`)
+### [x] P1.6 Integer plane points for export (`core/geom`)
 
 - **Goal:** implement the spec's _Integer plane points_ rule.
 - **Scope:** for a face whose points are not integers, compute three integer points that define the plane closest to the original. Approach:

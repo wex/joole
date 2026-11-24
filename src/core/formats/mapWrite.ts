@@ -1,6 +1,24 @@
-import type { BrushNode, EntityNode, Face, GroupNode, MapDocument, Vec3 } from '@core/types/index';
+import type {
+  BrushNode,
+  EntityNode,
+  Face,
+  GroupNode,
+  MapDocument,
+  MapNode,
+  Vec3,
+} from '@core/types/index';
+import { convertBrushToIntegerPoints } from '../geom/integerPoints';
 
 export type MapWriteMode = 'export' | 'clipboard';
+
+export interface MapWriteResult {
+  text: string;
+  /**
+   * Warnings from the integer plane point conversion in export mode,
+   * naming the brushes that could not be converted.
+   */
+  warnings: string[];
+}
 
 export interface MapWriteOptions {
   mode: MapWriteMode;
@@ -58,8 +76,24 @@ function propLine([key, value]: [string, string]): string {
  * func_group entities carrying the _joole keys, entities inside a group
  * carry _joole_group, so the round trip loses nothing.
  */
-export function writeMap(doc: MapDocument, options: MapWriteOptions): string {
+export function writeMap(doc: MapDocument, options: MapWriteOptions): MapWriteResult {
   const writeAttribs = options.writeAttribs ?? ((face: Face) => face.tex.attribsInFile);
+  const warnings: string[] = [];
+  // export converts every face to integer plane points; the clipboard
+  // keeps full precision, as the spec requires
+  if (options.mode === 'export') {
+    const nodes = new Map<string, MapNode>();
+    for (const [id, node] of doc.nodes) {
+      if (node.kind === 'brush') {
+        const conversion = convertBrushToIntegerPoints(node);
+        warnings.push(...conversion.warnings);
+        nodes.set(id, conversion.brush);
+      } else {
+        nodes.set(id, node);
+      }
+    }
+    doc = { ...doc, nodes };
+  }
   const lines: string[] = [];
 
   function writeBrushChildren(node: EntityNode | GroupNode): void {
@@ -152,5 +186,5 @@ export function writeMap(doc: MapDocument, options: MapWriteOptions): string {
   lines.push('}');
   writeChildren(world);
 
-  return lines.join('\n') + '\n';
+  return { text: lines.join('\n') + '\n', warnings };
 }

@@ -51,18 +51,18 @@ describe('round-trip on the canonical fixture', () => {
 
   it('written text is identical to the canonical input', () => {
     const doc = parseMap(text);
-    expect(writeMap(doc, { mode: 'export' })).toBe(text);
+    expect(writeMap(doc, { mode: 'export' }).text).toBe(text);
   });
 
   it('read-write-read produces identical data', () => {
     const first = parseMap(text);
-    const second = parseMap(writeMap(first, { mode: 'export' }));
+    const second = parseMap(writeMap(first, { mode: 'export' }).text);
     expect(normalize(second)).toEqual(normalize(first));
   });
 
   it('clipboard mode round-trips the same way', () => {
     const doc = parseMap(text);
-    expect(writeMap(doc, { mode: 'clipboard' })).toBe(text);
+    expect(writeMap(doc, { mode: 'clipboard' }).text).toBe(text);
   });
 });
 
