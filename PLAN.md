@@ -180,7 +180,7 @@ Goal: a repository in which every later WP can follow the normal workflow (write
 
 Goal: read Q2 game data and `.map` files without loss, and show the map in four views with textures.
 
-### [ ] P1.1 Shared types (`core/types`)
+### [x] P1.1 Shared types (`core/types`)
 
 - **Goal:** put every data-model type in one place, as type declarations only.
 - **Scope:**
