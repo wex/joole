@@ -192,7 +192,7 @@ Goal: read Q2 game data and `.map` files without loss, and show the map in four 
 - **Depends on:** Gate 0
 - **Done when:** the types match the spec's _Data model_ section exactly.
 
-### [ ] P1.2 Geometry basics (`core/geom`)
+### [x] P1.2 Geometry basics (`core/geom`)
 
 - **Goal:** turn plane sets into polygons, the derived geometry that every later feature builds on.
 - **Scope:**
