@@ -2,19 +2,19 @@
 
 This plan breaks the work of building Joole, from an empty repository to v1.0, into phases and work packages.
 
-Status: draft, 24.11.2026. The normative sources are [docs/00-spec.md](docs/00-spec.md) (what to build), [docs/10-stack.md](docs/10-stack.md) (which technologies to use) and [AGENTS.md](AGENTS.md) (how to work). This plan only sets the order and the slicing of the work. If the plan and the spec disagree, the spec wins, and the plan is corrected in the same change.
+Status: active, 24.11.2026. The normative sources are [docs/00-spec.md](docs/00-spec.md) (what to build), [docs/10-stack.md](docs/10-stack.md) (which technologies to use) and [AGENTS.md](AGENTS.md) (how to work). This plan only sets the order and the slicing of the work. If the plan and the spec disagree, the spec wins, and the plan is corrected in the same change.
 
 ## How to use this plan
 
-- **Phases** follow the spec's five implementation phases (*Implementation phases and decisions*). Phase 0 is an extra foundation phase that must be finished before phase 1 starts. A phase is closed only when its **gate**, which is the spec's *Done when* criterion, has been verified and checked off here.
+- **Phases** follow the spec's five implementation phases (_Implementation phases and decisions_). Phase 0 is an extra foundation phase that must be finished before phase 1 starts. A phase is closed only when its **gate**, which is the spec's _Done when_ criterion, has been verified and checked off here.
 - **Work packages** (WP) have IDs of the form `P<phase>.<n>`. A WP is normally one to three pull requests. Each WP lists:
-  - *Goal*
-  - *Scope*: modules and files
-  - *Tests*
-  - *Depends on*
-  - *Done when*
+  - _Goal_
+  - _Scope_: modules and files
+  - _Tests_
+  - _Depends on_
+  - _Done when_
 - **Order:** within a phase, a WP may start as soon as its dependencies are done. WPs marked ⇄ can run in parallel with the rest of their phase.
-- **Status:** tick the checkbox next to the WP title when it is merged and its *Done when* holds. Gates are ticked separately.
+- **Status:** tick the checkbox next to the WP title when it is merged and its _Done when_ holds. Gates are ticked separately.
 - **Definition of Done for every WP:**
   1. Tests are written first for `core/` and `app/` code, including a regression test for every bug fix.
   2. `pnpm check` passes locally and in CI.
@@ -27,14 +27,14 @@ Status: draft, 24.11.2026. The normative sources are [docs/00-spec.md](docs/00-s
 
 ## Overview
 
-| Phase | Goal | Gate (from spec) | Main risks |
-| --- | --- | --- | --- |
-| 0 Foundations | Repository, toolchain, CI, layer enforcement | `pnpm check` and `pnpm e2e` are green locally and in CI, and the layer canary tests fail on forbidden imports | TS 7 combined with typescript-eslint, Solid 2 being brand new |
-| 1 Reader and viewer | Parse Q2 data, show a map in four views | id's released Q2 map sources open with textures, and the round-trip test passes | `.map` fidelity, render performance |
-| 2 Brush editing | Commands, undo, selection, transforms, saving, qbsp3 in Node | A simple room can be built from scratch and saved, and qbsp3 accepts it with no warnings | Porting qbsp3 to WASM, undo memory |
-| 3 CSG and textures | CSG operations, vertex editing, texture tools and lock, surface flags | The property-based CSG tests pass, and textures look the same in the editor and in the game | CSG robustness, exact UV parity |
-| 4 Entities and structure | Entity definitions, panels, tree, groups, scope, prefabs, md2 | A working single-player level (player start, door, button, monster) can be made from start to finish | Inferring key types from QUAKED text |
-| 5 Compilation and polish | Compilers in the browser, leaks, PWA, performance, Firefox/Safari, release | The performance targets are met, and a map compiles to a playable BSP without leaving the browser | Threads, performance targets, browser differences |
+| Phase                    | Goal                                                                       | Gate (from spec)                                                                                              | Main risks                                                    |
+| ------------------------ | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| 0 Foundations            | Repository, toolchain, CI, layer enforcement                               | `pnpm check` and `pnpm e2e` are green locally and in CI, and the layer canary tests fail on forbidden imports | TS 7 combined with typescript-eslint, Solid 2 being brand new |
+| 1 Reader and viewer      | Parse Q2 data, show a map in four views                                    | id's released Q2 map sources open with textures, and the round-trip test passes                               | `.map` fidelity, render performance                           |
+| 2 Brush editing          | Commands, undo, selection, transforms, saving, qbsp3 in Node               | A simple room can be built from scratch and saved, and qbsp3 accepts it with no warnings                      | Porting qbsp3 to WASM, undo memory                            |
+| 3 CSG and textures       | CSG operations, vertex editing, texture tools and lock, surface flags      | The property-based CSG tests pass, and textures look the same in the editor and in the game                   | CSG robustness, exact UV parity                               |
+| 4 Entities and structure | Entity definitions, panels, tree, groups, scope, prefabs, md2              | A working single-player level (player start, door, button, monster) can be made from start to finish          | Inferring key types from QUAKED text                          |
+| 5 Compilation and polish | Compilers in the browser, leaks, PWA, performance, Firefox/Safari, release | The performance targets are met, and a map compiles to a playable BSP without leaving the browser             | Threads, performance targets, browser differences             |
 
 ```mermaid
 flowchart LR
@@ -68,7 +68,7 @@ Goal: a repository in which every later WP can follow the normal workflow (write
 - **Depends on:** –
 - **Done when:** the remote exists, `main` is protected as above, the existing local history is pushed, and `git status` never shows `ext/`.
 
-### [ ] P0.2 Package scaffold
+### [x] P0.2 Package scaffold
 
 - **Goal:** set up `package.json` and the dependencies listed in the stack.
 - **Scope:**
@@ -81,7 +81,7 @@ Goal: a repository in which every later WP can follow the normal workflow (write
 - **Depends on:** P0.1
 - **Done when:** `pnpm install --frozen-lockfile` works on a clean checkout, and `pnpm dev` serves an empty page.
 
-### [ ] P0.3 TypeScript project references
+### [x] P0.3 TypeScript project references
 
 - **Goal:** make each layer's environment rules a compile error.
 - **Scope:**
@@ -92,12 +92,12 @@ Goal: a repository in which every later WP can follow the normal workflow (write
   - `tsconfig.test.json` with Vitest and Node types.
   - A root `tsconfig.json` with references, and the path aliases `@core/*` … `@ui/*`.
   - `src/env.d.ts` for the `?raw`, `?url` and `*.module.css` imports.
-  - TS 6.0 is the `typescript` package and TS 7.0 the `typescript7` alias, as decided in the stack. `pnpm typecheck` calls `typescript7/bin/tsc` by path.
+  - TS 6.0 is the `typescript` package and TS 7.0 the `typescript7` alias, as decided in the stack. `pnpm typecheck` calls `typescript7/bin/tsc` by path, with declarations emitted into the ignored `.tsbuild/` cache because TS 7.0 does not allow `--noEmit` in referenced composite projects.
 - **Tests:** a canary script compiles a temporary core file that uses `document`, and it must fail. A lint canary runs one type-aware typescript-eslint rule, to prove that typescript-eslint loads TS 6 and not TS 7.
 - **Depends on:** P0.2
-- **Done when:** `pnpm typecheck` (TS 7 `tsc -b --noEmit`) passes, the DOM canary fails as expected, and the type-aware lint canary runs.
+- **Done when:** `pnpm typecheck` (TS 7 `tsc -b`) passes, the DOM canary fails as expected, and the type-aware lint canary runs.
 
-### [ ] P0.4 Lint, format and layer enforcement
+### [x] P0.4 Lint, format and layer enforcement
 
 - **Goal:** turn the spec's dependency rules into automated checks.
 - **Scope:**
@@ -114,7 +114,7 @@ Goal: a repository in which every later WP can follow the normal workflow (write
 - **Depends on:** P0.3
 - **Done when:** `pnpm lint` passes on the repository, and every row of the layer table is covered by the canary test.
 
-### [ ] P0.5 Vite configuration
+### [x] P0.5 Vite configuration
 
 - **Goal:** set up a dev server and build that are ready for workers, WASM and threads.
 - **Scope:** `vite.config.ts` with:
@@ -127,7 +127,7 @@ Goal: a repository in which every later WP can follow the normal workflow (write
 - **Depends on:** P0.2
 - **Done when:** the smoke test passes, and `pnpm build` produces `dist/`.
 
-### [ ] P0.6 Test infrastructure ⇄
+### [x] P0.6 Test infrastructure ⇄
 
 - **Goal:** get Vitest and Playwright running with the agreed limits.
 - **Scope:**
@@ -135,7 +135,7 @@ Goal: a repository in which every later WP can follow the normal workflow (write
     - `include` covers `src/**/*.test.ts` and `tests/**/*.test.ts` only.
     - The Node environment is used for `core`, `game` and `app`.
     - Coverage uses v8 with a 90 % line threshold for `src/core/**`.
-    - `bench` is set up for `*.bench.ts`.
+    - benchmarks are set up for `*.bench.ts` with Vitest 5's `benchmark` configuration.
   - `playwright.config.ts`:
     - `testDir: tests/e2e` and a Chromium project with `--use-angle=swiftshader`.
     - A `webServer` that runs `pnpm build && pnpm preview`.
@@ -168,7 +168,7 @@ Goal: a repository in which every later WP can follow the normal workflow (write
 ### [ ] P0.9 Documentation sync
 
 - **Goal:** make the documents describe reality rather than the target state.
-- **Scope:** AGENTS.md (*Project status*, the command table, actual file names), the stack (the TS 6 mechanism), and this plan's status.
+- **Scope:** AGENTS.md (_Project status_, the command table, actual file names), the stack (the TS 6 mechanism), and this plan's status.
 - **Depends on:** P0.1 to P0.7
 - **Done when:** every command listed in AGENTS.md exists in `package.json`, or is marked with the phase that adds it.
 
@@ -190,7 +190,7 @@ Goal: read Q2 game data and `.map` files without loss, and show the map in four 
   - A `Result<T, E>` type for operations that can fail.
 - **Tests:** none needed beyond type checks. ESLint ensures that `core/types` contains no runtime code (`import type` only).
 - **Depends on:** Gate 0
-- **Done when:** the types match the spec's *Data model* section exactly.
+- **Done when:** the types match the spec's _Data model_ section exactly.
 
 ### [ ] P1.2 Geometry basics (`core/geom`)
 
@@ -245,8 +245,8 @@ Goal: read Q2 game data and `.map` files without loss, and show the map in four 
   - Groups: `func_group` entities with `_joole_*` keys become `GroupNode`s and their nesting, and entities carrying `_joole_group` are attached to their group.
   - A canonical number writer: integers with no decimals, otherwise at most 6 decimals with trailing zeros removed.
   - A writer with two modes:
-    1. *export* (files and compilation): plane points are always integers (see P1.6), optional fields are written per the `attribsInFile` rule, and offsets and rotations are written as stored.
-    2. *clipboard* (clipboard and prefabs): full precision.
+    1. _export_ (files and compilation): plane points are always integers (see P1.6), optional fields are written per the `attribsInFile` rule, and offsets and rotations are written as stored.
+    2. _clipboard_ (clipboard and prefabs): full precision.
 - **Tests:**
   - the round-trip criterion from the spec, on self-made fixtures
   - id's released map sources from `JOOLE_MAPS_DIR` (base1–base3, the CTF and match packs)
@@ -256,7 +256,7 @@ Goal: read Q2 game data and `.map` files without loss, and show the map in four 
 
 ### [ ] P1.6 Integer plane points for export (`core/geom`)
 
-- **Goal:** implement the spec's *Integer plane points* rule.
+- **Goal:** implement the spec's _Integer plane points_ rule.
 - **Scope:** for a face whose points are not integers, compute three integer points that define the plane closest to the original. Approach:
   1. Round the face polygon's vertices to integers.
   2. Pick the non-collinear triple whose plane deviates least from the original.
@@ -415,7 +415,7 @@ Goal: editing through commands with unlimited undo, project files and autosave, 
 - **Scope:**
   - A 4×4 matrix applied to all face points.
   - Grid sizes 1 to 256, changed with `[` and `]`, with snapping in the 2D views.
-  - An explicit *Snap to grid* command; there is no automatic rounding after a rotation.
+  - An explicit _Snap to grid_ command; there is no automatic rounding after a rotation.
   - Moving a group moves each of its children.
   - Texture lock arrives in P3.7. Until then, transforms keep the texture parameters unchanged.
 - **Tests:** unit tests and fast-check properties (transforms keep brushes valid, and inverse transforms round-trip).
@@ -496,7 +496,7 @@ Goal: editing through commands with unlimited undo, project files and autosave, 
   - In `tools/qbsp3/`, a copy of the needed files from `ext/Quake-2-Tools` (`bsp/qbsp3/*`, `common/*`), each with a provenance header.
   - A Makefile for `emcc` with the q3edit-style flags (`MODULARIZE`, `FORCE_FILESYSTEM`, `INVOKE_RUN=0`, `EXIT_RUNTIME=0`, memory growth, exported `FS` and `callMain`) and `ENVIRONMENT=node,web,worker`.
   - Documented patches, recorded in `tools/README.md`:
-    1. plane points read with `atof` (spec, *Integer plane points*)
+    1. plane points read with `atof` (spec, _Integer plane points_)
     2. anything needed for Emscripten (`threads.c`, file IO)
   - Facts from the code that shape the build:
     - qbsp3 forces `numthreads = 1`, so no threads are needed here.
@@ -743,7 +743,7 @@ Goal: the full compile cycle in the browser, plus the performance targets, brows
 - **Scope:**
   - An automatic export in export mode, with integer-point warnings shown first.
   - `.wal` headers fed from the virtual filesystem into the in-memory filesystem.
-  - Profiles: *fast* (qbsp3, then qvis3 `-fast`, no qrad3), *normal* and *final* (qrad3 `-extra`).
+  - Profiles: _fast_ (qbsp3, then qvis3 `-fast`, no qrad3), _normal_ and _final_ (qrad3 `-extra`).
   - Outputs `.bsp`, `.pts` and `.prt`.
   - Chromium saves the `.bsp` to `baseq2/maps/`, and other browsers download it.
   - The editor shows the `+map <name>` command to copy.
@@ -753,7 +753,7 @@ Goal: the full compile cycle in the browser, plus the performance targets, brows
 ### [ ] P5.3 Leak display
 
 - **Goal:** make leaks easy to find and fix.
-- **Scope:** a `.pts` parser, the leak path drawn in all views in `vp-leak`, and a *Next leak point* command (N) that moves the camera along the path.
+- **Scope:** a `.pts` parser, the leak path drawn in all views in `vp-leak`, and a _Next leak point_ command (N) that moves the camera along the path.
 - **Tests:** a parser unit test, and an E2E test with a leaking fixture.
 - **Depends on:** P5.2
 - **Done when:** a leak found by qbsp3 is displayed automatically.
@@ -808,7 +808,7 @@ Goal: the full compile cycle in the browser, plus the performance targets, brows
 
 These run through every phase. They are not WPs of their own, but they are part of every WP's Definition of Done.
 
-- **Documentation:** the spec, stack, AGENTS.md and this plan are updated in the same change as the code they describe. Decisions get a date in the spec's *Decisions* list.
+- **Documentation:** the spec, stack, AGENTS.md and this plan are updated in the same change as the code they describe. Decisions get a date in the spec's _Decisions_ list.
 - **Licensing and provenance:** borrowed code (from Qoole, q2pro, Quake-2, Quake-2-Tools or q3edit) gets a header naming its origin, plus an entry in `THIRD_PARTY_NOTICES.md`. Only licences that are compatible with GPL-2.0-or-later are allowed.
 - **Dependencies:** new dependencies need a justification and an entry in the stack, and must be at least 7 days old. `minimumReleaseAge` is never bypassed.
 - **Test data:** only self-made or synthetic fixtures are committed. id's data is used only through `JOOLE_Q2_DIR` and `JOOLE_MAPS_DIR`.
@@ -818,22 +818,22 @@ These run through every phase. They are not WPs of their own, but they are part 
 
 ## Risks and mitigations
 
-| Risk | Impact | Mitigation | Owner WP |
-| --- | --- | --- | --- |
-| TS 7 has no stable JS API, so typescript-eslint needs TS 6 | TS 6 and TS 7 could disagree on a type | TS 6 as `typescript` plus the `typescript7` alias (P0.3). TS 6.0 matches TS 7 semantics, and the type check that gates CI is TS 7. Revisit the `tsgo` backend when it is stable | P0.3 |
-| Solid 2 is weeks old | Framework bugs and few examples | Keep `ui/` thin and logic in `app/`, pin versions, use Solid's agent diagnostics, report bugs upstream | P1.11 |
-| qbsp3 under Emscripten (`exit()`, global state, file IO) | The compiler oracle is late | Start P2.11 right after P1.5, use a fresh module per run, follow q3edit's port as a template | P2.11 |
-| Non-deterministic WASM builds | The CI diff job is flaky | Pin the emsdk Docker image, strip timestamps and paths, verify on the first build | P2.11 |
-| CSG and float precision | Invalid brushes, leaks | Tolerances in one place, fast-check properties, validation of every result, export integer points with re-validation | P1.6, P3.1 |
-| Exact UV parity with qbsp3 | The gate fails | Port the C code literally, and compare automatically against the `.bsp` texinfo (P3.11) | P1.10, P3.11 |
-| Performance with 20 000 brushes on an integrated GPU | The gate fails | Measure early (P1.12), use per-texture VBOs with incremental updates, culling, and render on demand | P1.12, P5.6 |
-| QUAKED text has no key types | Poor entity forms | Heuristics plus an override table, and the raw key–value editor is always available | P4.1 |
-| Browser filesystem API differences | Firefox and Safari gaps | Feature detection, fallbacks from the start (P1.8), and the full matrix in P5.5 | P1.8, P5.5 |
-| Integer-point export changes rotated brushes | Surprising geometry | A validated conversion that warns before export, and the atof patch in Joole's qbsp3 | P1.6 |
+| Risk                                                       | Impact                                 | Mitigation                                                                                                                                                                      | Owner WP     |
+| ---------------------------------------------------------- | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------ |
+| TS 7 has no stable JS API, so typescript-eslint needs TS 6 | TS 6 and TS 7 could disagree on a type | TS 6 as `typescript` plus the `typescript7` alias (P0.3). TS 6.0 matches TS 7 semantics, and the type check that gates CI is TS 7. Revisit the `tsgo` backend when it is stable | P0.3         |
+| Solid 2 is weeks old                                       | Framework bugs and few examples        | Keep `ui/` thin and logic in `app/`, pin versions, use Solid's agent diagnostics, report bugs upstream                                                                          | P1.11        |
+| qbsp3 under Emscripten (`exit()`, global state, file IO)   | The compiler oracle is late            | Start P2.11 right after P1.5, use a fresh module per run, follow q3edit's port as a template                                                                                    | P2.11        |
+| Non-deterministic WASM builds                              | The CI diff job is flaky               | Pin the emsdk Docker image, strip timestamps and paths, verify on the first build                                                                                               | P2.11        |
+| CSG and float precision                                    | Invalid brushes, leaks                 | Tolerances in one place, fast-check properties, validation of every result, export integer points with re-validation                                                            | P1.6, P3.1   |
+| Exact UV parity with qbsp3                                 | The gate fails                         | Port the C code literally, and compare automatically against the `.bsp` texinfo (P3.11)                                                                                         | P1.10, P3.11 |
+| Performance with 20 000 brushes on an integrated GPU       | The gate fails                         | Measure early (P1.12), use per-texture VBOs with incremental updates, culling, and render on demand                                                                             | P1.12, P5.6  |
+| QUAKED text has no key types                               | Poor entity forms                      | Heuristics plus an override table, and the raw key–value editor is always available                                                                                             | P4.1         |
+| Browser filesystem API differences                         | Firefox and Safari gaps                | Feature detection, fallbacks from the start (P1.8), and the full matrix in P5.5                                                                                                 | P1.8, P5.5   |
+| Integer-point export changes rotated brushes               | Surprising geometry                    | A validated conversion that warns before export, and the atof patch in Joole's qbsp3                                                                                            | P1.6         |
 
 ## Open items tracked by this plan
 
-| Item | Source | Resolved in |
-| --- | --- | --- |
-| Creating the remote repository (owner action, settings decided) | Stack, *Hosting and CI* | P0.1 |
-| Creating the Cloudflare account and connecting the repository (owner action, settings decided) | Stack, *Hosting and CI* | P0.8 |
+| Item                                                                                           | Source                  | Resolved in |
+| ---------------------------------------------------------------------------------------------- | ----------------------- | ----------- |
+| Creating the remote repository (owner action, settings decided)                                | Stack, _Hosting and CI_ | P0.1        |
+| Creating the Cloudflare account and connecting the repository (owner action, settings decided) | Stack, _Hosting and CI_ | P0.8        |

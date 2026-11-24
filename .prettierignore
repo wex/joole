@@ -1,0 +1,8 @@
+ext/
+dist/
+coverage/
+playwright-report/
+test-results/
+.tsbuild/
+.agents/
+pnpm-lock.yaml

@@ -6,31 +6,31 @@ This file is a guide for both human developers and coding agents: where informat
 
 ## Documentation
 
-| File | Contents | When to update |
-| --- | --- | --- |
-| [docs/00-spec.md](docs/00-spec.md) | Technical specification: goals, scope, architecture, data model, formats, algorithms, implementation phases, decisions | When functionality, scope or architecture changes, or when a detail is verified against the source code |
-| [docs/10-stack.md](docs/10-stack.md) | Technologies, major versions, purposes and constraints | When a dependency is added or removed or its major version changes, or when a technology decision is made |
-| [docs/20-sources.md](docs/20-sources.md) | External source projects, what they are used for, and their local copies in the `ext/` directory | When a new source is adopted (it is also cloned into `ext/`) |
-| [docs/design-system/](docs/design-system/README.md) | UI design system: tokens, components, the UI's language and voice | When UI conventions, tokens or components change |
-| [PLAN.md](PLAN.md) | Implementation plan: phases 0–5, work packages (`P<phase>.<n>`), dependencies, gates and risks | When a work package is finished (checkbox), when the order or breakdown changes, or when the spec changes |
-| `AGENTS.md` | Development process, commands and practices | When a command, process or practice changes |
+| File                                                | Contents                                                                                                               | When to update                                                                                            |
+| --------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| [docs/00-spec.md](docs/00-spec.md)                  | Technical specification: goals, scope, architecture, data model, formats, algorithms, implementation phases, decisions | When functionality, scope or architecture changes, or when a detail is verified against the source code   |
+| [docs/10-stack.md](docs/10-stack.md)                | Technologies, major versions, purposes and constraints                                                                 | When a dependency is added or removed or its major version changes, or when a technology decision is made |
+| [docs/20-sources.md](docs/20-sources.md)            | External source projects, what they are used for, and their local copies in the `ext/` directory                       | When a new source is adopted (it is also cloned into `ext/`)                                              |
+| [docs/design-system/](docs/design-system/README.md) | UI design system: tokens, components, the UI's language and voice                                                      | When UI conventions, tokens or components change                                                          |
+| [PLAN.md](PLAN.md)                                  | Implementation plan: phases 0–5, work packages (`P<phase>.<n>`), dependencies, gates and risks                         | When a work package is finished (checkbox), when the order or breakdown changes, or when the spec changes |
+| `AGENTS.md`                                         | Development process, commands and practices                                                                            | When a command, process or practice changes                                                               |
 
 **Rules:**
 
 - **The spec is normative.** If the implementation deviates from the spec, the spec is updated in the same change, or the change is not made and the question is raised. Code is not written against the spec.
 - **Information lives in one place.** Technologies and versions are only in `10-stack.md`, and the spec refers there. Functional requirements are only in the spec.
-- **Decisions are recorded** in the spec's *Decisions dd.mm.yyyy* section with a date. Open items are `- [ ]` tasks in the *To be refined later* list (spec) or the *Open technology decisions* list (stack). A resolved item is ticked off or moved to the decisions.
+- **Decisions are recorded** in the spec's _Decisions dd.mm.yyyy_ section with a date. Open items are `- [ ]` tasks in the _To be refined later_ list (spec) or the _Open technology decisions_ list (stack). A resolved item is ticked off or moved to the decisions.
 - **Numbering:** `docs/` files are numbered in tens (`00`, `10`, `20` …). A new document gets the next free number, for example `30-testdata.md`.
 - **Diagrams** are written in Mermaid (` ```mermaid `), so they render on GitHub and are readable as text. Embedded images and external diagram tools are not used.
 - **Language:** all documentation is written in English, as are code identifiers, code comments and commit messages. File names, identifiers and commands are marked as `code` in documents.
 
 ## Project status
 
-So far the repository contains only documentation. The implementation follows [PLAN.md](PLAN.md), and the first phase is phase 0 (*Foundations*: remote repository, `package.json`, `tsconfig` projects, Vite, ESLint, Prettier, Vitest, Playwright and CI). The commands and directories below describe the target state. Once the project scaffold is done (P0.9), this section is updated to reflect the actual state.
+The repository now contains the local phase 0 scaffold: `package.json` and the lockfile, the layer directories, TypeScript project references, Vite, ESLint, Prettier, Vitest, Playwright, CI configuration and a placeholder application. Phase 1 has not started. The remaining phase 0 verification is external to the code: the owner must verify the GitHub repository settings and connect Cloudflare, and CI must be observed on a pull request.
 
 ## Directory structure and layer rules
 
-The layered architecture, its diagram and the dependency rules are in the spec's *Architecture* section (*Layer order and dependency rules*). The ESLint configuration is in the stack's *Code quality* section. A summary follows.
+The layered architecture, its diagram and the dependency rules are in the spec's _Architecture_ section (_Layer order and dependency rules_). The ESLint configuration is in the stack's _Code quality_ section. A summary follows.
 
 ```text
 docs/             specification, stack, sources, design system
@@ -81,36 +81,36 @@ If a change requires a new dependency direction, the spec's rule table, the Merm
 - **q2pro** for testing compiled maps in the game. It is the reference engine.
 - **Q2 game data:** testing requires your own legal Quake 2 installation (`baseq2/pak0.pak`). The game data is not GPL-licensed, and it is never added to the repository (see Test data).
 
-## Commands (target state)
+## Commands
 
-| Command | Purpose |
-| --- | --- |
-| `pnpm install` | Install dependencies (`--frozen-lockfile` in CI) |
-| `pnpm dev` | Vite dev server with the COOP/COEP headers |
-| `pnpm build` | Production build into `dist/` |
-| `pnpm preview` | Run the production build locally |
-| `pnpm typecheck` | TypeScript 7 (`node node_modules/typescript7/bin/tsc -b --noEmit`), all tsconfig projects |
-| `pnpm lint` / `pnpm lint:fix` | ESLint, including the layer boundaries |
-| `pnpm format` / `pnpm format:check` | Prettier |
-| `pnpm test` | Vitest, single run |
-| `pnpm test:watch` | Vitest in watch mode |
-| `pnpm test:coverage` | Coverage, `core/` threshold ≥ 90 % |
-| `pnpm bench` | Vitest benchmarks |
-| `pnpm e2e` | Playwright tests, including screenshot comparison |
-| `pnpm build:tools` | qbsp3, qvis3 and qrad3 to WebAssembly into `workers/` (requires emsdk or Docker) |
-| `pnpm gen:entities` | Generates `game/q2/q2.def` and the md2 table from the game code (reads `ext/Quake-2/game/`) |
-| `pnpm check` | All checks before a commit: format:check, lint, typecheck, test, build |
+| Command                             | Purpose                                                                          |
+| ----------------------------------- | -------------------------------------------------------------------------------- |
+| `pnpm install`                      | Install dependencies (`--frozen-lockfile` in CI)                                 |
+| `pnpm dev`                          | Vite dev server with the COOP/COEP headers                                       |
+| `pnpm build`                        | Production build into `dist/`                                                    |
+| `pnpm preview`                      | Run the production build locally                                                 |
+| `pnpm typecheck`                    | TypeScript 7 (`node node_modules/typescript7/bin/tsc -b`), all tsconfig projects |
+| `pnpm lint` / `pnpm lint:fix`       | ESLint, including the layer boundaries                                           |
+| `pnpm format` / `pnpm format:check` | Prettier                                                                         |
+| `pnpm test`                         | Vitest, single run                                                               |
+| `pnpm test:watch`                   | Vitest in watch mode                                                             |
+| `pnpm test:coverage`                | Coverage, `core/` threshold ≥ 90 %                                               |
+| `pnpm bench`                        | Vitest benchmarks                                                                |
+| `pnpm e2e`                          | Playwright tests                                                                 |
+| `pnpm build:tools`                  | Added in P2.11: qbsp3, qvis3 and qrad3 to WebAssembly into `workers/`            |
+| `pnpm gen:entities`                 | Added in P4.2: generates `game/q2/q2.def` and the md2 table from the game code   |
+| `pnpm check`                        | All checks before a commit: format:check, lint, typecheck, test, build           |
 
 When a command is added to `package.json` or renamed, this table is updated in the same change.
 
 ## Development workflow
 
-The implementation follows the spec's five phases in order. The next phase starts only when the previous phase's *Done when* criterion is met. Features from later phases are not implemented early, but the structure must not prevent them.
+The implementation follows the spec's five phases in order. The next phase starts only when the previous phase's _Done when_ criterion is met. Features from later phases are not implemented early, but the structure must not prevent them.
 
 A single change is made like this:
 
 1. **Read the spec section** the change concerns, and check in `PLAN.md` which work package it belongs to and whether its dependencies are done. If the spec is unclear or contradictory, ask before implementing.
-2. **Check the sources.** For algorithms and editor behaviour, the model is Qoole. For formats and constants, the source of truth is id's original engine (`ext/Quake-2`) and Quake-2-Tools (`common/qfiles.h`). For extensions (`.pkz`, package search rules), the source is q2pro. For browser solutions, the template is q3edit. Code is read from the local copy in `ext/<repo>/`, and the file-level references are in the stack's *Role of the source projects* section. For the editor's basic features (entity definitions, CSG, `.map`), id's own editor in `ext/Quake-2-Tools/qe4/` is also worth checking. When the spec relies on a detail of the original code (a constant, a file format, an order of operations), verify it from the source code and record the result with a date in the spec.
+2. **Check the sources.** For algorithms and editor behaviour, the model is Qoole. For formats and constants, the source of truth is id's original engine (`ext/Quake-2`) and Quake-2-Tools (`common/qfiles.h`). For extensions (`.pkz`, package search rules), the source is q2pro. For browser solutions, the template is q3edit. Code is read from the local copy in `ext/<repo>/`, and the file-level references are in the stack's _Role of the source projects_ section. For the editor's basic features (entity definitions, CSG, `.map`), id's own editor in `ext/Quake-2-Tools/qe4/` is also worth checking. When the spec relies on a detail of the original code (a constant, a file format, an order of operations), verify it from the source code and record the result with a date in the spec.
 3. **Write the test first** whenever the change concerns `core/` or `app/` code: a unit test, a fast-check property or a round-trip test. A bug fix comes with a test that fails before the fix.
 4. **Implement** following the layer rules and the coding practices.
 5. **Run `pnpm check`.** For changes to rendering or the UI, also run `pnpm e2e`. For performance-critical changes (geometry, render cache, parsers), run `pnpm bench` and compare against the spec's performance table.
@@ -155,7 +155,7 @@ A single change is made like this:
 
 - **Unit tests (Vitest):** all `core/` and `game/q2/` code and the `app/` logic. The coverage threshold in `core/` is ≥ 90 % of lines, and the threshold is mandatory in CI.
 - **Property-based tests (fast-check):** every CSG operation, building polygons and texture lock. The seed and minimised input of a failing case are added as a permanent regression test.
-- **Round-trip tests:** every test map is read, written and read again. The data structure must always be identical, and the text must be the same line by line when the file is in canonical form (spec, *File formats*). The same is done for the `.joole.json` format, and each project format version has its own test file.
+- **Round-trip tests:** every test map is read, written and read again. The data structure must always be identical, and the text must be the same line by line when the file is in canonical form (spec, _File formats_). The same is done for the `.joole.json` format, and each project format version has its own test file.
 - **Compiler test:** qbsp3.wasm runs in Node on the test maps, and warnings about invalid brushes fail the test.
 - **E2E (Playwright):** the main workflows (open, create a brush, subtract, undo, save), performance tests and screenshot comparison of the views with SwiftShader. Reference screenshots are updated only for an intentional visual change, and the reason is recorded in the commit message.
 - **Test data:**

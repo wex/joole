@@ -1,16 +1,100 @@
 <!-- @dsCard group="Panels" height=330 subtitle="Thumbnails, selection, filter" -->
 <!doctype html>
 <html>
-<head><meta charset="utf-8"><title>preview</title></head>
-<body>
-<section class="q2-pane" style="max-width:420px" aria-label="Textures">
-  <header class="q2-titlebar">Textures <span class="q2-coords">textures/e1u1 · 214</span><span class="q2-spacer"></span></header>
-  <div style="display:flex;gap:var(--space-xs);padding:var(--space-md) var(--space-md) 0"><input class="q2-search" id="texsearch" placeholder="Filter by name"><button class="q2-btn" aria-pressed="false" id="inuse">In use</button></div>
-  <div class="q2-texgrid" role="listbox" aria-label="Textures in e1u1"><div class="q2-tex" role="option" aria-selected="true" tabindex="0"><canvas class="q2-swatch" width="16" height="16" data-c="110,84,60" data-i="0"></canvas><span class="q2-texname">floor1_3</span></div><div class="q2-tex" role="option" aria-selected="false" tabindex="0"><canvas class="q2-swatch" width="16" height="16" data-c="62,78,58" data-i="1"></canvas><span class="q2-texname">grnx2_1</span></div><div class="q2-tex" role="option" aria-selected="false" tabindex="0"><canvas class="q2-swatch" width="16" height="16" data-c="92,96,104" data-i="2"></canvas><span class="q2-texname">metal1_1</span></div><div class="q2-tex" role="option" aria-selected="false" tabindex="0"><canvas class="q2-swatch" width="16" height="16" data-c="118,100,78" data-i="3"></canvas><span class="q2-texname">wslt1_4</span></div><div class="q2-tex" role="option" aria-selected="false" tabindex="0"><canvas class="q2-swatch" width="16" height="16" data-c="96,70,52" data-i="4"></canvas><span class="q2-texname">door1_1</span></div><div class="q2-tex" role="option" aria-selected="false" tabindex="0"><canvas class="q2-swatch" width="16" height="16" data-c="196,186,150" data-i="5"></canvas><span class="q2-texname">light2_1</span></div><div class="q2-tex" role="option" aria-selected="false" tabindex="0"><canvas class="q2-swatch" width="16" height="16" data-c="80,108,150" data-i="6"></canvas><span class="q2-texname">sky1</span></div><div class="q2-tex" role="option" aria-selected="false" tabindex="0"><canvas class="q2-swatch" width="16" height="16" data-c="120,80,170" data-i="7"></canvas><span class="q2-texname">clip</span></div></div>
-  <footer class="q2-titlebar" style="border-top:1px solid var(--line);border-bottom:0;background:var(--surface-1)"><span class="q2-coords">floor1_3 · 64 × 64 · baseq2/pak0.pak</span></footer>
-</section>
-<script>document.querySelectorAll('canvas.q2-swatch').forEach(function(cv){var g=cv.getContext('2d'),c=cv.dataset.c.split(',').map(Number),seed=+cv.dataset.i*97+13;function r(){seed=(seed*16807)%2147483647;return seed/2147483647}for(var y=0;y<16;y++)for(var x=0;x<16;x++){var k=0.7+r()*0.5;if(cv.dataset.i==='0'&&(x%8===0||y%8===0))k=0.5;g.fillStyle='rgb('+(c[0]*k|0)+','+(c[1]*k|0)+','+(c[2]*k|0)+')';g.fillRect(x,y,1,1)}});
-document.querySelectorAll('.q2-tex').forEach(function(t){t.onclick=function(){document.querySelectorAll('.q2-tex').forEach(function(x){x.setAttribute('aria-selected','false')});t.setAttribute('aria-selected','true');document.querySelector('footer .q2-coords').textContent=t.textContent+' · 64 × 64 · baseq2/pak0.pak'}});
-var b=document.getElementById('inuse');b.onclick=function(){b.setAttribute('aria-pressed',b.getAttribute('aria-pressed')==='true'?'false':'true')};</script>
-</body>
+  <head>
+    <meta charset="utf-8" />
+    <title>preview</title>
+  </head>
+  <body>
+    <section class="q2-pane" style="max-width: 420px" aria-label="Textures">
+      <header class="q2-titlebar">
+        Textures <span class="q2-coords">textures/e1u1 · 214</span><span class="q2-spacer"></span>
+      </header>
+      <div style="display: flex; gap: var(--space-xs); padding: var(--space-md) var(--space-md) 0">
+        <input class="q2-search" id="texsearch" placeholder="Filter by name" /><button
+          class="q2-btn"
+          aria-pressed="false"
+          id="inuse"
+        >
+          In use
+        </button>
+      </div>
+      <div class="q2-texgrid" role="listbox" aria-label="Textures in e1u1">
+        <div class="q2-tex" role="option" aria-selected="true" tabindex="0">
+          <canvas class="q2-swatch" width="16" height="16" data-c="110,84,60" data-i="0"></canvas
+          ><span class="q2-texname">floor1_3</span>
+        </div>
+        <div class="q2-tex" role="option" aria-selected="false" tabindex="0">
+          <canvas class="q2-swatch" width="16" height="16" data-c="62,78,58" data-i="1"></canvas
+          ><span class="q2-texname">grnx2_1</span>
+        </div>
+        <div class="q2-tex" role="option" aria-selected="false" tabindex="0">
+          <canvas class="q2-swatch" width="16" height="16" data-c="92,96,104" data-i="2"></canvas
+          ><span class="q2-texname">metal1_1</span>
+        </div>
+        <div class="q2-tex" role="option" aria-selected="false" tabindex="0">
+          <canvas class="q2-swatch" width="16" height="16" data-c="118,100,78" data-i="3"></canvas
+          ><span class="q2-texname">wslt1_4</span>
+        </div>
+        <div class="q2-tex" role="option" aria-selected="false" tabindex="0">
+          <canvas class="q2-swatch" width="16" height="16" data-c="96,70,52" data-i="4"></canvas
+          ><span class="q2-texname">door1_1</span>
+        </div>
+        <div class="q2-tex" role="option" aria-selected="false" tabindex="0">
+          <canvas class="q2-swatch" width="16" height="16" data-c="196,186,150" data-i="5"></canvas
+          ><span class="q2-texname">light2_1</span>
+        </div>
+        <div class="q2-tex" role="option" aria-selected="false" tabindex="0">
+          <canvas class="q2-swatch" width="16" height="16" data-c="80,108,150" data-i="6"></canvas
+          ><span class="q2-texname">sky1</span>
+        </div>
+        <div class="q2-tex" role="option" aria-selected="false" tabindex="0">
+          <canvas class="q2-swatch" width="16" height="16" data-c="120,80,170" data-i="7"></canvas
+          ><span class="q2-texname">clip</span>
+        </div>
+      </div>
+      <footer
+        class="q2-titlebar"
+        style="border-top: 1px solid var(--line); border-bottom: 0; background: var(--surface-1)"
+      >
+        <span class="q2-coords">floor1_3 · 64 × 64 · baseq2/pak0.pak</span>
+      </footer>
+    </section>
+    <script>
+      document.querySelectorAll('canvas.q2-swatch').forEach(function (cv) {
+        var g = cv.getContext('2d'),
+          c = cv.dataset.c.split(',').map(Number),
+          seed = +cv.dataset.i * 97 + 13;
+        function r() {
+          seed = (seed * 16807) % 2147483647;
+          return seed / 2147483647;
+        }
+        for (var y = 0; y < 16; y++)
+          for (var x = 0; x < 16; x++) {
+            var k = 0.7 + r() * 0.5;
+            if (cv.dataset.i === '0' && (x % 8 === 0 || y % 8 === 0)) k = 0.5;
+            g.fillStyle =
+              'rgb(' + ((c[0] * k) | 0) + ',' + ((c[1] * k) | 0) + ',' + ((c[2] * k) | 0) + ')';
+            g.fillRect(x, y, 1, 1);
+          }
+      });
+      document.querySelectorAll('.q2-tex').forEach(function (t) {
+        t.onclick = function () {
+          document.querySelectorAll('.q2-tex').forEach(function (x) {
+            x.setAttribute('aria-selected', 'false');
+          });
+          t.setAttribute('aria-selected', 'true');
+          document.querySelector('footer .q2-coords').textContent =
+            t.textContent + ' · 64 × 64 · baseq2/pak0.pak';
+        };
+      });
+      var b = document.getElementById('inuse');
+      b.onclick = function () {
+        b.setAttribute(
+          'aria-pressed',
+          b.getAttribute('aria-pressed') === 'true' ? 'false' : 'true',
+        );
+      };
+    </script>
+  </body>
 </html>

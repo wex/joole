@@ -17,16 +17,16 @@ Goals:
 
 V1 supports Quake 2 only. Qoole's `Game` abstraction (Quake, Hexen II, Half-Life, Sin, Heretic II) is left out, but game-specific things are still isolated in one module (`game/q2`). That way, adding a new game later requires no changes to the core.
 
-| In v1 | Not in v1 |
-| --- | --- |
-| Reading and writing Q2 `.map` (id's original format) | The Valve 220 texture format, Quake 3 patches and curves |
-| An own JSON project format as the primary save format | Importing Qoole `.qle` files (a later phase) |
-| `.wal` textures from `pak` and `pkz` packages and loose directories, including Q2 mod game directories | `.wad` textures, Qoole's cross-game map conversion |
-| Brushes, entities, groups, prefabs | Terrain tools, a model editor |
-| CSG: subtract, intersect, hollow, plane clip, mirror | Opening a BSP file for editing (decompiling) |
-| Entity properties based on a definition file, md2 models as wireframes (other point entities as boxes) | Lighting preview (equivalent to qrad3 output) |
-| Running the compiler and displaying the leak file (`.pts`) | Multi-user editing (real-time collaborative editing) |
-| Chromium browsers with full file support, Firefox and Safari with load/download-based files; the latest two major versions of each | Mobile and touch use |
+| In v1                                                                                                                              | Not in v1                                                |
+| ---------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
+| Reading and writing Q2 `.map` (id's original format)                                                                               | The Valve 220 texture format, Quake 3 patches and curves |
+| An own JSON project format as the primary save format                                                                              | Importing Qoole `.qle` files (a later phase)             |
+| `.wal` textures from `pak` and `pkz` packages and loose directories, including Q2 mod game directories                             | `.wad` textures, Qoole's cross-game map conversion       |
+| Brushes, entities, groups, prefabs                                                                                                 | Terrain tools, a model editor                            |
+| CSG: subtract, intersect, hollow, plane clip, mirror                                                                               | Opening a BSP file for editing (decompiling)             |
+| Entity properties based on a definition file, md2 models as wireframes (other point entities as boxes)                             | Lighting preview (equivalent to qrad3 output)            |
+| Running the compiler and displaying the leak file (`.pts`)                                                                         | Multi-user editing (real-time collaborative editing)     |
+| Chromium browsers with full file support, Firefox and Safari with load/download-based files; the latest two major versions of each | Mobile and touch use                                     |
 
 Qoole's Windows-specific features, such as the Glide, DirectX and MGL renderers and MFC's docking windows, are replaced by WebGL2 and the browser's own panel layout.
 
@@ -66,7 +66,7 @@ flowchart TB
   APP -.->|uses| PLATFORM
 ```
 
-*Figure 1. Layered architecture: four layers and the game module. The dashed arrows, `core/types` and the Tool logic box are refinements to the original diagram made on 24.11.2026.*
+_Figure 1. Layered architecture: four layers and the game module. The dashed arrows, `core/types` and the Tool logic box are refinements to the original diagram made on 24.11.2026._
 
 Game-specific data (the palette, surface flags, directory paths, compile profiles and the default texture `e2u1/mine10_1`, as in Qoole) lives in the `game/q2` module. It corresponds to the `Quake2` implementation of Qoole's `Game` class, but v1 has no other games.
 
@@ -93,15 +93,15 @@ tests/            E2E tests and test data
 
 The diagram draws the platform below the core because the platform is closer to the browser than the core is. In terms of dependencies, the order from top to bottom is **UI → application → platform → core**, and the game module sits above the core but below the other layers. The "and on the core" part of the rule means that every layer may use the core directly.
 
-| Layer | Directories | May import | May not import |
-| --- | --- | --- | --- |
-| UI | `ui/` | `app/`, `render/`, `platform/`, `game/q2/`, `core/` | `workers/` (messages only) |
-| Application | `app/` | `render/`, `platform/`, `game/q2/`, `core/` | `ui/`, `workers/` |
-| Platform | `render/`, `platform/`, `workers/` | `game/q2/`, `core/` (internal limits below) | `app/`, `ui/` |
-| Game module | `game/q2/` | `core/` | everything else |
-| Core | `core/` | only `core/` (internal order below) | everything else |
+| Layer       | Directories                        | May import                                          | May not import             |
+| ----------- | ---------------------------------- | --------------------------------------------------- | -------------------------- |
+| UI          | `ui/`                              | `app/`, `render/`, `platform/`, `game/q2/`, `core/` | `workers/` (messages only) |
+| Application | `app/`                             | `render/`, `platform/`, `game/q2/`, `core/`         | `ui/`, `workers/`          |
+| Platform    | `render/`, `platform/`, `workers/` | `game/q2/`, `core/` (internal limits below)         | `app/`, `ui/`              |
+| Game module | `game/q2/`                         | `core/`                                             | everything else            |
+| Core        | `core/`                            | only `core/` (internal order below)                 | everything else            |
 
-- **Within the platform**, `render/` may import `platform/` (for example the texture cache in OPFS), but not the other way round. `workers/` is a bundle of its own: it may import `core/` and `game/q2/` modules (for example the `wal` and `pcx` parsers and the palette), but not `app/`, `ui/` or `render/`. Other layers do not import worker code. They start the worker (`new Worker(new URL(…))`) and talk to it with messages through the worker clients in `platform/`.
+- **Within the platform**, `render/` may import `platform/` (for example the texture cache in OPFS), but not the other way round. `workers/` is a bundle of its own: it may import `core/` and `game/q2/` modules (for example the `wal` and `pcx` parsers and the palette), but not `app/`, `ui/`, `render/` or `platform/`. Other layers do not import worker code. They start the worker (`new Worker(new URL(…))`) and talk to it with messages through the worker clients in `platform/`.
 - **The core's internal order** is `core/types` ← `core/geom` ← `core/doc` ← `core/formats`. Without it there would be a cycle: commands (`core/doc`) run CSG (`core/geom`), and CSG uses the document model's types (`Plane`, `Face`, `FaceTexture`). That is why the data model types live in the `core/types` module, which contains type declarations only and is imported with `import type`. `core/formats` is at the top because the parsers produce a `MapDocument`.
 - **Within a layer**, imports are free (for example between `ui/` panels and views), except for the platform and core limits listed above.
 - **Start-up:** `src/main.ts` is the Vite entry and the only file that may import every layer. It creates the CommandBus, the renderer and the file services, and wires them together.
@@ -114,36 +114,56 @@ The diagram draws the platform below the core because the platform is closer to 
 The document is a tree whose nodes are groups, entities or brushes. The solution is the same as in Qoole, where one `Object` class can contain children, a brush (`Geometry`) or an entity (`Entity`). In the browser version, the node kinds are separated into type-safe shapes. Each node has a persistent id that undo, selection and the render cache use. The types below live in the `core/types` module.
 
 ```typescript
-type Id = string;               // nanoid, stays the same across saves
-type Vec3 = [number, number, number];   // float64, Q2 coordinates (Z up)
+type Id = string; // nanoid, stays the same across saves
+type Vec3 = [number, number, number]; // float64, Q2 coordinates (Z up)
 
-interface Plane { n: Vec3; d: number }  // n·p = d, normal points outwards
+interface Plane {
+  n: Vec3;
+  d: number;
+} // n·p = d, normal points outwards
 
 interface FaceTexture {
-  name: string;                 // e.g. "e1u1/floor1_3" without the .wal extension
-  offset: [number, number];     // xoff yoff
-  rotation: number;             // degrees
-  scale: [number, number];      // xscale yscale
-  contents: number;             // CONTENTS_* bit field
-  flags: number;                // SURF_* bit field
-  value: number;                // e.g. light intensity
-  attribsInFile: boolean;       // contents flags value were present in the .map that was read
+  name: string; // e.g. "e1u1/floor1_3" without the .wal extension
+  offset: [number, number]; // xoff yoff
+  rotation: number; // degrees
+  scale: [number, number]; // xscale yscale
+  contents: number; // CONTENTS_* bit field
+  flags: number; // SURF_* bit field
+  value: number; // e.g. light intensity
+  attribsInFile: boolean; // contents flags value were present in the .map that was read
 }
 
 interface Face {
-  points: [Vec3, Vec3, Vec3];   // define the plane as in .map
+  points: [Vec3, Vec3, Vec3]; // define the plane as in .map
   tex: FaceTexture;
 }
 
-interface BrushNode   { kind: 'brush';  id: Id; faces: Face[] }
-interface EntityNode  { kind: 'entity'; id: Id; props: [string, string][]; children: Id[] }
-interface GroupNode   { kind: 'group';  id: Id; name: string; props: [string, string][]; children: Id[]; locked?: boolean; hidden?: boolean }  // props: other keys of the func_group
+interface BrushNode {
+  kind: 'brush';
+  id: Id;
+  faces: Face[];
+}
+interface EntityNode {
+  kind: 'entity';
+  id: Id;
+  props: [string, string][];
+  children: Id[];
+}
+interface GroupNode {
+  kind: 'group';
+  id: Id;
+  name: string;
+  props: [string, string][];
+  children: Id[];
+  locked?: boolean;
+  hidden?: boolean;
+} // props: other keys of the func_group
 type MapNode = BrushNode | EntityNode | GroupNode;
 
 interface MapDocument {
   nodes: Map<Id, MapNode>;
   parent: Map<Id, Id>;
-  worldspawn: Id;               // always present, root node
+  worldspawn: Id; // always present, root node
 }
 ```
 
@@ -159,18 +179,18 @@ Design decisions:
 
 The editor reads the binary and text formats listed below plus its own project format, and it writes `.map` and project files. All parsers are pure TypeScript functions (an `ArrayBuffer` or `string` in, a data structure out), so they can be tested in Node without a browser. The binary formats are little-endian.
 
-| Format | Direction | Structure | Notes |
-| --- | --- | --- | --- |
-| `.map` | read + write | Text: entities `{ "key" "value" … { brush } }`, a brush face `( x y z ) ( x y z ) ( x y z ) texture xoff yoff rot xscale yscale [contents flags value]` | The last three fields are optional. If they are missing, qbsp3 takes the defaults from the `.wal` header. The editor writes them if they were in the file that was read (`attribsInFile`), if they differ from the texture's defaults, or if the texture cannot be found, in which case the defaults are unknown. qbsp3 reads the plane points and the `xoff`, `yoff` and `rot` values as integers (`atoi`) but the scale as a float (`bsp/qbsp3/map.c`), see below. `//` comments are allowed. |
-| `.pak` | read | Header `PACK`, directory offset (int32), directory length (int32). An entry is 64 bytes: name (56 bytes), position (int32), length (int32). | Uncompressed, so files are read directly with `Blob.slice` without loading the whole pak into memory. Files are looked up in the same order as in the game engine (see Mods below). |
-| `.pkz` | read | A ZIP archive (a q2pro extension). The central directory is read from the end of the file, and files are uncompressed (stored) or deflate-compressed. | Parsing the directory and headers is pure core code. Deflate decompression is done in the platform layer with the browser's `DecompressionStream('deflate-raw')` API, and the decompression function is passed to the parser as a parameter, because the core does not use browser APIs. The file is read in chunks with `Blob.slice`, like `.pak`. ZIP64 and encrypted archives are not supported. |
-| `.wal` | read | A 100-byte header: name (32), width, height, 4 mip offsets, next name in the animation chain (32), flags, contents, value. Then 8-bit indexed pixels. | The editor uses only mip 0 and lets WebGL generate the mipmaps. The header's flags, contents and value are the face defaults. |
-| `pics/colormap.pcx` | read | The last 768 bytes of the PCX are a 256-colour RGB palette. | The palette converts `.wal` textures to RGBA8. Index 255 is not transparent in Q2, so no alpha channel is used. |
-| `.md2` | read | Header `IDP2`, version 8, frames and GL commands | Optional. Shown as a wireframe preview of point entities (frame 0, see md2 preview below). Qoole showed md2 models as wireframes (`Quake2::LoadModel`). |
-| entity definitions | read | Radiant's `/*QUAKED class (r g b) (min) (max) FLAG1 FLAG2 … description */` blocks. The Q2 definitions are generated from the game code (see Entity definitions below). | The properties panel, colours, box sizes and spawnflag checkboxes come from here. Qoole's equivalent is its own typed format (`EntList`: VEC, INT, STR, FLAGDEF, COLOR …), so the editor's internal model supports the same types. |
-| `.pts` | read | Lines of the form `x y z` | qbsp3's leak path, shown as a line in every view (compare Qoole's `LoadLeakFile`). |
+| Format              | Direction    | Structure                                                                                                                                                               | Notes                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| ------------------- | ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `.map`              | read + write | Text: entities `{ "key" "value" … { brush } }`, a brush face `( x y z ) ( x y z ) ( x y z ) texture xoff yoff rot xscale yscale [contents flags value]`                 | The last three fields are optional. If they are missing, qbsp3 takes the defaults from the `.wal` header. The editor writes them if they were in the file that was read (`attribsInFile`), if they differ from the texture's defaults, or if the texture cannot be found, in which case the defaults are unknown. qbsp3 reads the plane points and the `xoff`, `yoff` and `rot` values as integers (`atoi`) but the scale as a float (`bsp/qbsp3/map.c`), see below. `//` comments are allowed. |
+| `.pak`              | read         | Header `PACK`, directory offset (int32), directory length (int32). An entry is 64 bytes: name (56 bytes), position (int32), length (int32).                             | Uncompressed, so files are read directly with `Blob.slice` without loading the whole pak into memory. Files are looked up in the same order as in the game engine (see Mods below).                                                                                                                                                                                                                                                                                                             |
+| `.pkz`              | read         | A ZIP archive (a q2pro extension). The central directory is read from the end of the file, and files are uncompressed (stored) or deflate-compressed.                   | Parsing the directory and headers is pure core code. Deflate decompression is done in the platform layer with the browser's `DecompressionStream('deflate-raw')` API, and the decompression function is passed to the parser as a parameter, because the core does not use browser APIs. The file is read in chunks with `Blob.slice`, like `.pak`. ZIP64 and encrypted archives are not supported.                                                                                             |
+| `.wal`              | read         | A 100-byte header: name (32), width, height, 4 mip offsets, next name in the animation chain (32), flags, contents, value. Then 8-bit indexed pixels.                   | The editor uses only mip 0 and lets WebGL generate the mipmaps. The header's flags, contents and value are the face defaults.                                                                                                                                                                                                                                                                                                                                                                   |
+| `pics/colormap.pcx` | read         | The last 768 bytes of the PCX are a 256-colour RGB palette.                                                                                                             | The palette converts `.wal` textures to RGBA8. Index 255 is not transparent in Q2, so no alpha channel is used.                                                                                                                                                                                                                                                                                                                                                                                 |
+| `.md2`              | read         | Header `IDP2`, version 8, frames and GL commands                                                                                                                        | Optional. Shown as a wireframe preview of point entities (frame 0, see md2 preview below). Qoole showed md2 models as wireframes (`Quake2::LoadModel`).                                                                                                                                                                                                                                                                                                                                         |
+| entity definitions  | read         | Radiant's `/*QUAKED class (r g b) (min) (max) FLAG1 FLAG2 … description */` blocks. The Q2 definitions are generated from the game code (see Entity definitions below). | The properties panel, colours, box sizes and spawnflag checkboxes come from here. Qoole's equivalent is its own typed format (`EntList`: VEC, INT, STR, FLAGDEF, COLOR …), so the editor's internal model supports the same types.                                                                                                                                                                                                                                                              |
+| `.pts`              | read         | Lines of the form `x y z`                                                                                                                                               | qbsp3's leak path, shown as a line in every view (compare Qoole's `LoadLeakFile`).                                                                                                                                                                                                                                                                                                                                                                                                              |
 
-The `.map` writer turns numbers into text like this: integers without decimals, and other numbers with at most six decimals and no trailing zeros. The writer's output form is called *canonical*. A grid-aligned brush therefore produces the same lines as the original file, if the file was already in canonical form.
+The `.map` writer turns numbers into text like this: integers without decimals, and other numbers with at most six decimals and no trailing zeros. The writer's output form is called _canonical_. A grid-aligned brush therefore produces the same lines as the original file, if the file was already in canonical form.
 
 **Integer plane points.** The original qbsp3 reads plane points with `atoi`, so decimals are truncated, and the compiled brush may differ from the editor's brush or break. The data model and the project file keep points at float64 precision. Export to a `.map` file and compilation, however, convert every face whose points are not integers into three integer points that define the plane closest to the original. The converted brush is checked (valid and convex). If the conversion breaks the brush or moves its vertices by more than the `POINT_EPS` tolerance, the brush is flagged and the user sees a warning before the export. The clipboard and prefabs keep full precision (at most six decimals), because other editors accept decimals. In addition, Joole's WASM qbsp3 gets a documented fix that reads the points as floats (`atof`). The export does not rely on it, though, so that maps also compile with the original tools.
 
@@ -178,7 +198,7 @@ The `.map` writer turns numbers into text like this: integers without decimals, 
 
 **Round-trip criterion** (read → write → read): the data structure must be identical for every test map. The text must be the same line by line, apart from comments and whitespace, when the file is already in canonical form and its plane points are integers (as in every map that compiles correctly with the original qbsp3). Other files are normalised on the first save, after which the round trip produces the same text.
 
-**Own project format (`.joole.json`).** The project is the primary save format, and `.map` is an export format for the compiler and other editors. Ctrl+S saves the project. The `.map` is written separately with the *Export* command and automatically before compiling. The project stores everything that a `.map` file loses:
+**Own project format (`.joole.json`).** The project is the primary save format, and `.map` is an export format for the compiler and other editors. Ctrl+S saves the project. The `.map` is written separately with the _Export_ command and automatically before compiling. The project stores everything that a `.map` file loses:
 
 ```json
 {
@@ -189,8 +209,38 @@ The `.map` writer turns numbers into text like this: integers without decimals, 
     "worldspawn": "w0",
     "nodes": [
       { "kind": "entity", "id": "w0", "props": [["classname", "worldspawn"]], "children": ["g1"] },
-      { "kind": "group", "id": "g1", "name": "Entrance", "props": [], "children": ["b1"], "locked": false, "hidden": false },
-      { "kind": "brush", "id": "b1", "faces": [ { "points": [[0,0,0],[0,64,0],[64,0,0]], "tex": { "name": "e1u1/floor1_3", "offset": [0,0], "rotation": 0, "scale": [1,1], "contents": 0, "flags": 0, "value": 0, "attribsInFile": false } } ] }
+      {
+        "kind": "group",
+        "id": "g1",
+        "name": "Entrance",
+        "props": [],
+        "children": ["b1"],
+        "locked": false,
+        "hidden": false
+      },
+      {
+        "kind": "brush",
+        "id": "b1",
+        "faces": [
+          {
+            "points": [
+              [0, 0, 0],
+              [0, 64, 0],
+              [64, 0, 0]
+            ],
+            "tex": {
+              "name": "e1u1/floor1_3",
+              "offset": [0, 0],
+              "rotation": 0,
+              "scale": [1, 1],
+              "contents": 0,
+              "flags": 0,
+              "value": 0,
+              "attribsInFile": false
+            }
+          }
+        ]
+      }
     ]
   },
   "editor": { "grid": 8, "textureLock": true, "cameras": {}, "compileProfile": "normal" }
@@ -215,19 +265,19 @@ The geometry core (`core/geom`) is a dependency-free TypeScript library that com
 
 The tolerances are constants in one place: `PLANE_EPS = 1e-4` (classifying a point against a plane) and `POINT_EPS = 1e-3` (merging vertices). A brush is valid when its volume is greater than 0, it has at least four faces and no face is redundant. Every operation returns either valid brushes or an error, never broken geometry.
 
-| Operation | Qoole equivalent | Algorithm |
-| --- | --- | --- |
-| Building polygons | `ConstructEdgeList`, `ConstructPlaneList` | For each plane, a large square (winding) is created and clipped by all the other planes. A face that ends up empty is redundant and is removed. |
-| New brush | prefabs, `MakeSegment` | A box is dragged in a 2D view, and its height comes from another view or from a default. The primitives are box, wedge, n-sided cylinder, cone and an approximate sphere. |
-| CSG subtract | `CSGSubtract` | Each plane of the cutter splits the target in two: the part outside the plane becomes a new brush, and the part inside continues to the next plane. Finally, the part left inside is discarded. New faces get the cutter's texture. |
-| CSG intersect | `CSGIntersect` | The brushes' plane sets are merged and redundant faces are removed. |
-| Hollow | `HollowInward`, `HollowOutBrush` | Each face becomes a shell of thickness d (8 units by default, as in Qoole), either inwards or outwards. The implementation is a subtraction: a copy moved inwards is subtracted from the original. |
-| Plane clip | `PlaneClip` | The plane is given in a 2D view by two points and the view's depth axis. Modes: keep the front side, the back side, or both as separate brushes. |
-| Mirror and flip | `OpPlaneMirror`, `OpPlaneFlip` | The points are mirrored, and the point order of each face is reversed so that the normal still points outwards. |
+| Operation                     | Qoole equivalent                                    | Algorithm                                                                                                                                                                                                                                                                                                                                                     |
+| ----------------------------- | --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Building polygons             | `ConstructEdgeList`, `ConstructPlaneList`           | For each plane, a large square (winding) is created and clipped by all the other planes. A face that ends up empty is redundant and is removed.                                                                                                                                                                                                               |
+| New brush                     | prefabs, `MakeSegment`                              | A box is dragged in a 2D view, and its height comes from another view or from a default. The primitives are box, wedge, n-sided cylinder, cone and an approximate sphere.                                                                                                                                                                                     |
+| CSG subtract                  | `CSGSubtract`                                       | Each plane of the cutter splits the target in two: the part outside the plane becomes a new brush, and the part inside continues to the next plane. Finally, the part left inside is discarded. New faces get the cutter's texture.                                                                                                                           |
+| CSG intersect                 | `CSGIntersect`                                      | The brushes' plane sets are merged and redundant faces are removed.                                                                                                                                                                                                                                                                                           |
+| Hollow                        | `HollowInward`, `HollowOutBrush`                    | Each face becomes a shell of thickness d (8 units by default, as in Qoole), either inwards or outwards. The implementation is a subtraction: a copy moved inwards is subtracted from the original.                                                                                                                                                            |
+| Plane clip                    | `PlaneClip`                                         | The plane is given in a 2D view by two points and the view's depth axis. Modes: keep the front side, the back side, or both as separate brushes.                                                                                                                                                                                                              |
+| Mirror and flip               | `OpPlaneMirror`, `OpPlaneFlip`                      | The points are mirrored, and the point order of each face is reversed so that the normal still points outwards.                                                                                                                                                                                                                                               |
 | Vertex, edge and face editing | `MoveVertex`, `MoveEdge`, `MoveFace`, `BreakPlanes` | A derived vertex is moved, and the planes of the touching faces are recomputed. If a face is no longer planar, it is split into triangles, as in Qoole's `BreakPlanes`. Finally, convexity is checked. If the result is not convex, the move is rejected and the view shows it as a dashed `vp-invalid` line (orange, because red is reserved for selection). |
-| Move, rotate, scale | `OpSelectionMove`, `Rotate`, `Scale` | A 4×4 matrix is applied to all face points. With texture lock on, the texture parameters are recomputed (see Textures). |
+| Move, rotate, scale           | `OpSelectionMove`, `Rotate`, `Scale`                | A 4×4 matrix is applied to all face points. With texture lock on, the texture parameters are recomputed (see Textures).                                                                                                                                                                                                                                       |
 
-In the 2D views, a point's position snaps to the grid (1, 2, 4 … 256 units, 8 by default). Grid-aligned brushes are written as integer points, which avoids qbsp3's precision problems. After a rotation, the plane points are rounded to the grid only if the user chooses the *Snap to grid* command, because automatic rounding can make a brush non-convex.
+In the 2D views, a point's position snaps to the grid (1, 2, 4 … 256 units, 8 by default). Grid-aligned brushes are written as integer points, which avoids qbsp3's precision problems. After a rotation, the plane points are rounded to the grid only if the user chooses the _Snap to grid_ command, because automatic rounding can make a brush non-convex.
 
 ## Rendering with WebGL2
 
@@ -259,11 +309,11 @@ UV coordinates are computed exactly as in qbsp3, so that the editor's view and t
 
 **Surface properties** are edited in a per-face panel as checkboxes. The values are constants from Q2's `qfiles.h`. The panel shows whether a value differs from the `.wal` texture's default (Qoole's `OpModSurfaceAttrib` and `OpModContentAttrib`).
 
-| Group | Flags (hexadecimal value) |
-| --- | --- |
-| Surface flags | LIGHT 0x1, SLICK 0x2, SKY 0x4, WARP 0x8, TRANS33 0x10, TRANS66 0x20, FLOWING 0x40, NODRAW 0x80, HINT 0x100, SKIP 0x200 |
-| Contents | SOLID 0x1, WINDOW 0x2, AUX 0x4, LAVA 0x8, SLIME 0x10, WATER 0x20, MIST 0x40, AREAPORTAL 0x8000, PLAYERCLIP 0x10000, MONSTERCLIP 0x20000, CURRENT\_0…CURRENT\_DOWN 0x40000–0x800000, ORIGIN 0x1000000, DETAIL 0x8000000, TRANSLUCENT 0x10000000, LADDER 0x20000000 |
-| Value | an integer; with the LIGHT flag, the light intensity |
+| Group         | Flags (hexadecimal value)                                                                                                                                                                                                                                         |
+| ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Surface flags | LIGHT 0x1, SLICK 0x2, SKY 0x4, WARP 0x8, TRANS33 0x10, TRANS66 0x20, FLOWING 0x40, NODRAW 0x80, HINT 0x100, SKIP 0x200                                                                                                                                            |
+| Contents      | SOLID 0x1, WINDOW 0x2, AUX 0x4, LAVA 0x8, SLIME 0x10, WATER 0x20, MIST 0x40, AREAPORTAL 0x8000, PLAYERCLIP 0x10000, MONSTERCLIP 0x20000, CURRENT\_0…CURRENT\_DOWN 0x40000–0x800000, ORIGIN 0x1000000, DETAIL 0x8000000, TRANSLUCENT 0x10000000, LADDER 0x20000000 |
+| Value         | an integer; with the LIGHT flag, the light intensity                                                                                                                                                                                                              |
 
 The values were verified on 24.11.2026 against Quake-2-Tools' `common/qfiles.h`, and they match it. Only `CONTENTS_MONSTER` (0x2000000) and `CONTENTS_DEADMONSTER` (0x4000000) are missing from the table. They are runtime values of the game and are not set on brushes, so the editor does not show them.
 
@@ -273,18 +323,18 @@ The default layout has four views in a 2×2 grid (3D, top, front, side), a prope
 
 **Tool modes** (one at a time, shortcut in parentheses):
 
-| Mode | Behaviour | Qoole equivalent |
-| --- | --- | --- |
-| Select (S) | click, Shift adds to the selection, box drag, move by dragging, handles for scaling, Ctrl+drag rotates | `OpSelect*`, `OpSelectionMove/Rotate/Scale` |
-| Brush (B) | dragging in a 2D view creates the chosen primitive | prefabs, `QPrefbVw` |
-| Entity (E) | a click creates an entity of the chosen class. A brush class (`func_*`, `trigger_*`) turns the selected brushes into an entity | `QEntSel` |
-| Clip (C) | two points in a 2D view, Enter clips, Tab switches the side to keep | `OpPlaneClip` (scissors icon) |
-| Vertex and edge (V, pressing again switches), face (F) | handles for the derived elements, dragging snaps to the grid | `MoveVertex`, `MoveEdge`, `MoveFace` |
-| Texture (T) | selecting a face in the 3D view, setting and adjusting its texture | `QPropSrf`, `QPropTex` |
+| Mode                                                   | Behaviour                                                                                                                      | Qoole equivalent                            |
+| ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------- |
+| Select (S)                                             | click, Shift adds to the selection, box drag, move by dragging, handles for scaling, Ctrl+drag rotates                         | `OpSelect*`, `OpSelectionMove/Rotate/Scale` |
+| Brush (B)                                              | dragging in a 2D view creates the chosen primitive                                                                             | prefabs, `QPrefbVw`                         |
+| Entity (E)                                             | a click creates an entity of the chosen class. A brush class (`func_*`, `trigger_*`) turns the selected brushes into an entity | `QEntSel`                                   |
+| Clip (C)                                               | two points in a 2D view, Enter clips, Tab switches the side to keep                                                            | `OpPlaneClip` (scissors icon)               |
+| Vertex and edge (V, pressing again switches), face (F) | handles for the derived elements, dragging snaps to the grid                                                                   | `MoveVertex`, `MoveEdge`, `MoveFace`        |
+| Texture (T)                                            | selecting a face in the 3D view, setting and adjusting its texture                                                             | `QPropSrf`, `QPropTex`                      |
 
 **Commands in menus and as shortcuts:** cut, copy, paste and duplicate (as `.map` text on the clipboard, so transfer to another editor works). Also CSG subtract, CSG intersect, hollow inwards and outwards, mirror X/Y/Z, rotate 90°, group and ungroup, hide and show, lock, and grid size \[ and \]. The views have a right-click context menu with Add Brush, Add Entity and Apply Entity → category → class.
 
-**Tree view and entering a group.** The side panel's tree shows worldspawn, entities and groups, and nodes can be moved by dragging (Qoole's `QTrView` and `OpTreeViewDragMove`). Double-clicking enters a group, so that selection and new brushes are limited to it and the rest of the map is dimmed. This is Qoole's *scope* concept (`OpScopeChange`).
+**Tree view and entering a group.** The side panel's tree shows worldspawn, entities and groups, and nodes can be moved by dragging (Qoole's `QTrView` and `OpTreeViewDragMove`). Double-clicking enters a group, so that selection and new brushes are limited to it and the rest of the map is dimmed. This is Qoole's _scope_ concept (`OpScopeChange`).
 
 **Entity panel.** A class picker in two steps, a category and then a class, as in Qoole. The categories come from the class-name prefix (in vanilla Q2: `ammo_`, `func_`, `info_`, `item_`, `key_`, `light`, `misc_`, `monster_`, `path_`, `point_`, `target_`, `trigger_`, `turret_`, `weapon_`; classes without a prefix, such as `worldspawn` and `viewthing`, go under Misc), and classes are listed by their definition names (for example `func_door_secret`). Choosing a brush class turns the selected brushes into that entity. Below it is a form based on the definition file: `spawnflags` as checkboxes, `_color` as a colour picker, `angle` as a compass and `target`/`targetname` as a drop-down of the names that exist in the map. Below the form is a raw key–value table for editing unknown keys. `target` links between entities are drawn as lines in the 2D views.
 
@@ -295,13 +345,18 @@ The default layout has four views in a 2×2 grid (3D, top, front, side), a prope
 All document changes go through a single `CommandBus`, and no UI code changes the document directly. Qoole has about 30 `Operation` subclasses and an `OpManager`, and most of them store the old objects and swap them back on undo (`OpObjModification::SwapObjs`). The browser version generalises the same model into a single mechanism.
 
 ```typescript
-interface Patch {                // the effect of one command
-  before: Map<Id, MapNode | null>;   // null = the node did not exist
-  after:  Map<Id, MapNode | null>;   // null = the node was removed
+interface Patch {
+  // the effect of one command
+  before: Map<Id, MapNode | null>; // null = the node did not exist
+  after: Map<Id, MapNode | null>; // null = the node was removed
   parentBefore: Map<Id, Id | null>;
-  parentAfter:  Map<Id, Id | null>;
+  parentAfter: Map<Id, Id | null>;
 }
-interface Command { label: string; mergeKey?: string; run(doc: Readonly<MapDocument>): Patch }
+interface Command {
+  label: string;
+  mergeKey?: string;
+  run(doc: Readonly<MapDocument>): Patch;
+}
 ```
 
 - **Undo** applies the `before` state and **redo** the `after` state. Nodes are immutable objects, so a snapshot is cheap: unchanged nodes are not copied.
@@ -313,13 +368,13 @@ interface Command { label: string; mergeKey?: string; run(doc: Readonly<MapDocum
 
 **File handling in the browser:**
 
-| Need | Chromium (Chrome, Edge) | Firefox, Safari |
-| --- | --- | --- |
+| Need                     | Chromium (Chrome, Edge)                                                                                                                 | Firefox, Safari                                            |
+| ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
 | Choosing the game folder | File System Access API: `showDirectoryPicker()`, the handle is stored in IndexedDB, and permission is requested again on the next start | `<input type=file webkitdirectory>` or a single `pak0.pak` |
-| Opening a map | `showOpenFilePicker()`, and the file handle is remembered | `<input type=file>` or drag and drop |
-| Saving | Writing directly to the same file (`createWritable`) | Download (`<a download>`) |
-| Autosave | OPFS every 30 seconds and before the page closes | OPFS |
-| Settings, recent files | IndexedDB | IndexedDB |
+| Opening a map            | `showOpenFilePicker()`, and the file handle is remembered                                                                               | `<input type=file>` or drag and drop                       |
+| Saving                   | Writing directly to the same file (`createWritable`)                                                                                    | Download (`<a download>`)                                  |
+| Autosave                 | OPFS every 30 seconds and before the page closes                                                                                        | OPFS                                                       |
+| Settings, recent files   | IndexedDB                                                                                                                               | IndexedDB                                                  |
 
 Autosave records whether the document has unsaved changes since the last save or download. If OPFS holds an autosave with this flag set at start-up, the user is asked whether to restore it. This works the same way in every browser, including download-based saving, where no file timestamp is available. The application is a PWA and also works offline.
 
@@ -327,9 +382,9 @@ Autosave records whether the document has unsaved changes since the last save or
 
 In v1, compiling is done in the browser with qbsp3, qvis3 and qrad3 compiled to WebAssembly. As a fallback, the `.map` is exported for compiling on the user's own machine. Qoole ran the same three programs as external processes with the parameter `%file%` and started the game with `+map %file%` (`Quake2::Quake2`, `QCompile`). A browser has no external processes, so:
 
-1. **WASM compilation.** The tools' C code is compiled with Emscripten, and each tool runs in its own Web Worker. Input and output pass through Emscripten's in-memory filesystem: the `.map` goes in, and `.bsp`, `.pts` and `.prt` come out. The textures' `.wal` headers are given to the tools from the pak. Stdout is streamed to the log pane in real time. qvis3 and qrad3 can take minutes on large maps, so the user chooses a profile: *fast* (qbsp3, qvis3 `-fast`, no qrad3), *normal* or *final* (qrad3 `-extra`).
+1. **WASM compilation.** The tools' C code is compiled with Emscripten, and each tool runs in its own Web Worker. Input and output pass through Emscripten's in-memory filesystem: the `.map` goes in, and `.bsp`, `.pts` and `.prt` come out. The textures' `.wal` headers are given to the tools from the pak. Stdout is streamed to the log pane in real time. qvis3 and qrad3 can take minutes on large maps, so the user chooses a profile: _fast_ (qbsp3, qvis3 `-fast`, no qrad3), _normal_ or _final_ (qrad3 `-extra`).
 2. **Threads.** qvis3 and qrad3 are multithreaded. WASM threads require `SharedArrayBuffer`, which in turn requires the COOP and COEP headers. The hosting must send them, and without them a single-threaded build is used.
-3. **Leaks.** If qbsp3 finds a leak, the `.pts` is loaded automatically and the path is shown in every view. The *Next leak point* command (N) moves the camera along the path.
+3. **Leaks.** If qbsp3 finds a leak, the `.pts` is loaded automatically and the path is shown in every view. The _Next leak point_ command (N) moves the camera along the path.
 4. **Testing in the game.** The finished `.bsp` is saved to the game folder's `baseq2/maps/` directory (Chromium) or downloaded. The game cannot be started from the browser, so the editor shows the command `+map <name>` to copy. The reference engine for in-game testing is q2pro (`ext/q2pro`). The compilers are id's original tools, so the BSP stays in the original format and within its limits, even though q2pro itself has higher limits. Embedding a browser-based Q2 port as a preview is a v2 matter.
 
 The tools are compiled from id's original Quake-2-Tools source code (`ext/Quake-2-Tools`). Its file headers give the licence as "GPL v2 or later", which is compatible with Joole's `GPL-2.0-or-later` licence (verified on 24.11.2026). Only the changes Emscripten compilation requires and necessary bug fixes are made to the code (for example reading plane points with `atof`, see Integer plane points), and they are recorded in the README of the `tools/` directory. A single-threaded qbsp3 build for Node is made as early as phase 2, for tests and CI.
@@ -338,13 +393,13 @@ The tools are compiled from id's original Quake-2-Tools source code (`ext/Quake-
 
 The targets are sized so that a large Q2 map works on an integrated GPU. They are starting assumptions that will be checked with the first prototype.
 
-| Metric | Target | Measured with | Where |
-| --- | --- | --- | --- |
-| 3D view frame rate, 20,000 brushes, textures on | ≥ 60 fps | Chrome on the reference hardware | Manual, at each phase gate |
-| Opening a `.map`, 5,000 brushes, views ready | < 2 s | A Playwright performance test | CI (loose threshold) and the reference hardware |
-| Latency of editing a single brush (drag) | < 8 ms per frame | The Performance timeline | Manual, at each phase gate |
-| CSG subtract, 1 cutter and 50 targets | < 50 ms | A Vitest benchmark | CI (loose threshold) and the reference hardware |
-| Memory use without textures, 20,000 brushes | < 300 MB | Chrome's memory profiler | Manual, at each phase gate |
+| Metric                                          | Target           | Measured with                    | Where                                           |
+| ----------------------------------------------- | ---------------- | -------------------------------- | ----------------------------------------------- |
+| 3D view frame rate, 20,000 brushes, textures on | ≥ 60 fps         | Chrome on the reference hardware | Manual, at each phase gate                      |
+| Opening a `.map`, 5,000 brushes, views ready    | < 2 s            | A Playwright performance test    | CI (loose threshold) and the reference hardware |
+| Latency of editing a single brush (drag)        | < 8 ms per frame | The Performance timeline         | Manual, at each phase gate                      |
+| CSG subtract, 1 cutter and 50 targets           | < 50 ms          | A Vitest benchmark               | CI (loose threshold) and the reference hardware |
+| Memory use without textures, 20,000 brushes     | < 300 MB         | Chrome's memory profiler         | Manual, at each phase gate                      |
 
 **Reference hardware:** a laptop with an Intel Iris Xe (11th–13th gen) or AMD Radeon 680M-class integrated GPU, 16 GB RAM, the current Chrome, on the balanced power profile. Every recorded result names the exact model, the Chrome version and the date. CI runs only the CPU-bound metrics (map opening and the CSG benchmark), with thresholds of twice the target, to catch regressions; the CI runners render with SwiftShader, so GPU-bound numbers there are meaningless. The GPU-bound metrics (frame rate, drag latency, memory) are measured by hand on the reference hardware at each phase gate.
 
@@ -356,17 +411,17 @@ The targets are sized so that a large Q2 map works on an integrated GPU. They ar
 - **Compiler test:** CI writes the test maps and runs the WASM version of qbsp3 in Node. The test fails if the compiler warns about invalid brushes.
 - **E2E (Playwright)** for the main workflows: open, create a brush, subtract, undo, save. Plus screenshot comparison tests for the views (pixel comparison with SwiftShader software rendering).
 
-**Code quality:** TypeScript's `strict` mode, ESLint and Prettier. `core/` must not import any DOM or WebGL types. The rule is enforced by ESLint's import restriction and by the core's own tsconfig project without the `DOM` library. The other layer boundaries are described in the *Layer order and dependency rules* section.
+**Code quality:** TypeScript's `strict` mode, ESLint and Prettier. `core/` must not import any DOM or WebGL types. The rule is enforced by ESLint's import restriction and by the core's own tsconfig project without the `DOM` library. The other layer boundaries are described in the _Layer order and dependency rules_ section.
 
 ## Implementation phases and decisions
 
 The implementation proceeds in five phases. Each phase ends with a usable version, and the next phase starts only when the previous one's acceptance criterion is met. The detailed work breakdown is in [PLAN.md](../PLAN.md).
 
-1. **Reader and viewer.** Pak, pkz, wal and palette parsers, the search order of mod directories, the `.map` reader and writer, building polygons, the four views and the cameras. *Done when* id's released Q2 map sources open with their textures and the round-trip test passes.
-2. **Brush editing.** CommandBus and undo, selection, move, rotate and scale, new brush, grid, saving the JSON project, `.map` export, autosave, and a single-threaded qbsp3.wasm for Node for the compiler test. *Done when* a simple room can be built from scratch and saved, and qbsp3 accepts it without warnings.
-3. **CSG and textures.** Subtract, intersect, hollow, plane clip, mirror, vertex, edge and face editing, texture tools and lock, and surface flags. *Done when* the property-based CSG tests pass and textures look the same in the editor and in the game.
-4. **Entities and structure.** The definition file parser, the entity panel, brush entities, the tree view, groups and entering a group, prefabs, md2 preview and `target` lines. *Done when* a working single-player level (player start, door, button, enemy) can be made from start to finish.
-5. **Compilation and polish.** WASM tools in the browser (qbsp3, qvis3 and qrad3 in workers, threads), the leak path, compile profiles, PWA, the performance targets and Firefox/Safari support. *Done when* the targets in the performance table are met and a map compiles to a playable BSP file without leaving the browser.
+1. **Reader and viewer.** Pak, pkz, wal and palette parsers, the search order of mod directories, the `.map` reader and writer, building polygons, the four views and the cameras. _Done when_ id's released Q2 map sources open with their textures and the round-trip test passes.
+2. **Brush editing.** CommandBus and undo, selection, move, rotate and scale, new brush, grid, saving the JSON project, `.map` export, autosave, and a single-threaded qbsp3.wasm for Node for the compiler test. _Done when_ a simple room can be built from scratch and saved, and qbsp3 accepts it without warnings.
+3. **CSG and textures.** Subtract, intersect, hollow, plane clip, mirror, vertex, edge and face editing, texture tools and lock, and surface flags. _Done when_ the property-based CSG tests pass and textures look the same in the editor and in the game.
+4. **Entities and structure.** The definition file parser, the entity panel, brush entities, the tree view, groups and entering a group, prefabs, md2 preview and `target` lines. _Done when_ a working single-player level (player start, door, button, enemy) can be made from start to finish.
+5. **Compilation and polish.** WASM tools in the browser (qbsp3, qvis3 and qrad3 in workers, threads), the leak path, compile profiles, PWA, the performance targets and Firefox/Safari support. _Done when_ the targets in the performance table are met and a map compiles to a playable BSP file without leaving the browser.
 
 **Decisions 24.11.2026:**
 
@@ -387,6 +442,7 @@ The implementation proceeds in five phases. Each phase ends with a usable versio
 - **Autosave recovery:** based on an unsaved-changes flag, not on timestamps.
 - **Qoole `.qle` import** moves to a phase after v1. The reader can be based on the source code's `LoadObjFile` and `ReadBoundGeometry` functions.
 - **Technology stack:** the UI library is Solid 2, the language TypeScript 7 (native `tsc`), the development environment Node 26 LTS and the package manager pnpm. The reasoning and versions are in [10-stack.md](10-stack.md).
+- **TypeScript project references:** TS 7.0 does not allow `--noEmit` in referenced composite projects (TS6310), so type checking emits declaration files only into the ignored `.tsbuild/` cache. The details are in [10-stack.md](10-stack.md).
 - **Layered architecture:** the layer order, dependency rules, the `core/types` module, `src/main.ts` and the split of tools between the `app/` and `ui/` layers were refined (see Architecture).
 - **Documentation language:** all project documentation is written in English.
 - **Undo memory limit:** a structural estimate of the node versions held only by the history, and the newest step is always kept.

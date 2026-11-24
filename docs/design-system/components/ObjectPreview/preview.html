@@ -1,12 +1,62 @@
 <!-- @dsCard group="Panels" height=200 subtitle="Selected object’s texture, or a mixed-state note" -->
 <!doctype html>
 <html>
-<head><meta charset="utf-8"><title>preview</title></head>
-<body>
-<div style="display:flex;gap:var(--space-md)">
-<section class="q2-pane" style="width:140px" aria-label="Object"><header class="q2-titlebar">Object</header><div style="padding:var(--space-md)"><div class="q2-objprev">Multiple<br>textures</div></div></section>
-<section class="q2-pane" style="width:140px" aria-label="Object"><header class="q2-titlebar">Object</header><div style="padding:var(--space-md);display:flex;flex-direction:column;gap:var(--space-2xs)"><canvas id="one" class="q2-objprev" width="16" height="16" style="width:100%;image-rendering:pixelated"></canvas><span class="q2-mono" style="font-size:11px;text-align:center;background:var(--select);color:var(--on-select);border-radius:var(--radius-sm)">city4_6</span></div></section>
-</div>
-<script>var g=document.getElementById('one').getContext('2d'),s=7;function r(){s=(s*16807)%2147483647;return s/2147483647}for(var y=0;y<16;y++)for(var x=0;x<16;x++){var k=.6+r()*.5;g.fillStyle='rgb('+(96*k|0)+','+(88*k|0)+','+(74*k|0)+')';g.fillRect(x,y,1,1)}</script>
-</body>
+  <head>
+    <meta charset="utf-8" />
+    <title>preview</title>
+  </head>
+  <body>
+    <div style="display: flex; gap: var(--space-md)">
+      <section class="q2-pane" style="width: 140px" aria-label="Object">
+        <header class="q2-titlebar">Object</header>
+        <div style="padding: var(--space-md)">
+          <div class="q2-objprev">Multiple<br />textures</div>
+        </div>
+      </section>
+      <section class="q2-pane" style="width: 140px" aria-label="Object">
+        <header class="q2-titlebar">Object</header>
+        <div
+          style="
+            padding: var(--space-md);
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-2xs);
+          "
+        >
+          <canvas
+            id="one"
+            class="q2-objprev"
+            width="16"
+            height="16"
+            style="width: 100%; image-rendering: pixelated"
+          ></canvas
+          ><span
+            class="q2-mono"
+            style="
+              font-size: 11px;
+              text-align: center;
+              background: var(--select);
+              color: var(--on-select);
+              border-radius: var(--radius-sm);
+            "
+            >city4_6</span
+          >
+        </div>
+      </section>
+    </div>
+    <script>
+      var g = document.getElementById('one').getContext('2d'),
+        s = 7;
+      function r() {
+        s = (s * 16807) % 2147483647;
+        return s / 2147483647;
+      }
+      for (var y = 0; y < 16; y++)
+        for (var x = 0; x < 16; x++) {
+          var k = 0.6 + r() * 0.5;
+          g.fillStyle = 'rgb(' + ((96 * k) | 0) + ',' + ((88 * k) | 0) + ',' + ((74 * k) | 0) + ')';
+          g.fillRect(x, y, 1, 1);
+        }
+    </script>
+  </body>
 </html>
