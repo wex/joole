@@ -158,7 +158,7 @@ Goal: a repository in which every later WP can follow the normal workflow (write
 - **Depends on:** P0.1, P0.4 to P0.6
 - **Done when:** a PR shows a green CI run, and a deliberately broken PR (a layer violation) shows a red one.
 
-### [ ] P0.8 Preview hosting (Cloudflare Workers) ⇄
+### [x] P0.8 Preview hosting (Cloudflare Workers) ⇄
 
 - **Goal:** get early preview deployments with the production headers.
 - **Scope:** `public/_headers` (COOP, COEP and the Content-Security-Policy for `/*`), `wrangler.jsonc` (static assets from `dist/`, no Worker script), and Cloudflare's Git integration (Workers Builds) connected to the repository: `main` deploys to `joole.<account>.workers.dev`, and each PR branch gets a preview URL. Connecting the account is the owner's action.

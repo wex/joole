@@ -26,7 +26,7 @@ This file is a guide for both human developers and coding agents: where informat
 
 ## Project status
 
-The repository now contains the local phase 0 scaffold: `package.json` and the lockfile, the layer directories, TypeScript project references, Vite, ESLint, Prettier, Vitest, Playwright, CI configuration and a placeholder application. Phase 1 has not started. The remaining phase 0 verification is external to the code: the owner must verify the GitHub repository settings and connect Cloudflare, and CI must be observed on a pull request.
+The phase 0 scaffold is merged on `main` (PR #1, green CI) and the production deployment is live at [joole.niko-hujanen.workers.dev](https://joole.niko-hujanen.workers.dev/), where the security headers were verified on 24.11.2026 (`crossOriginIsolated === true`, `SharedArrayBuffer` available, no CSP violations). Phase 0 is not yet closed: `main` still lacks branch protection (PR required, `check` and `conventional-pr-title` as required checks, linear history, no force-pushes) and the deliberately-broken-PR test (a layer violation must produce a red, unmergeable CI run) has not been done. Once both are verified, P0.1, P0.7, P0.9 and Gate 0 are ticked in [PLAN.md](PLAN.md) and phase 1 begins.
 
 ## Directory structure and layer rules
 
