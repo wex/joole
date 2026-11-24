@@ -267,7 +267,7 @@ Goal: read Q2 game data and `.map` files without loss, and show the map in four 
 - **Depends on:** P1.2
 - **Done when:** the writer's export mode uses this, and the warnings appear in the export result.
 
-### [ ] P1.7 Document construction (`core/doc`)
+### [x] P1.7 Document construction (`core/doc`)
 
 - **Goal:** turn a parsed map into a `MapDocument`.
 - **Scope:** id generation with nanoid, building the document (the node map, the parent map, worldspawn as the root), read-only query helpers (children, ancestors, the brushes of an entity), and pure `applyPatch` and `invertPatch`, which phase 2 needs.
