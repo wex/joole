@@ -13,11 +13,10 @@ describe('core DOM canary', () => {
     writeFileSync(canary, 'document.body;\n');
 
     try {
-      const result = spawnSync(
-        process.execPath,
-        [tsc, '-p', 'tsconfig.core.json', '--noEmit'],
-        { cwd: repoRoot, encoding: 'utf8' },
-      );
+      const result = spawnSync(process.execPath, [tsc, '-p', 'tsconfig.core.json', '--noEmit'], {
+        cwd: repoRoot,
+        encoding: 'utf8',
+      });
       const output = `${result.stdout}\n${result.stderr}`;
 
       expect(result.status).not.toBe(0);

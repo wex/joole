@@ -5,7 +5,7 @@ Write components as CSS Modules that read every value from the `tokens.css` vari
 ## Language and voice
 
 - **The UI language is always English.** Menus, buttons, titles, tooltips, error messages and log lines are written in English.
-- Use the established terms of Q2 mappers without translating or explaining them: *brush*, *entity*, *worldspawn*, *CSG Subtract*, *Hollow*, *Clip*, *Tex Lock*, *leak*, *spawnflags*.
+- Use the established terms of Q2 mappers without translating or explaining them: _brush_, _entity_, _worldspawn_, _CSG Subtract_, _Hollow_, _Clip_, _Tex Lock_, _leak_, _spawnflags_.
 - Write class names, keys and flags exactly as in the game and the `.map` file: `func_door`, `targetname`, `SURF_TRANS33`, `CONTENTS_WATER`. Always set them in the `mono-*` styles.
 - Menu items and buttons use Title Case and start with the verb: "Add Brush", "Apply Entity", "Insert Prefab…". An ellipsis means the item opens a dialog.
 - Show a shortcut at the right edge of a menu row (`Ctrl+I`) and in parentheses after a tool name: "Clip (C)", "Vertex (V)".

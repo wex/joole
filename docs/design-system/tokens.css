@@ -1,5 +1,6 @@
 /* Joole UI — generated from tokens.json */
-:root, [data-theme="dark"] {
+:root,
+[data-theme='dark'] {
   --surface-0: #101214; /* App ground between panels and the splitter gap. No text directly on it. */
   --surface-1: #1a1d21; /* Panel body: properties panel, texture browser, log, toolbar. */
   --surface-2: #252a30; /* Raised surfaces: panel title bars, inputs, menus, floating windows. */
@@ -33,9 +34,9 @@
   --vp-toolface: #7a52c7; /* SURF_NODRAW, clip and hint faces in the 3D view, dimmed (drawn at 35% opacity). */
   --vp-scope-dim: #5a5a5a; /* The rest of the map while inside a group (scope): wireframe in this color. */
   --vp-label: #c9c9c9; /* Text drawn over a view: measurements, handle coordinates. */
-  --shadow-float: 0 6px 20px rgba(0,0,0,0.55); /* Menus, submenus and floating windows. Every other surface is flat. */
+  --shadow-float: 0 6px 20px rgba(0, 0, 0, 0.55); /* Menus, submenus and floating windows. Every other surface is flat. */
 }
-[data-theme="light"] {
+[data-theme='light'] {
   --surface-0: #b8bcc2;
   --surface-1: #d9dce0;
   --surface-2: #eef0f2;
@@ -69,7 +70,7 @@
   --vp-toolface: #7a52c7;
   --vp-scope-dim: #5a5a5a;
   --vp-label: #c9c9c9;
-  --shadow-float: 0 6px 20px rgba(20,24,30,0.22);
+  --shadow-float: 0 6px 20px rgba(20, 24, 30, 0.22);
 }
 :root {
   --space-2xs: 2px; /* Gap between icon and edge in a button; handle radius. */
@@ -87,8 +88,8 @@
   --size-toolbar: 34px; /* Toolbar height. */
   --size-thumb: 64px; /* Texture browser thumbnail (default; 32–128px). */
   --size-splitter: 4px; /* Width of a draggable panel splitter. */
-  --font-ui: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
-  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --font-ui: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
   --text-ui-heading: 600 13px/18px var(--font-ui); /* Floating window and panel group titles. */
   --text-ui-title: 600 12px/16px var(--font-ui); /* Panel and view title bars. */
   --text-ui-body: 400 12px/16px var(--font-ui); /* Menus, buttons, forms, tree view. The default style. */

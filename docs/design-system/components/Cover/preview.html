@@ -1,34 +1,140 @@
 <!-- @dsCard height=288 -->
 <!doctype html>
 <html>
-<head><meta charset="utf-8"><title>Cover</title>
-<style>
-body{margin:0;padding:0;background:var(--surface-0)}
-.cv{position:relative;width:960px;height:288px;overflow:hidden;background:var(--surface-0)}
-.cv svg{position:absolute;inset:0}
-.vpbg{fill:var(--vp-bg)} .acc{fill:var(--accent)} .sel{fill:var(--select)} .ent{fill:var(--vp-entity)}
-.sat{rx:var(--radius-md)}
-.pl{stroke:var(--vp-grid-major);stroke-width:1.5;fill:none}
-.txt{position:absolute;left:48px;bottom:40px;max-width:440px}
-.nm{font:600 80px/.95 var(--font-ui);color:var(--ink);letter-spacing:-.02em;margin:0}
-.tg{font:400 14px/20px var(--font-ui);color:var(--ink-muted);margin:16px 0 0}
-</style></head>
-<body>
-<div class="cv"><svg viewBox="0 0 960 288" width="960" height="288" aria-hidden="true">
-<!--
+  <head>
+    <meta charset="utf-8" />
+    <title>Cover</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        background: var(--surface-0);
+      }
+      .cv {
+        position: relative;
+        width: 960px;
+        height: 288px;
+        overflow: hidden;
+        background: var(--surface-0);
+      }
+      .cv svg {
+        position: absolute;
+        inset: 0;
+      }
+      .vpbg {
+        fill: var(--vp-bg);
+      }
+      .acc {
+        fill: var(--accent);
+      }
+      .sel {
+        fill: var(--select);
+      }
+      .ent {
+        fill: var(--vp-entity);
+      }
+      .sat {
+        rx: var(--radius-md);
+      }
+      .pl {
+        stroke: var(--vp-grid-major);
+        stroke-width: 1.5;
+        fill: none;
+      }
+      .txt {
+        position: absolute;
+        left: 48px;
+        bottom: 40px;
+        max-width: 440px;
+      }
+      .nm {
+        font: 600 80px/0.95 var(--font-ui);
+        color: var(--ink);
+        letter-spacing: -0.02em;
+        margin: 0;
+      }
+      .tg {
+        font: 400 14px/20px var(--font-ui);
+        color: var(--ink-muted);
+        margin: 16px 0 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="cv">
+      <svg viewBox="0 0 960 288" width="960" height="288" aria-hidden="true">
+        <!--
 blocks: vp-bg slab 240×288 (space-xl × 15 by full height), accent 192×96, select 96×48, vp-entity 48×48 (space-2xl multiples), titlebar strip accent × size-titlebar
 arrangement: one tall black slab bleeding top and bottom at the right edge, three satellites stepped left of it like the 2×2 views and their panels
 pattern: plus grid at 2 × space-xl in vp-grid-major on the slab — precise, technical, grid-snapped UI: the viewport grid is the brand
 steps and radii: space-xl 16, space-2xl 24, pitch 32; radius-none on slab and strip (views are square), radius-md on satellites
 -->
-<rect class="vpbg" x="720" y="0" width="240" height="288"/>
-<rect class="acc" x="720" y="0" width="240" height="22"/>
-<path class="pl" d="M748 46h8M752 42v8"/><path class="pl" d="M748 78h8M752 74v8"/><path class="pl" d="M748 110h8M752 106v8"/><path class="pl" d="M748 142h8M752 138v8"/><path class="pl" d="M748 174h8M752 170v8"/><path class="pl" d="M748 206h8M752 202v8"/><path class="pl" d="M748 238h8M752 234v8"/><path class="pl" d="M748 270h8M752 266v8"/><path class="pl" d="M780 46h8M784 42v8"/><path class="pl" d="M780 78h8M784 74v8"/><path class="pl" d="M780 110h8M784 106v8"/><path class="pl" d="M780 142h8M784 138v8"/><path class="pl" d="M780 174h8M784 170v8"/><path class="pl" d="M780 206h8M784 202v8"/><path class="pl" d="M780 238h8M784 234v8"/><path class="pl" d="M780 270h8M784 266v8"/><path class="pl" d="M812 46h8M816 42v8"/><path class="pl" d="M812 78h8M816 74v8"/><path class="pl" d="M812 110h8M816 106v8"/><path class="pl" d="M812 142h8M816 138v8"/><path class="pl" d="M812 174h8M816 170v8"/><path class="pl" d="M812 206h8M816 202v8"/><path class="pl" d="M812 238h8M816 234v8"/><path class="pl" d="M812 270h8M816 266v8"/><path class="pl" d="M844 46h8M848 42v8"/><path class="pl" d="M844 78h8M848 74v8"/><path class="pl" d="M844 110h8M848 106v8"/><path class="pl" d="M844 142h8M848 138v8"/><path class="pl" d="M844 174h8M848 170v8"/><path class="pl" d="M844 206h8M848 202v8"/><path class="pl" d="M844 238h8M848 234v8"/><path class="pl" d="M844 270h8M848 266v8"/><path class="pl" d="M876 46h8M880 42v8"/><path class="pl" d="M876 78h8M880 74v8"/><path class="pl" d="M876 110h8M880 106v8"/><path class="pl" d="M876 142h8M880 138v8"/><path class="pl" d="M876 174h8M880 170v8"/><path class="pl" d="M876 206h8M880 202v8"/><path class="pl" d="M876 238h8M880 234v8"/><path class="pl" d="M876 270h8M880 266v8"/><path class="pl" d="M908 46h8M912 42v8"/><path class="pl" d="M908 78h8M912 74v8"/><path class="pl" d="M908 110h8M912 106v8"/><path class="pl" d="M908 142h8M912 138v8"/><path class="pl" d="M908 174h8M912 170v8"/><path class="pl" d="M908 206h8M912 202v8"/><path class="pl" d="M908 238h8M912 234v8"/><path class="pl" d="M908 270h8M912 266v8"/><path class="pl" d="M940 46h8M944 42v8"/><path class="pl" d="M940 78h8M944 74v8"/><path class="pl" d="M940 110h8M944 106v8"/><path class="pl" d="M940 142h8M944 138v8"/><path class="pl" d="M940 174h8M944 170v8"/><path class="pl" d="M940 206h8M944 202v8"/><path class="pl" d="M940 238h8M944 234v8"/><path class="pl" d="M940 270h8M944 266v8"/>
-<rect class="acc sat" x="504" y="48" width="192" height="96"/>
-<rect class="ent sat" x="528" y="168" width="48" height="48"/>
-<rect class="sel sat" x="600" y="168" width="96" height="48"/>
-</svg>
-<div class="txt"><h1 class="nm">Q2 Web<br>Editor UI</h1><p class="tg">Qoole's views in browser panels. Black grid, red selection.</p></div>
-</div>
-</body>
+        <rect class="vpbg" x="720" y="0" width="240" height="288" />
+        <rect class="acc" x="720" y="0" width="240" height="22" />
+        <path class="pl" d="M748 46h8M752 42v8" />
+        <path class="pl" d="M748 78h8M752 74v8" />
+        <path class="pl" d="M748 110h8M752 106v8" />
+        <path class="pl" d="M748 142h8M752 138v8" />
+        <path class="pl" d="M748 174h8M752 170v8" />
+        <path class="pl" d="M748 206h8M752 202v8" />
+        <path class="pl" d="M748 238h8M752 234v8" />
+        <path class="pl" d="M748 270h8M752 266v8" />
+        <path class="pl" d="M780 46h8M784 42v8" />
+        <path class="pl" d="M780 78h8M784 74v8" />
+        <path class="pl" d="M780 110h8M784 106v8" />
+        <path class="pl" d="M780 142h8M784 138v8" />
+        <path class="pl" d="M780 174h8M784 170v8" />
+        <path class="pl" d="M780 206h8M784 202v8" />
+        <path class="pl" d="M780 238h8M784 234v8" />
+        <path class="pl" d="M780 270h8M784 266v8" />
+        <path class="pl" d="M812 46h8M816 42v8" />
+        <path class="pl" d="M812 78h8M816 74v8" />
+        <path class="pl" d="M812 110h8M816 106v8" />
+        <path class="pl" d="M812 142h8M816 138v8" />
+        <path class="pl" d="M812 174h8M816 170v8" />
+        <path class="pl" d="M812 206h8M816 202v8" />
+        <path class="pl" d="M812 238h8M816 234v8" />
+        <path class="pl" d="M812 270h8M816 266v8" />
+        <path class="pl" d="M844 46h8M848 42v8" />
+        <path class="pl" d="M844 78h8M848 74v8" />
+        <path class="pl" d="M844 110h8M848 106v8" />
+        <path class="pl" d="M844 142h8M848 138v8" />
+        <path class="pl" d="M844 174h8M848 170v8" />
+        <path class="pl" d="M844 206h8M848 202v8" />
+        <path class="pl" d="M844 238h8M848 234v8" />
+        <path class="pl" d="M844 270h8M848 266v8" />
+        <path class="pl" d="M876 46h8M880 42v8" />
+        <path class="pl" d="M876 78h8M880 74v8" />
+        <path class="pl" d="M876 110h8M880 106v8" />
+        <path class="pl" d="M876 142h8M880 138v8" />
+        <path class="pl" d="M876 174h8M880 170v8" />
+        <path class="pl" d="M876 206h8M880 202v8" />
+        <path class="pl" d="M876 238h8M880 234v8" />
+        <path class="pl" d="M876 270h8M880 266v8" />
+        <path class="pl" d="M908 46h8M912 42v8" />
+        <path class="pl" d="M908 78h8M912 74v8" />
+        <path class="pl" d="M908 110h8M912 106v8" />
+        <path class="pl" d="M908 142h8M912 138v8" />
+        <path class="pl" d="M908 174h8M912 170v8" />
+        <path class="pl" d="M908 206h8M912 202v8" />
+        <path class="pl" d="M908 238h8M912 234v8" />
+        <path class="pl" d="M908 270h8M912 266v8" />
+        <path class="pl" d="M940 46h8M944 42v8" />
+        <path class="pl" d="M940 78h8M944 74v8" />
+        <path class="pl" d="M940 110h8M944 106v8" />
+        <path class="pl" d="M940 142h8M944 138v8" />
+        <path class="pl" d="M940 174h8M944 170v8" />
+        <path class="pl" d="M940 206h8M944 202v8" />
+        <path class="pl" d="M940 238h8M944 234v8" />
+        <path class="pl" d="M940 270h8M944 266v8" />
+        <rect class="acc sat" x="504" y="48" width="192" height="96" />
+        <rect class="ent sat" x="528" y="168" width="48" height="48" />
+        <rect class="sel sat" x="600" y="168" width="96" height="48" />
+      </svg>
+      <div class="txt">
+        <h1 class="nm">Q2 Web<br />Editor UI</h1>
+        <p class="tg">Qoole's views in browser panels. Black grid, red selection.</p>
+      </div>
+    </div>
+  </body>
 </html>

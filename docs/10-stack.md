@@ -6,28 +6,28 @@ Versions are recorded as major versions. Exact versions are locked in `package.j
 
 ## Summary
 
-| Area | Technology | Major version | Purpose |
-| --- | --- | --- | --- |
-| Language | TypeScript (native `tsc`) | 7 | All application code, `strict` mode, type checking |
-| Lint-time TypeScript API | TypeScript | 6 | The compiler API for typescript-eslint and the editor's language service |
-| Runtime (development, CI) | Node.js LTS | 26 | Tooling, tests, running the `core/` code without a browser |
-| Package manager | pnpm | 12 | Dependencies, scripts, lockfile |
-| Build and dev server | Vite | 8 | Dev server, production build, workers, static assets |
-| UI | Solid (`solid-js`, `@solidjs/web`) | 2 | Panels: properties, tree, texture browser, log, menus |
-| Solid's Vite integration | `@solidjs/vite-plugin` | 3 | JSX transform for Solid 2 |
-| Rendering | WebGL2 + GLSL ES 3.00 | – | All four views in one canvas, no 3D library |
-| Ids | nanoid | 6 | Persistent node `Id`s |
-| Native tools | Emscripten (emsdk) | 7 | qbsp3, qvis3 and qrad3 to WebAssembly |
-| PWA | vite-plugin-pwa (Workbox) | 2 | Service worker and offline use (phase 5) |
-| Styles | CSS Modules (built into Vite) + CSS Grid | – | Panel styles and layout |
-| Icons | `lucide-static` | 1 | UI icons as static SVGs, plus custom CSG, Hollow and Clip icons |
-| Hosting | Cloudflare Workers (static assets) | – | Static production hosting with the COOP and COEP headers, preview per PR |
-| CI | GitHub Actions | – | Checks, E2E and WASM build reproducibility |
-| Unit tests | Vitest + `@vitest/coverage-v8` | 5 | The `core/` code, parsers, benchmarks, coverage |
-| Property-based tests | fast-check | 4 | CSG and geometry invariants |
-| E2E and screenshot comparison | Playwright | 1 | Workflows, performance tests, pixel comparison of the views |
-| Lint | ESLint (flat config) + typescript-eslint + eslint-plugin-import-x + eslint-plugin-solid | 10 / 8 / 4 / 0.20 | Layer boundaries, type rules, Solid 2 rules |
-| Formatting | Prettier | 3 | Consistent code style |
+| Area                          | Technology                                                                              | Major version     | Purpose                                                                  |
+| ----------------------------- | --------------------------------------------------------------------------------------- | ----------------- | ------------------------------------------------------------------------ |
+| Language                      | TypeScript (native `tsc`)                                                               | 7                 | All application code, `strict` mode, type checking                       |
+| Lint-time TypeScript API      | TypeScript                                                                              | 6                 | The compiler API for typescript-eslint and the editor's language service |
+| Runtime (development, CI)     | Node.js LTS                                                                             | 26                | Tooling, tests, running the `core/` code without a browser               |
+| Package manager               | pnpm                                                                                    | 12                | Dependencies, scripts, lockfile                                          |
+| Build and dev server          | Vite                                                                                    | 8                 | Dev server, production build, workers, static assets                     |
+| UI                            | Solid (`solid-js`, `@solidjs/web`)                                                      | 2                 | Panels: properties, tree, texture browser, log, menus                    |
+| Solid's Vite integration      | `@solidjs/vite-plugin`                                                                  | 3                 | JSX transform for Solid 2                                                |
+| Rendering                     | WebGL2 + GLSL ES 3.00                                                                   | –                 | All four views in one canvas, no 3D library                              |
+| Ids                           | nanoid                                                                                  | 6                 | Persistent node `Id`s                                                    |
+| Native tools                  | Emscripten (emsdk)                                                                      | 7                 | qbsp3, qvis3 and qrad3 to WebAssembly                                    |
+| PWA                           | vite-plugin-pwa (Workbox)                                                               | 2                 | Service worker and offline use (phase 5)                                 |
+| Styles                        | CSS Modules (built into Vite) + CSS Grid                                                | –                 | Panel styles and layout                                                  |
+| Icons                         | `lucide-static`                                                                         | 1                 | UI icons as static SVGs, plus custom CSG, Hollow and Clip icons          |
+| Hosting                       | Cloudflare Workers (static assets)                                                      | –                 | Static production hosting with the COOP and COEP headers, preview per PR |
+| CI                            | GitHub Actions                                                                          | –                 | Checks, E2E and WASM build reproducibility                               |
+| Unit tests                    | Vitest + `@vitest/coverage-v8`                                                          | 5                 | The `core/` code, parsers, benchmarks, coverage                          |
+| Property-based tests          | fast-check                                                                              | 4                 | CSG and geometry invariants                                              |
+| E2E and screenshot comparison | Playwright                                                                              | 1                 | Workflows, performance tests, pixel comparison of the views              |
+| Lint                          | ESLint (flat config) + typescript-eslint + eslint-plugin-import-x + eslint-plugin-solid | 10 / 8 / 4 / 0.20 | Layer boundaries, type rules, Solid 2 rules                              |
+| Formatting                    | Prettier                                                                                | 3                 | Consistent code style                                                    |
 
 ## Language and typing: TypeScript 7
 
@@ -98,29 +98,29 @@ The raw WebGL2 API is chosen because the rendering is narrow and fully controlle
 
 The modules are listed in dependency order: each may import only the ones above it.
 
-| Module | Contents | External reference |
-| --- | --- | --- |
-| `core/types` | data model types (`Id`, `Vec3`, `Plane`, `FaceTexture`, `Face`, node types, `MapDocument`, `Patch`), no runtime code | – |
-| `core/geom` | vector and matrix math, planes, windings, CSG, picking, BVH, tolerances (`PLANE_EPS`, `POINT_EPS`) | Qoole `source/Objects/Geometry.cpp`, Quake-2-Tools `common/polylib.c` |
-| `core/doc` | creating nodes (nanoid), command implementations (`Command.run` → `Patch`), applying patches | Qoole `source/Qoole/QooleOp.cpp` |
-| `core/formats` | `.map`, `.pak`, `.pkz` (ZIP), `.wal`, `.pcx`, `.md2`, entity definitions, `.pts`, `.joole.json` | q2pro `inc/format/*.h` and `src/common/files.c` (`load_zip_file`), Quake-2-Tools `common/qfiles.h` |
-| `game/q2` | palette, surface and contents flags, directories, compile profiles, default texture | Qoole `source/Game/Quake2.cpp` |
+| Module         | Contents                                                                                                             | External reference                                                                                 |
+| -------------- | -------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| `core/types`   | data model types (`Id`, `Vec3`, `Plane`, `FaceTexture`, `Face`, node types, `MapDocument`, `Patch`), no runtime code | –                                                                                                  |
+| `core/geom`    | vector and matrix math, planes, windings, CSG, picking, BVH, tolerances (`PLANE_EPS`, `POINT_EPS`)                   | Qoole `source/Objects/Geometry.cpp`, Quake-2-Tools `common/polylib.c`                              |
+| `core/doc`     | creating nodes (nanoid), command implementations (`Command.run` → `Patch`), applying patches                         | Qoole `source/Qoole/QooleOp.cpp`                                                                   |
+| `core/formats` | `.map`, `.pak`, `.pkz` (ZIP), `.wal`, `.pcx`, `.md2`, entity definitions, `.pts`, `.joole.json`                      | q2pro `inc/format/*.h` and `src/common/files.c` (`load_zip_file`), Quake-2-Tools `common/qfiles.h` |
+| `game/q2`      | palette, surface and contents flags, directories, compile profiles, default texture                                  | Qoole `source/Game/Quake2.cpp`                                                                     |
 
 The CommandBus, undo history (merging, memory limit) and selection live in the `app/` layer. They use the pure functions of the `core/doc` module.
 
 ## Browser platform APIs (`platform/`)
 
-| API | Purpose | Support |
-| --- | --- | --- |
-| File System Access API (`showDirectoryPicker`, `showOpenFilePicker`, `createWritable`) | Choosing the game folder, opening a map and saving directly to the file, writing the `.bsp` to `baseq2/maps/` | Chromium |
-| `<input type=file webkitdirectory>`, drag and drop, `<a download>` | Fallback path for opening and saving | Firefox, Safari |
-| `Blob.slice` | Reading `.pak` files in chunks without loading the whole file into memory | All |
-| OPFS (Origin Private File System) | Autosave, prefabs, cache of converted textures | All |
-| IndexedDB | Settings, recent files, File System Access handles | All |
-| Web Workers | Texture conversion, WASM compilers | All |
-| `SharedArrayBuffer` + COOP/COEP | Threaded qvis3/qrad3 | All, when the headers are in place |
-| Pointer Lock API | The 3D view's fly camera | All |
-| Service Worker | PWA, offline use | All |
+| API                                                                                    | Purpose                                                                                                       | Support                            |
+| -------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- | ---------------------------------- |
+| File System Access API (`showDirectoryPicker`, `showOpenFilePicker`, `createWritable`) | Choosing the game folder, opening a map and saving directly to the file, writing the `.bsp` to `baseq2/maps/` | Chromium                           |
+| `<input type=file webkitdirectory>`, drag and drop, `<a download>`                     | Fallback path for opening and saving                                                                          | Firefox, Safari                    |
+| `Blob.slice`                                                                           | Reading `.pak` files in chunks without loading the whole file into memory                                     | All                                |
+| OPFS (Origin Private File System)                                                      | Autosave, prefabs, cache of converted textures                                                                | All                                |
+| IndexedDB                                                                              | Settings, recent files, File System Access handles                                                            | All                                |
+| Web Workers                                                                            | Texture conversion, WASM compilers                                                                            | All                                |
+| `SharedArrayBuffer` + COOP/COEP                                                        | Threaded qvis3/qrad3                                                                                          | All, when the headers are in place |
+| Pointer Lock API                                                                       | The 3D view's fly camera                                                                                      | All                                |
+| Service Worker                                                                         | PWA, offline use                                                                                              | All                                |
 
 Feature support is checked at runtime (feature detection), not by the browser's name.
 
@@ -138,19 +138,19 @@ qbsp3, qvis3 and qrad3 are compiled to WebAssembly from id Software's original [
 
 ## Testing
 
-| Tool | Target | Notes |
-| --- | --- | --- |
-| Vitest 5 | `core/`, `game/q2/`, `app/` (Node environment) | Coverage with `@vitest/coverage-v8`, target ≥ 90 % of lines in the `core/` directory. Benchmarks (`vitest bench`) for the CSG targets in the performance table. |
-| fast-check 4 | CSG operations, building polygons, texture lock | Random convex brushes are used to check that results are valid and volumes are preserved. |
-| Vitest + WASM | Compiler test | qbsp3.wasm runs in Node on the test maps, and the test fails on warnings. |
-| Playwright 1 | E2E, performance, screenshot comparison | The main browser is Chromium. Screenshot comparison runs in headless Chromium with SwiftShader software rendering (`--use-angle=swiftshader`), so the result is the same on every machine. Firefox and WebKit are tested in phase 5 for the load and save paths. |
+| Tool          | Target                                          | Notes                                                                                                                                                                                                                                                            |
+| ------------- | ----------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Vitest 5      | `core/`, `game/q2/`, `app/` (Node environment)  | Coverage with `@vitest/coverage-v8`, target ≥ 90 % of lines in the `core/` directory. Benchmarks (`vitest bench`) for the CSG targets in the performance table.                                                                                                  |
+| fast-check 4  | CSG operations, building polygons, texture lock | Random convex brushes are used to check that results are valid and volumes are preserved.                                                                                                                                                                        |
+| Vitest + WASM | Compiler test                                   | qbsp3.wasm runs in Node on the test maps, and the test fails on warnings.                                                                                                                                                                                        |
+| Playwright 1  | E2E, performance, screenshot comparison         | The main browser is Chromium. Screenshot comparison runs in headless Chromium with SwiftShader software rendering (`--use-angle=swiftshader`), so the result is the same on every machine. Firefox and WebKit are tested in phase 5 for the load and save paths. |
 
 `@solidjs/testing-library`, intended for unit testing UI components, exists for Solid 2 only as a release candidate, so it is not part of the base stack. Panels are tested with Playwright, and panel logic is kept in the `app/` layer, where Vitest can test it.
 
 ## Code quality
 
 - **ESLint 10** with a flat config (`eslint.config.js`) and **typescript-eslint 8** (see the TS 7 limitation above).
-- **Layer boundaries** are defined in the spec's *Layer order and dependency rules* section and enforced with **eslint-plugin-import-x 4**'s rule `import-x/no-restricted-paths`. The original `eslint-plugin-import` (2.x) does not support ESLint 10. Path aliases (`@core/*` etc.) are resolved with the `eslint-import-resolver-typescript` package (`createTypeScriptImportResolver`), so that the zones also recognise alias imports. `src/main.ts` is not the target of any zone, so it may import everything. Starting configuration:
+- **Layer boundaries** are defined in the spec's _Layer order and dependency rules_ section and enforced with **eslint-plugin-import-x 4**'s rule `import-x/no-restricted-paths`. The original `eslint-plugin-import` (2.x) does not support ESLint 10. Path aliases (`@core/*` etc.) are resolved with the `eslint-import-resolver-typescript` package (`createTypeScriptImportResolver`), so that the zones also recognise alias imports. `src/main.ts` is not the target of any zone, so it may import everything. Starting configuration:
 
   ```js
   'import-x/no-restricted-paths': ['error', { zones: [
@@ -162,12 +162,13 @@ qbsp3, qvis3 and qrad3 are compiled to WebAssembly from id Software's original [
     { target: ['./src/render', './src/platform'], from: ['./src/app', './src/ui'] },
     { target: './src/platform', from: './src/render' },
     { target: './src/app', from: './src/ui' },
-    { target: './workers', from: ['./src/app', './src/ui', './src/render'] },
+    { target: './workers', from: ['./src/app', './src/ui', './src/render', './src/platform'] },
     { target: ['./src/app', './src/render', './src/platform', './src/ui'], from: './workers' },
   ]}]
   ```
 
   The last zone ensures that workers are reached only through messages. `new Worker(new URL(…, import.meta.url))` is not an import, so the worker clients in `platform/` work. Package-level restrictions use the built-in `no-restricted-imports` rule: `solid-js` and `@solidjs/*` are allowed only in `ui/`. Imports from the `core/types` module must use the `import type` form (`@typescript-eslint/consistent-type-imports`).
+
 - **eslint-plugin-solid** is enabled for the `ui/` directory with its `v2` configuration. The configuration contains Solid 2's rules (for example `solid/removed-api`, which prevents use of the APIs removed in Solid 1). Support was checked from the package README on 24.11.2026.
 - **Prettier 3** formats the code. ESLint's style rules are turned off (`eslint-config-prettier`), so the tools do not conflict.
 
@@ -175,14 +176,14 @@ qbsp3, qvis3 and qrad3 are compiled to WebAssembly from id Software's original [
 
 The sources are described in [20-sources.md](20-sources.md), and their local copies are in the `ext/<repo>/` directory. The table lists the source projects' most important files for the technical solutions, and the paths are relative to each repository's root (for example `ext/q2pro/inc/format/pak.h`). All are licensed "GPL v2 or later", so code may be moved into Joole (`GPL-2.0-or-later`) as long as the copyright notices are kept.
 
-| Source | Files | What is taken from it |
-| --- | --- | --- |
-| [q2pro](https://github.com/q2pro/q2pro) | `inc/format/{pak,wal,pcx,md2,bsp}.h`, `src/common/files.c`, `src/refresh/images.c`, `src/refresh/models.c` | Binary format structures, the search order of paks and directories (mods), reading md2 |
-| [Quake-2](https://github.com/id-Software/Quake-2) | `qcommon/files.c` (`FS_AddGameDirectory`), `qcommon/qfiles.h`, `game/*.c` (`/*QUAKED*/` blocks, spawn functions), `ctf/*.c` | Vanilla engine behaviour (search order), generating entity definitions and the md2 table, an example of a mod's definitions (CTF) |
-| [Quake-2-Tools](https://github.com/id-Software/Quake-2-Tools) `qe4/` | `eclass.c`, `csg.c` (`CSG_MakeHollow`, `CSG_Subtract`), `brush.c`, `map.c`, `points.c`, `vertsel.c`, `select.c`, `textures.c` | id's own Q2 editor QuakeEd 4: parsing `/*QUAKED … */` entity definitions, CSG and hollowing, building brushes from planes, reading and writing `.map`, the leak file, vertex editing |
-| [Quake-2-Tools](https://github.com/id-Software/Quake-2-Tools) | `common/qfiles.h`, `bsp/qbsp3/textures.c` (`TextureAxisFromPlane`, `TexinfoForBrushTexture`), `bsp/qbsp3/map.c`, `bsp/qbsp3/leakfile.c` | Surface and contents flag constants, UV computation exactly as in the compiler, the `.map` parsing rules, the `.pts` format, the code compiled to WASM |
-| [Qoole](https://github.com/demoth/qoole) | `source/Objects/Geometry.cpp`, `source/Objects/EntList.cpp`, `source/Game/Quake2.cpp`, `source/Qoole/QooleOp.cpp`, `source/Render/Selector.cpp` | The editor's behaviour: CSG, hollowing, plane clip, operations and undo, picking |
-| [q3edit](https://github.com/drdator/q3edit) | `q3map-compiler/Makefile`, `src/q3map-worker.ts`, `src/gl-utils.ts`, `src/pak.ts`, `src/map-parser.ts` | Emscripten flags and the worker model for compilers, WebGL2 practices, browser-side pak and map handling |
+| Source                                                               | Files                                                                                                                                           | What is taken from it                                                                                                                                                                |
+| -------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| [q2pro](https://github.com/q2pro/q2pro)                              | `inc/format/{pak,wal,pcx,md2,bsp}.h`, `src/common/files.c`, `src/refresh/images.c`, `src/refresh/models.c`                                      | Binary format structures, the search order of paks and directories (mods), reading md2                                                                                               |
+| [Quake-2](https://github.com/id-Software/Quake-2)                    | `qcommon/files.c` (`FS_AddGameDirectory`), `qcommon/qfiles.h`, `game/*.c` (`/*QUAKED*/` blocks, spawn functions), `ctf/*.c`                     | Vanilla engine behaviour (search order), generating entity definitions and the md2 table, an example of a mod's definitions (CTF)                                                    |
+| [Quake-2-Tools](https://github.com/id-Software/Quake-2-Tools) `qe4/` | `eclass.c`, `csg.c` (`CSG_MakeHollow`, `CSG_Subtract`), `brush.c`, `map.c`, `points.c`, `vertsel.c`, `select.c`, `textures.c`                   | id's own Q2 editor QuakeEd 4: parsing `/*QUAKED … */` entity definitions, CSG and hollowing, building brushes from planes, reading and writing `.map`, the leak file, vertex editing |
+| [Quake-2-Tools](https://github.com/id-Software/Quake-2-Tools)        | `common/qfiles.h`, `bsp/qbsp3/textures.c` (`TextureAxisFromPlane`, `TexinfoForBrushTexture`), `bsp/qbsp3/map.c`, `bsp/qbsp3/leakfile.c`         | Surface and contents flag constants, UV computation exactly as in the compiler, the `.map` parsing rules, the `.pts` format, the code compiled to WASM                               |
+| [Qoole](https://github.com/demoth/qoole)                             | `source/Objects/Geometry.cpp`, `source/Objects/EntList.cpp`, `source/Game/Quake2.cpp`, `source/Qoole/QooleOp.cpp`, `source/Render/Selector.cpp` | The editor's behaviour: CSG, hollowing, plane clip, operations and undo, picking                                                                                                     |
+| [q3edit](https://github.com/drdator/q3edit)                          | `q3map-compiler/Makefile`, `src/q3map-worker.ts`, `src/gl-utils.ts`, `src/pak.ts`, `src/map-parser.ts`                                          | Emscripten flags and the worker model for compilers, WebGL2 practices, browser-side pak and map handling                                                                             |
 
 ## Hosting and CI
 
