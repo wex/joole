@@ -6,5 +6,6 @@
     "outDir": "./.tsbuild/core",
     "tsBuildInfoFile": "./.tsbuild/core.tsbuildinfo"
   },
-  "include": ["src/core/**/*", "src/game/**/*"]
+  "include": ["src/core/**/*", "src/game/**/*"],
+  "exclude": ["src/**/*.test.ts", "src/**/*.bench.ts", "src/**/__tests__"]
 }
