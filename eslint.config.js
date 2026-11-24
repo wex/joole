@@ -102,6 +102,38 @@ export default tseslint.config(
     },
   },
   {
+    files: ['src/core/types/**/*.ts'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: 'VariableDeclaration',
+          message: 'core/types is type-only: no runtime code (see the spec layer rules).',
+        },
+        {
+          selector: 'FunctionDeclaration, TSDeclareFunction',
+          message: 'core/types is type-only: no runtime code (see the spec layer rules).',
+        },
+        {
+          selector: 'ClassDeclaration',
+          message: 'core/types is type-only: no runtime code (see the spec layer rules).',
+        },
+        {
+          selector: 'TSEnumDeclaration, TSModuleDeclaration',
+          message: 'core/types is type-only: no runtime code (see the spec layer rules).',
+        },
+        {
+          selector: 'ExpressionStatement',
+          message: 'core/types is type-only: no side effects.',
+        },
+        {
+          selector: 'ExportDefaultDeclaration',
+          message: 'core/types is type-only: no runtime code (see the spec layer rules).',
+        },
+      ],
+    },
+  },
+  {
     files: ['src/ui/**/*.{ts,tsx}'],
     ...solidV2,
     rules: {
