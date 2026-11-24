@@ -60,7 +60,7 @@ Goal: a repository in which every later WP can follow the normal workflow (write
 
 - **Goal:** create the remote repository and the legal and housekeeping files.
 - **Scope:**
-  - The GitHub repository `github.com/<owner>/joole` on the owner's personal account, public. Creating it is the owner's action; until then CI is run locally.
+  - The GitHub repository [github.com/wex/joole](https://github.com/wex/joole) on the `wex` GitHub account, public. Creating it is the owner's action; until then CI is run locally.
   - Repository settings: squash merge only (PR title as the commit message), and branch protection for `main` (PR required, CI checks required, linear history, no force-pushes, no required review).
   - `LICENSE` (GPL-2.0 text with an "or later" notice) and a short `README.md` that points to `docs/`.
   - `THIRD_PARTY_NOTICES.md` (empty skeleton), `.editorconfig` and `.nvmrc` (`26`).

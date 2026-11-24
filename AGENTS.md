@@ -165,7 +165,7 @@ A single change is made like this:
 
 ## Git and commits
 
-- The repository is `github.com/<owner>/joole` (public). The main branch is `main`, and it is protected: changes arrive only through pull requests with green CI, without force-pushes. Changes are made in small, single-purpose units.
+- The repository is [github.com/wex/joole](https://github.com/wex/joole) (public). The main branch is `main`, and it is protected: changes arrive only through pull requests with green CI, without force-pushes. Changes are made in small, single-purpose units.
 - Pull requests are squash-merged. The PR title becomes the commit message on `main`, so it must follow Conventional Commits (CI checks it).
 - Commit messages follow the Conventional Commits format in English (`feat:`, `fix:`, `refactor:`, `test:`, `docs:`, `chore:`, `perf:`), for example `feat(geom): add CSG subtract`. The scope is the directory name: `geom`, `formats`, `doc`, `q2`, `app`, `render`, `platform`, `ui`, `tools`.
 - `pnpm check` passes before a commit. CI (GitHub Actions) runs the same, plus the E2E tests and the WASM build reproducibility check, for every pull request. Hooks are not bypassed (`--no-verify`).

@@ -200,7 +200,7 @@ The sources are described in [20-sources.md](20-sources.md), and their local cop
 - WASM job: `tools/` is built with the `emscripten/emsdk` Docker image and compared with the committed `.wasm` files.
 - Third-party actions are pinned to a commit SHA, not a tag.
 
-**Repository (decided 24.11.2026):** `github.com/<owner>/joole` under the owner's personal account (it can be transferred to an organization later), public from the start. Pull requests are squash-merged, so the PR title becomes the commit message on `main` and must follow Conventional Commits; CI checks the title with a small script. `main` is protected: no direct pushes or force-pushes, the CI checks must pass, and the history is linear. No approving review is required, so a solo developer can merge their own PRs. The repository is created before CI is taken into use (P0.1).
+**Repository (decided 24.11.2026):** [github.com/wex/joole](https://github.com/wex/joole) under the `wex` GitHub account (it can be transferred to an organization later), public from the start. Pull requests are squash-merged, so the PR title becomes the commit message on `main` and must follow Conventional Commits; CI checks the title with a small script. `main` is protected: no direct pushes or force-pushes, the CI checks must pass, and the history is linear. No approving review is required, so a solo developer can merge their own PRs. The repository is created before CI is taken into use (P0.1).
 
 ## Keeping reference code out of the tooling (`ext/`)
 
