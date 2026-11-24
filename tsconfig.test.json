@@ -12,6 +12,7 @@
     "tests/**/*.ts",
     "src/**/*.test.ts",
     "src/**/*.bench.ts",
+    "src/**/__tests__/**/*.ts",
     "vite.config.ts",
     "vitest.config.ts",
     "playwright.config.ts"
