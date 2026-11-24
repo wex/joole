@@ -1,0 +1,19 @@
+<!-- @dsCard group="Panels" height=380 subtitle="Class picker, spawnflags, raw key–value grid" -->
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>preview</title></head>
+<body>
+<section class="q2-float" style="max-width:340px" aria-label="Entity Properties">
+  <header class="q2-titlebar">Entity Properties<span class="q2-spacer"></span><button class="q2-winbtn" aria-label="Close"><svg viewBox="0 0 10 10"><path d="M2 2l6 6M8 2L2 8"/></svg></button></header>
+  <div style="display:flex;flex-direction:column;gap:var(--space-lg);padding:var(--space-lg)">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-xs)">
+      <select class="q2-select" id="cat" aria-label="Category"><option>func</option><option>info</option><option>item</option><option>light</option><option>misc</option><option>monster</option><option>path</option><option>trigger</option></select>
+      <select class="q2-select" id="cls" aria-label="Class"><option>func_door</option><option>func_door_rotating</option><option>func_door_secret</option><option>func_button</option><option>func_plat</option><option>func_train</option></select>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:var(--space-xs)"><span class="q2-grouplabel">Spawnflags</span><div class="q2-flags"><label><input type="checkbox" > START_OPEN</label><label><input type="checkbox" > REVERSE</label><label><input type="checkbox" checked> CRUSHER</label><label><input type="checkbox" > NOMONSTER</label><label><input type="checkbox" > ANIMATED</label><label><input type="checkbox" > TOGGLE</label></div></div>
+    <table class="q2-kv" aria-label="Keys and values"><tbody><tr><td>classname</td><td>func_door</td></tr><tr><td>targetname</td><td>t_door1</td></tr><tr><td>angle</td><td>90</td></tr><tr><td>speed</td><td>100</td></tr><tr><td>wait</td><td>-1</td></tr><tr><td>_minlight</td><td>0.2</td></tr><tr class="is-new"><td>(new key)</td><td></td></tr></tbody></table>
+  </div>
+</section>
+
+</body>
+</html>

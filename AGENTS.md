@@ -11,6 +11,7 @@ Tämä tiedosto on ohje sekä ihmiskehittäjille että koodausagenteille: mistä
 | [docs/00-spec.md](docs/00-spec.md) | Tekninen määrittely: tavoitteet, rajaus, arkkitehtuuri, tietomalli, formaatit, algoritmit, toteutusvaiheet, päätökset | Kun toiminnallisuus, rajaus tai arkkitehtuuri muuttuu tai kun "tarkistetaan ennen toteutusta" -kohta on tarkistettu |
 | [docs/10-stack.md](docs/10-stack.md) | Teknologiat, pääversiot, käyttötarkoitukset ja rajoitukset | Kun riippuvuus lisätään, poistetaan tai sen pääversio vaihtuu, tai kun teknologiapäätös tehdään |
 | [docs/20-sources.md](docs/20-sources.md) | Ulkoiset lähdeprojektit, niiden käyttötarkoitus ja paikalliset kopiot `ext/`-hakemistossa | Kun uusi lähde otetaan käyttöön (kloonataan myös `ext/`-hakemistoon) |
+| [PLAN.md](PLAN.md) | Toteutussuunnitelma: vaiheet 0–5, työpaketit (`P<vaihe>.<n>`), riippuvuudet, portit ja riskit (englanniksi) | Kun työpaketti valmistuu (valintaruutu), kun järjestys tai jako muuttuu, tai kun määrittely muuttuu |
 | `AGENTS.md` | Kehitysprosessi, komennot ja käytännöt | Kun komento, prosessi tai käytäntö muuttuu |
 
 **Säännöt:**
@@ -20,11 +21,11 @@ Tämä tiedosto on ohje sekä ihmiskehittäjille että koodausagenteille: mistä
 - **Päätökset kirjataan** määrittelyn kohtaan *Päätökset pp.kk.vvvv* päivämäärän kanssa. Avoimet asiat ovat `- [ ]`-tehtävinä *Tarkennetaan myöhemmin* -listassa (määrittely) tai *Avoimet teknologiapäätökset* -listassa (stack). Ratkaistu kohta merkitään tehdyksi tai siirretään päätöksiin.
 - **Numerointi:** `docs/`-tiedostot numeroidaan kymmenin (`00`, `10`, `20` …). Uusi dokumentti saa seuraavan vapaan numeron, esim. `30-testdata.md`.
 - **Kaaviot** kirjoitetaan Mermaid-muodossa (` ```mermaid `), jotta ne näkyvät GitHubissa ja ovat luettavissa tekstinä. Upotettuja kuvia tai ulkoisia kaaviotyökaluja ei käytetä.
-- **Kieli:** dokumentaatio kirjoitetaan suomeksi. Koodin tunnisteet, koodikommentit ja commit-viestit kirjoitetaan englanniksi. Tiedostonimet, tunnisteet ja komennot merkitään dokumenteissa `koodina`.
+- **Kieli:** dokumentaatio kirjoitetaan suomeksi. Poikkeus: `PLAN.md` on omistajan pyynnöstä englanniksi. Koodin tunnisteet, koodikommentit ja commit-viestit kirjoitetaan englanniksi. Tiedostonimet, tunnisteet ja komennot merkitään dokumenteissa `koodina`.
 
 ## Projektin tila
 
-Repossa on toistaiseksi vain dokumentaatio. Ensimmäinen toteutustehtävä on projektipohja (vaihe 1): `package.json`, `tsconfig`-projektit, Vite, ESLint, Prettier, Vitest ja Playwright. Alla olevat komennot ja hakemistot kuvaavat tavoitetilaa. Kun projektipohja on tehty, tämä osio päivitetään vastaamaan todellista tilaa.
+Repossa on toistaiseksi vain dokumentaatio. Toteutus etenee [PLAN.md](PLAN.md):n mukaan, ja ensimmäinen vaihe on vaihe 0 (*Foundations*: etärepo, `package.json`, `tsconfig`-projektit, Vite, ESLint, Prettier, Vitest, Playwright ja CI). Alla olevat komennot ja hakemistot kuvaavat tavoitetilaa. Kun projektipohja on tehty (P0.9), tämä osio päivitetään vastaamaan todellista tilaa.
 
 ## Hakemistorakenne ja kerrossäännöt
 
@@ -105,12 +106,12 @@ Toteutus etenee määrittelyn viiden vaiheen järjestyksessä. Seuraava vaihe al
 
 Yksittäinen muutos tehdään näin:
 
-1. **Lue määrittelyn osio**, jota muutos koskee, ja tarkista, mihin vaiheeseen se kuuluu. Jos määrittely on epäselvä tai ristiriitainen, kysy ennen toteutusta.
+1. **Lue määrittelyn osio**, jota muutos koskee, ja tarkista `PLAN.md`:stä, mihin työpakettiin se kuuluu ja ovatko sen riippuvuudet valmiita. Jos määrittely on epäselvä tai ristiriitainen, kysy ennen toteutusta.
 2. **Tarkista lähteet.** Algoritmeissa ja editorin käytöksessä esikuvana on Qoole. Formaateissa ja vakioissa totuuden lähteenä ovat id:n alkuperäinen moottori (`ext/Quake-2`) ja Quake-2-Tools (`common/qfiles.h`). Laajennuksissa (`.pkz`, pakettien hakusäännöt) lähteenä on q2pro. Selainratkaisuissa mallina on q3edit. Koodi luetaan paikallisesta kopiosta `ext/<repo>/`, ja tiedostokohtaiset viitteet ovat stackin kohdassa *Lähdeprojektien rooli*. Editorin perustoimintoihin (entiteettimääritykset, CSG, `.map`) kannattaa katsoa myös id:n omaa editoria `ext/Quake-2-Tools/qe4/`. Määrittelyn "tarkistetaan ennen toteutusta" -kohdat (esim. kääntäjien versio ja lisenssi) tarkistetaan lähdekoodista, ja tulos kirjataan määrittelyyn.
 3. **Kirjoita testi ensin** aina, kun muutos koskee `core/`- tai `app/`-koodia: yksikkötesti, fast-check-ominaisuus tai kierrostesti. Bugikorjaukseen kuuluu testi, joka epäonnistuu ennen korjausta.
 4. **Toteuta** noudattaen kerrossääntöjä ja koodauskäytäntöjä.
 5. **Aja `pnpm check`.** Renderöintiä tai UI:ta koskevissa muutoksissa aja myös `pnpm e2e`. Suorituskykykriittisissä muutoksissa (geometria, renderöinnin välimuisti, jäsentäjät) aja `pnpm bench` ja vertaa määrittelyn suorituskykytaulukkoon.
-6. **Päivitä dokumentaatio** samassa muutoksessa: määrittely, stack ja tämä tiedosto tarpeen mukaan.
+6. **Päivitä dokumentaatio** samassa muutoksessa: määrittely, stack, `PLAN.md` (työpaketin tila) ja tämä tiedosto tarpeen mukaan.
 7. **Commitoi** pieninä, yhden asian kokonaisuuksina (ks. Git).
 
 ## Koodauskäytännöt

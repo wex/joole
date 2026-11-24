@@ -1,0 +1,148 @@
+/* Q2 Web Editor UI — generated from tokens.json */
+:root, [data-theme="dark"] {
+  --surface-0: #101214; /* App ground between panels and the splitter gap. No text directly on it. */
+  --surface-1: #1a1d21; /* Panel body: properties panel, texture browser, log, toolbar. */
+  --surface-2: #252a30; /* Raised surfaces: panel title bars, inputs, menus, floating windows. */
+  --surface-3: #313740; /* Hover state on surface-2 and pressed buttons. */
+  --line: #3a4049; /* Panel borders, table cell rules, separators. Decorative; never the only sign of a state. */
+  --line-strong: #6b7380; /* Input and button borders (≥3:1 on surface-1 and surface-2 in both themes). */
+  --ink: #e7eaee; /* Body text and headings on surface-0 to surface-3. */
+  --ink-muted: #9ba3ae; /* Secondary text: coordinates, metadata, empty fields, the (new key) row. On surface-1 and surface-2. */
+  --ink-disabled: #6a717b; /* Unavailable menu items and buttons. Exempt from 4.5:1 (WCAG: inactive components). */
+  --accent: #7b93ff; /* Active view, highlighted menu row, selected tab, primary button. Qoole's blue active-window title bar. As text, on surface-1 and surface-2. */
+  --on-accent: #0b1030; /* Text and icons on an accent fill. */
+  --accent-soft: #252f5c; /* Background of a selected row in trees and lists when the selection is not focused. */
+  --focus-ring: #a9b8ff; /* Keyboard focus: a solid 2px ring after a 1px gap. ≥3:1 on every surface token. */
+  --select: #cf2b22; /* Selected item in the UI: the selected texture's name label, the selected node's marker. Means the same as vp-select in the viewports. */
+  --on-select: #ffffff; /* Text on a select fill. */
+  --warn: #f0a43a; /* Warning: Tex Lock error over 0.5 texels, surface flag differing from the texture default, compiler warning in the log. As text on surface-1 and surface-2; always with an icon or a word. */
+  --error: #ff7a70; /* Error: compile error, leak, rejected geometry. As text on surface-1 and surface-2; always with an icon or a word. */
+  --ok: #5cc8ff; /* Successful compile in the log. Blue, not green, so ok and error differ without relying on red–green. */
+  --vp-bg: #000000; /* Background of all four views in both themes, as in Qoole. */
+  --vp-grid-minor: #262626; /* Grid lines at the current grid size. Fade out when spacing drops below 4px. */
+  --vp-grid-major: #4d4d4d; /* Every 8th grid line and every 64 units. */
+  --vp-axis: #6e6a32; /* World origin axes (x = 0, y = 0, z = 0) in the 2D views. */
+  --vp-brush: #e6e6e6; /* Unselected brush wireframe in the 2D views and 3D wireframe mode. */
+  --vp-select: #ff2b1f; /* Selected brush or entity in every view. Selection is never shown in any other color. */
+  --vp-entity: #3ccaff; /* Point entities in the 2D views when the entity definition gives no color. */
+  --vp-target: #1c86b3; /* target/targetname link lines in the 2D views, dashed. */
+  --vp-handle: #ffd60a; /* Vertex, edge and face handles, and clip plane points. */
+  --vp-invalid: #ff9f0a; /* Rejected move (non-convex result). Departs from the spec, which says red: red is reserved for selection. */
+  --vp-leak: #e040fb; /* qbsp3 leak path (.pts) in every view. */
+  --vp-sky: #5f7898; /* SURF_SKY faces in the 3D view. */
+  --vp-toolface: #7a52c7; /* SURF_NODRAW, clip and hint faces in the 3D view, dimmed (drawn at 35% opacity). */
+  --vp-scope-dim: #5a5a5a; /* The rest of the map while inside a group (scope): wireframe in this color. */
+  --vp-label: #c9c9c9; /* Text drawn over a view: measurements, handle coordinates. */
+  --shadow-float: 0 6px 20px rgba(0,0,0,0.55); /* Menus, submenus and floating windows. Every other surface is flat. */
+}
+[data-theme="light"] {
+  --surface-0: #b8bcc2;
+  --surface-1: #d9dce0;
+  --surface-2: #eef0f2;
+  --surface-3: #ffffff;
+  --line: #9aa0a8;
+  --line-strong: #5f6670;
+  --ink: #14171a;
+  --ink-muted: #4c535c;
+  --ink-disabled: #7c838c;
+  --accent: #2c43b8;
+  --on-accent: #ffffff;
+  --accent-soft: #d4dafb;
+  --focus-ring: #1e33a3;
+  --select: #c8261d;
+  --on-select: #ffffff;
+  --warn: #8a5300;
+  --error: #b3261e;
+  --ok: #0b5e91;
+  --vp-bg: #000000;
+  --vp-grid-minor: #262626;
+  --vp-grid-major: #4d4d4d;
+  --vp-axis: #6e6a32;
+  --vp-brush: #e6e6e6;
+  --vp-select: #ff2b1f;
+  --vp-entity: #3ccaff;
+  --vp-target: #1c86b3;
+  --vp-handle: #ffd60a;
+  --vp-invalid: #ff9f0a;
+  --vp-leak: #e040fb;
+  --vp-sky: #5f7898;
+  --vp-toolface: #7a52c7;
+  --vp-scope-dim: #5a5a5a;
+  --vp-label: #c9c9c9;
+  --shadow-float: 0 6px 20px rgba(20,24,30,0.22);
+}
+:root {
+  --space-2xs: 2px; /* Gap between icon and edge in a button; handle radius. */
+  --space-xs: 4px; /* Tight padding: tabs, gap between toolbar buttons. */
+  --space-sm: 6px; /* Horizontal cell padding in tables and menu row indent. */
+  --space-md: 8px; /* Panel padding, gap between texture tiles. */
+  --space-lg: 12px; /* Floating window padding, gap between groups in a panel. */
+  --space-xl: 16px; /* Gap between sections in the properties panel. */
+  --radius-none: 0px; /* Views, panels and splitters. The workspace is a rectangular grid. */
+  --radius-sm: 2px; /* Buttons, inputs, tabs, texture tiles. */
+  --radius-md: 4px; /* Menus and floating windows. */
+  --size-titlebar: 22px; /* Height of panel and view title bars. */
+  --size-row: 22px; /* Menu row, table row, tree row. */
+  --size-control: 26px; /* Button, input, select. */
+  --size-toolbar: 34px; /* Toolbar height. */
+  --size-thumb: 64px; /* Texture browser thumbnail (default; 32–128px). */
+  --size-splitter: 4px; /* Width of a draggable panel splitter. */
+  --font-ui: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --text-ui-heading: 600 13px/18px var(--font-ui); /* Floating window and panel group titles. */
+  --text-ui-title: 600 12px/16px var(--font-ui); /* Panel and view title bars. */
+  --text-ui-body: 400 12px/16px var(--font-ui); /* Menus, buttons, forms, tree view. The default style. */
+  --text-ui-small: 400 11px/14px var(--font-ui); /* Tabs, tooltips, shortcuts. */
+  --text-ui-label: 600 10px/12px var(--font-ui); /* Uppercase group labels inside a panel. */
+  --text-mono-body: 400 12px/16px var(--font-mono); /* Key–value tables, the log, .map text. */
+  --text-mono-small: 400 11px/14px var(--font-mono); /* Texture names, title bar coordinates, grid size. */
+}
+.ui-heading {
+  font-family: var(--font-ui);
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+.ui-title {
+  font-family: var(--font-ui);
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+.ui-body {
+  font-family: var(--font-ui);
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 400;
+  letter-spacing: 0;
+}
+.ui-small {
+  font-family: var(--font-ui);
+  font-size: 11px;
+  line-height: 14px;
+  font-weight: 400;
+  letter-spacing: 0;
+}
+.ui-label {
+  font-family: var(--font-ui);
+  font-size: 10px;
+  line-height: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+}
+.mono-body {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 400;
+  letter-spacing: 0;
+}
+.mono-small {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 14px;
+  font-weight: 400;
+  letter-spacing: 0;
+}

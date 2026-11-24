@@ -1,0 +1,61 @@
+{
+  "manifestVersion": 3,
+  "name": "Q2 Web Editor UI",
+  "namespace": "Q2UI",
+  "files": [
+    "components/ContextMenu/README.md",
+    "components/EntityProperties/README.md",
+    "components/ObjectPreview/README.md",
+    "components/PanelTabs/README.md",
+    "components/TextureBrowser/README.md",
+    "components/Toolbar/README.md",
+    "components/ViewportPane/README.md",
+    "components/Workspace/README.md",
+    "components/bundle.css",
+    "tokens.css"
+  ],
+  "libraries": [],
+  "components": [
+    {
+      "name": "ContextMenu",
+      "group": "Controls",
+      "summary": "The viewport's right-click menu and its submenus (Add Brush, Add Entity, Apply Entity → func → class)."
+    },
+    {
+      "name": "EntityProperties",
+      "group": "Panels",
+      "summary": "Entity properties: class picker (category and class), spawnflags checkboxes and a raw key–value table."
+    },
+    {
+      "name": "ObjectPreview",
+      "group": "Panels",
+      "summary": "A preview of the selected object's texture at the top of the properties panel."
+    },
+    {
+      "name": "PanelTabs",
+      "group": "Controls",
+      "summary": "A tab row for switching panel content and maximizing a view."
+    },
+    {
+      "name": "TextureBrowser",
+      "group": "Panels",
+      "summary": "The texture browser: folder and texture count in the title, a name filter, an In use filter, thumbnails, and the selected texture's details in the footer."
+    },
+    {
+      "name": "Toolbar",
+      "group": "Controls",
+      "summary": "The top toolbar: file, undo/redo, tool modes, CSG commands, grid size, Tex Lock and Compile."
+    },
+    {
+      "name": "ViewportPane",
+      "group": "Workspace",
+      "summary": "A view's frame: a title bar (name, axes or cursor coordinates, maximize button) over a WebGL canvas drawn in the vp-* colors."
+    },
+    {
+      "name": "Workspace",
+      "group": "Workspace",
+      "summary": "The editor's default layout: toolbar, 2 × 2 views, properties panel on the right, and textures and log at the bottom."
+    }
+  ],
+  "assetGroups": []
+}
