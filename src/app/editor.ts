@@ -822,10 +822,18 @@ export class EditorApp {
     return selectionToMapText(this.document, this.selection);
   }
 
+  private clipboardMirror: string | null = null;
+
   async copySelection(): Promise<boolean> {
     const text = this.copySelectionText();
-    if (!text || !this.clipboard) return false;
-    await this.clipboard.writeText(text);
+    if (!text) return false;
+    // The in-app mirror is the guarantee: the system clipboard may deny
+    // access (WebKit does not grant clipboard permissions at all), but
+    // copy/paste inside the editor must still work.
+    this.clipboardMirror = text;
+    if (this.clipboard) {
+      await this.clipboard.writeText(text).catch(() => undefined);
+    }
     this.log('ok', 'Selection copied as .map text.');
     return true;
   }
@@ -853,8 +861,11 @@ export class EditorApp {
   }
 
   async pasteClipboard(): Promise<boolean> {
-    if (!this.clipboard) return false;
-    return this.pasteMapText(await this.clipboard.readText());
+    if (this.clipboard) {
+      const text = await this.clipboard.readText().catch(() => null);
+      if (text !== null) return this.pasteMapText(text);
+    }
+    return this.clipboardMirror !== null ? this.pasteMapText(this.clipboardMirror) : false;
   }
 
   /** Saves the current selection as a named prefab snippet in OPFS. */
