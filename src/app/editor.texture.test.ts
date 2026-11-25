@@ -12,8 +12,7 @@ function makeApp() {
         Promise.resolve({
           width: 64,
           height: 64,
-          pixels: new Uint8Array(64 * 64 * 4),
-          mipmaps: [],
+          rgba: new Uint8Array(64 * 64 * 4),
         }),
     },
   });

@@ -586,7 +586,7 @@ Goal: Qoole-level geometry operations, and textures that look exactly the same i
 - **Depends on:** P1.10 (`texAxes`), P2.4
 - **Done when:** transforms with lock on behave as the spec describes.
 
-### [ ] P3.8 Texture tools (T)
+### [x] P3.8 Texture tools (T)
 
 - **Goal:** Qoole-level texture work.
 - **Scope:**
