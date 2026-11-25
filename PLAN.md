@@ -422,7 +422,7 @@ Goal: editing through commands with unlimited undo, project files and autosave, 
 - **Depends on:** P2.1
 - **Done when:** commands exist for move, rotate, scale and snap.
 
-### [ ] P2.5 Tool framework and Select tool (`app`, `ui`)
+### [x] P2.5 Tool framework and Select tool (`app`, `ui`)
 
 - **Goal:** tool logic that can be tested in Node, with the UI only translating input.
 - **Scope:**

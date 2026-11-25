@@ -10,6 +10,7 @@ interface JooleWindow {
       nodes: number;
       textures: readonly { name: string; width: number; height: number }[];
     };
+    selection(): string[];
   };
 }
 
@@ -77,6 +78,13 @@ test('the shell has the workspace, file menu, panels, splitters, theme and view 
   await expect(page.getByRole('menuitem', { name: 'Open Game Folder…' })).toBeVisible();
   await expect(page.getByRole('menuitem', { name: 'Open Map…' })).toBeVisible();
   await page.keyboard.press('Escape');
+
+  const top = await viewPoint(page, 'top');
+  await page.mouse.click(top.x, top.y, { button: 'right' });
+  await expect(page.locator('[data-testid=view-context-menu]')).toBeVisible();
+  await expect(page.getByRole('menuitem', { name: 'Add Brush' })).toBeDisabled();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('[data-testid=view-context-menu]')).toHaveCount(0);
 
   await page.keyboard.press('F2');
   await expect(page.locator('[data-testid=view-title-top]')).toBeVisible();
@@ -176,5 +184,34 @@ test('2D pan and zoom and 3D fly change the rendered views', async ({ page }) =>
   expect(await page.evaluate(() => (window as unknown as JooleWindow).joole!.stats().frames)).toBe(
     framesAtIdle,
   );
+  expect(errors).toEqual([]);
+});
+
+test('selecting and dragging a brush moves it, and Ctrl+Z undoes the move', async ({ page }) => {
+  const errors = consoleErrors(page);
+  await openFixtureMap(page);
+  const initial = await canvasScreenshot(page);
+  const top = await viewPoint(page, 'top');
+
+  await page.mouse.click(top.x, top.y, { button: 'left' });
+  await expect
+    .poll(() => page.evaluate(() => (window as unknown as JooleWindow).joole!.selection().length))
+    .toBe(1);
+  await page.evaluate(() => (window as unknown as JooleWindow).joole!.whenIdle());
+  const selected = await canvasScreenshot(page);
+  expect(selected.equals(initial)).toBe(false);
+
+  await page.mouse.move(top.x, top.y);
+  await page.mouse.down({ button: 'left' });
+  await page.mouse.move(top.x + 72, top.y + 40, { steps: 5 });
+  await page.mouse.up({ button: 'left' });
+  await page.evaluate(() => (window as unknown as JooleWindow).joole!.whenIdle());
+  const moved = await canvasScreenshot(page);
+  expect(moved.equals(selected)).toBe(false);
+
+  await page.keyboard.press('Control+z');
+  await page.evaluate(() => (window as unknown as JooleWindow).joole!.whenIdle());
+  const undone = await canvasScreenshot(page);
+  expect(undone.equals(selected)).toBe(true);
   expect(errors).toEqual([]);
 });

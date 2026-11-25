@@ -1,8 +1,11 @@
 import { createEmptyDocument } from '@core/doc/index';
 import { parseMap, readPcxPalette } from '@core/formats/index';
-import type { ConvertedTexture, Inflate, MapDocument } from '@core/types/index';
+import type { Command, ConvertedTexture, Inflate, MapDocument, Patch } from '@core/types/index';
 import { PALETTE_PATH } from '@game/q2/index';
 import type { GameFileEntry } from '@platform/index';
+import { CommandBus } from './commandBus';
+import { SelectionManager } from './selection';
+import { SelectTool, type ToolOutput, type ToolPointerEvent } from './tools';
 import { entriesFromFileList, entriesFromSinglePak, openGameVfs } from '@platform/index';
 
 export type LogLevel = 'info' | 'ok' | 'warning' | 'error';
@@ -38,10 +41,11 @@ export interface EditorAppOptions {
 }
 
 export type EditorEvent =
-  | { readonly type: 'document' }
+  | { readonly type: 'document'; readonly patch?: Patch }
   | { readonly type: 'game' }
   | { readonly type: 'log' }
-  | { readonly type: 'grid' };
+  | { readonly type: 'grid' }
+  | { readonly type: 'selection' };
 
 export type EditorListener = (event: EditorEvent) => void;
 
@@ -76,7 +80,9 @@ export class EditorApp {
   private readonly pickMapFile?: () => Promise<File | null>;
   private entries: LogEntry[] = [];
   private nextLogId = 1;
-  private doc: MapDocument = createEmptyDocument();
+  private readonly bus: CommandBus;
+  private readonly selectionManager: SelectionManager;
+  private readonly selectTool: SelectTool;
   private map: string | null = null;
   private vfs: Awaited<ReturnType<typeof openGameVfs>> | null = null;
   private palette: Uint8Array | null = null;
@@ -89,11 +95,31 @@ export class EditorApp {
     this.textureCache = options.textureCache ?? null;
     this.pickGameEntries = options.pickGameEntries;
     this.pickMapFile = options.pickMapFile;
+    this.bus = new CommandBus(createEmptyDocument());
+    this.selectionManager = new SelectionManager(this.bus);
+    this.selectTool = new SelectTool(
+      () => this.document,
+      () => this.gridSize,
+    );
+    this.bus.subscribe((event) => {
+      if (event.type !== 'history') {
+        this.selectTool.applyPatch(event.document, event.patch);
+        this.emit({ type: 'document', patch: event.patch });
+      }
+    });
+    this.selectionManager.subscribe(() => {
+      this.selectTool.setSelection(this.selectionManager.selection);
+      this.emit({ type: 'selection' });
+    });
     this.log('info', 'Joole ready. Open a game folder and a map.');
   }
 
   get document(): MapDocument {
-    return this.doc;
+    return this.bus.document;
+  }
+
+  get selection(): ReadonlySet<string> {
+    return this.selectionManager.selection;
   }
 
   get mapName(): string | null {
@@ -219,7 +245,9 @@ export class EditorApp {
   async openMapText(name: string, text: string): Promise<boolean> {
     try {
       const doc = parseMap(text);
-      this.doc = doc;
+      this.bus.reset(doc);
+      this.selectionManager.clear();
+      this.selectTool.syncDocument(doc);
       this.map = name;
       this.emit({ type: 'document' });
       this.log('ok', `Opened map ${name} (${plural(doc.nodes.size, 'node')}).`);
@@ -228,6 +256,40 @@ export class EditorApp {
       this.log('error', `Map failed to open: ${errorText(error)}`);
       return false;
     }
+  }
+
+  /** Executes one document command through the central bus and selection history. */
+  executeCommand(command: Command): Patch {
+    return this.selectionManager.execute(command);
+  }
+
+  undo(): boolean {
+    return this.selectionManager.undo();
+  }
+
+  redo(): boolean {
+    return this.selectionManager.redo();
+  }
+
+  setSelection(ids: Iterable<string>): void {
+    this.selectionManager.setSelection(ids);
+  }
+
+  /** Feeding a neutral pointer event through the Select tool and applying its effects. */
+  selectPointer(event: ToolPointerEvent): ToolOutput {
+    const output = this.selectTool.pointer(event);
+    for (const command of output.commands) {
+      try {
+        this.executeCommand(command);
+      } catch (error) {
+        this.log('warning', error instanceof Error ? error.message : String(error));
+        break;
+      }
+    }
+    if (output.selection) {
+      this.setSelection(output.selection);
+    }
+    return output;
   }
 
   /** The renderer's lazy texture loader, over the open VFS, worker and cache. */

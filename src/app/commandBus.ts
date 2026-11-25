@@ -73,6 +73,14 @@ export class CommandBus {
     return () => this.listeners.delete(listener);
   }
 
+  /** Replaces the document outside history, used when opening another file. */
+  reset(document: MapDocument): void {
+    this.doc = document;
+    this.undoStack = [];
+    this.redoStack = [];
+    this.memory = 0;
+  }
+
   execute(command: Command): Patch {
     const patch = command.run(this.doc);
     const last = this.undoStack[this.undoStack.length - 1];

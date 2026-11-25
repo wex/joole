@@ -256,6 +256,11 @@ export class BrushBvh {
     return this.leaves.size;
   }
 
+  clear(): void {
+    this.root = null;
+    this.leaves.clear();
+  }
+
   insert(id: Id, brush: BrushNode): void {
     this.remove(id);
     const data = leafData(id, brush);

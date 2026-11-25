@@ -72,7 +72,13 @@ renderer.setGridSize(app.gridSize);
 // frame cameras after the geometry cache has been updated.
 app.subscribe((event) => {
   if (event.type === 'document') {
-    renderer.setDocument(app.document);
+    if (event.patch) {
+      renderer.applyPatch(app.document, event.patch);
+    } else {
+      renderer.setDocument(app.document);
+    }
+  } else if (event.type === 'selection') {
+    renderer.setSelection(app.selection);
   } else if (event.type === 'game') {
     renderer.reloadTextures();
   } else if (event.type === 'grid') {
@@ -85,12 +91,14 @@ declare global {
     joole?: {
       whenIdle: () => Promise<void>;
       stats: () => ReturnType<Renderer['stats']>;
+      selection: () => string[];
     };
   }
 }
 window.joole = {
   whenIdle: () => renderer.whenIdle(),
   stats: () => renderer.stats(),
+  selection: () => [...app.selection],
 };
 
 mountEditorShell({ app, renderer, canvas }, root);

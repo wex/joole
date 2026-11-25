@@ -120,6 +120,41 @@ export function orthoCoordinates(
   return { labels, values: axisCoordinates(camera.axis, horizontal, vertical) };
 }
 
+/** The world point on the camera-centred plane of a 2D view. */
+export function orthoWorldPoint(
+  camera: OrthoCamera,
+  point: ViewportPoint,
+  viewport: ViewportSize,
+  devicePixelRatio: number,
+): Vec3 {
+  const { right, up } = orthoBasis(camera.axis);
+  const horizontal =
+    dot(camera.center, right) + ((point.x - viewport.width / 2) * devicePixelRatio) / camera.zoom;
+  const vertical =
+    dot(camera.center, up) - ((point.y - viewport.height / 2) * devicePixelRatio) / camera.zoom;
+  return ma(
+    ma(camera.center, right, horizontal - dot(camera.center, right)),
+    up,
+    vertical - dot(camera.center, up),
+  );
+}
+
+/** The world-space picking ray direction through a point of the perspective view. */
+export function perspectiveRayDirection(
+  camera: PerspectiveCamera,
+  point: ViewportPoint,
+  viewport: ViewportSize,
+): Vec3 {
+  const forward = forwardFromAngles(camera.yaw, camera.pitch);
+  const right = normalize(cross(forward, [0, 0, 1]));
+  const up = cross(right, forward);
+  const aspect = viewport.width / Math.max(1, viewport.height);
+  const x = (point.x / Math.max(1, viewport.width)) * 2 - 1;
+  const y = 1 - (point.y / Math.max(1, viewport.height)) * 2;
+  const tanY = Math.tan(((camera.fovY * Math.PI) / 180) * 0.5);
+  return normalize(ma(ma(ma(forward, right, x * tanY * aspect), up, y * tanY), [0, 0, 0], 0));
+}
+
 /** Mouse look for the fly camera. Positive movementX turns right. */
 export function lookPerspective(
   camera: PerspectiveCamera,
