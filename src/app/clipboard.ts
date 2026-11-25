@@ -70,14 +70,16 @@ export function mapTextToPastePatch(
   doc: Readonly<MapDocument>,
   text: string,
   offset: Vec3 = [0, 0, 0],
+  parent: Id | null = null,
 ): PasteResult {
   const parsed = parseMap(text);
   let patch: Patch | null = null;
   let working = doc;
   const ids: Id[] = [];
+  const target = parent ?? doc.worldspawn;
   for (const source of brushesIn(parsed)) {
     const brush = movedBrush(source, offset);
-    const effective: Patch = addNodePatch(working, working.worldspawn, brush);
+    const effective: Patch = addNodePatch(working, target, brush);
     patch = patch ? mergePatches(patch, effective) : effective;
     working = applyPatch(working, effective);
     ids.push(brush.id);

@@ -22,6 +22,7 @@ import { createTransformCommand } from './transformCommands';
 import { clipSelectionPatch } from './csg';
 import { clipPlaneFromPoints } from '@core/geom/csg';
 import { moveVertices } from '@core/geom/vertexEdit';
+import { createPointEntityPatch } from './entities';
 import { extractWireframe } from '@core/geom/brush';
 
 export type ToolView = PickAxis | '3d';
@@ -174,6 +175,7 @@ export class BrushTool {
     private readonly getDocument: () => Readonly<MapDocument>,
     private readonly getGridSize: () => number,
     private readonly texture: FaceTexture = DEFAULT_FACE_TEXTURE,
+    private readonly getInsertParent?: () => string,
   ) {}
 
   pointer(event: ToolPointerEvent): ToolOutput {
@@ -237,7 +239,7 @@ export class BrushTool {
       commands: [
         {
           label: `Add ${this.primitive}`,
-          run: (doc) => addNodePatch(doc, doc.worldspawn, brush),
+          run: (doc) => addNodePatch(doc, this.getInsertParent?.() ?? doc.worldspawn, brush),
         },
       ],
       selection: new Set([brush.id]),
@@ -1024,4 +1026,62 @@ export class TextureTool {
 export interface FacePick {
   readonly brush: Id;
   readonly face: number;
+}
+
+/**
+ * The entity tool (E): a click places a point entity of the current class at
+ * the clicked world point, snapped to the grid, in every view. Brush entity
+ * classes are not placed — they are made by converting selected brushes.
+ */
+export class EntityTool {
+  private readonly gridSize: () => number;
+
+  constructor(
+    private readonly getDocument: () => Readonly<MapDocument>,
+    private readonly currentClass: () => string,
+    private readonly scopeParent: () => Id,
+    gridSize: number | (() => number) = 8,
+  ) {
+    this.gridSize = typeof gridSize === 'function' ? gridSize : () => gridSize;
+    void this.getDocument;
+  }
+
+  syncDocument(doc: Readonly<MapDocument>): void {
+    void doc;
+  }
+
+  applyPatch(doc: Readonly<MapDocument>, patch: Patch): void {
+    void doc;
+    void patch;
+  }
+
+  setSelection(ids: Iterable<Id>): void {
+    void ids;
+  }
+  cancel(): void {}
+
+  pointer(event: ToolPointerEvent): ToolOutput {
+    if (event.type !== 'down' || event.button !== 0) return { commands: [] };
+    const classname = this.currentClass();
+    if (!classname) return { commands: [] };
+    const grid = this.gridSize();
+    const snapped = event.point.map((value) => Math.round(value / grid) * grid) as Vec3;
+    const doc = this.getDocument();
+    let placement: { patch: Patch; id: Id };
+    try {
+      placement = createPointEntityPatch(doc, classname, snapped, this.scopeParent());
+    } catch {
+      return { commands: [] };
+    }
+    const id = placement.id;
+    return {
+      commands: [
+        {
+          label: `Add ${classname}`,
+          run: () => placement.patch,
+        },
+      ],
+      selection: new Set([id]),
+    };
+  }
 }

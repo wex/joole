@@ -1,5 +1,5 @@
 EMCC ?= emcc
-OUT ?= ../../workers/wasm/qbsp3.mjs
+OUT ?= ../../public/wasm/qbsp3.mjs
 
 SRCS = \
 	qbsp3/brushbsp.c qbsp3/csg.c qbsp3/faces.c qbsp3/glfile.c \
@@ -18,4 +18,4 @@ all:
 		-sALLOW_MEMORY_GROWTH=1 -sFORCE_FILESYSTEM=1 -sINVOKE_RUN=0 -sEXIT_RUNTIME=0
 
 clean:
-	rm -f ../../workers/wasm/qbsp3.mjs ../../workers/wasm/qbsp3.wasm
+	rm -f ../../public/wasm/qbsp3.mjs ../../public/wasm/qbsp3.wasm

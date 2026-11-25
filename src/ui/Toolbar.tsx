@@ -3,7 +3,7 @@ import type { PrimitiveKind } from '@core/geom/index';
 import { Icon } from './Icon';
 import styles from './Toolbar.module.css';
 
-export type ToolbarTool = 'select' | 'brush' | 'clip' | 'vertex' | 'face' | 'texture';
+export type ToolbarTool = 'select' | 'brush' | 'clip' | 'vertex' | 'face' | 'texture' | 'entity';
 
 export interface ToolbarProps {
   readonly gridSize: number;
@@ -31,6 +31,8 @@ export interface ToolbarProps {
   readonly onToggleTextureLock: () => void;
   readonly onTool: (tool: ToolbarTool) => void;
   readonly onBrushPrimitive: (kind: PrimitiveKind, sides: number) => void;
+  readonly onCompile: () => void;
+  readonly gameOpen: boolean;
 }
 
 function tool(
@@ -45,7 +47,7 @@ function tool(
 const tools = [
   tool('select', 'Select (S)', 'mousePointer', true),
   tool('brush', 'Brush (B)', 'box', true),
-  tool('entity', 'Entity (E)', 'circleUser'),
+  tool('entity', 'Entity (E)', 'circleUser', true),
   tool('clip', 'Clip (C)', 'clip', true),
   tool('vertex', 'Vertex/edge (V)', 'move', true),
   tool('face', 'Face (F)', 'scan', true),
@@ -375,7 +377,14 @@ export function Toolbar(props: ToolbarProps) {
       >
         <Icon name="sunMoon" />
       </button>
-      <button type="button" class={styles.compileButton} disabled>
+      <button
+        type="button"
+        class={styles.compileButton}
+        data-testid="compile-button"
+        disabled={!props.gameOpen}
+        title={props.gameOpen ? 'Compile the map' : 'Open a game folder before compiling'}
+        onClick={() => props.onCompile()}
+      >
         <Icon name="play" /> Compile
       </button>
     </div>

@@ -18,6 +18,7 @@ uniform vec4 uBrushColor;
 uniform vec4 uEntityColor;
 uniform vec4 uSelectColor;
 uniform vec4 uInvalidColor;
+uniform vec4 uLeakColor;
 
 out vec4 vColor;
 
@@ -27,13 +28,24 @@ const vec4 OUTSIDE = vec4(2.0, 2.0, 2.0, 1.0);
 void main() {
   ivec2 size = textureSize(uState, 0);
   int i = int(aIndex);
-  uint state = texelFetch(uState, ivec2(i % size.x, i / size.x), 0).r;
+  uvec4 texel = texelFetch(uState, ivec2(i % size.x, i / size.x), 0);
+  uint state = texel.r;
   bool selected = (state & 1u) != 0u;
   bool entity = (state & 2u) != 0u;
   bool invalid = (state & 4u) != 0u;
+  bool dimmed = (state & 8u) != 0u;
+  bool leak = (state & 16u) != 0u;
   vec4 a = uViewProjection * vec4(aA, 1.0);
   vec4 b = uViewProjection * vec4(aB, 1.0);
-  vColor = invalid ? uInvalidColor : selected ? uSelectColor : entity ? uEntityColor : uBrushColor;
+  vec4 classColor = vec4(vec3(texel.gba) / 255.0, 1.0);
+  bool hasClassColor = entity && (texel.g + texel.b + texel.a) > 0u;
+  vColor = invalid ? uInvalidColor : selected ? uSelectColor : entity ? (hasClassColor ? classColor : uEntityColor) : uBrushColor;
+  if (dimmed) {
+    vColor = vec4(vColor.rgb * 0.35, vColor.a);
+  }
+  if (leak) {
+    vColor = uLeakColor;
+  }
   // Freed instances are zeroed, so a == b; they and filtered lines collapse.
   if (aA == aB || selected != (uPass == 1) || (uEntitiesOnly && !entity) ||
       (a.w < NEAR_W && b.w < NEAR_W)) {

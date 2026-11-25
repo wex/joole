@@ -7,3 +7,7 @@ export * from './mapParse';
 export * from './mapWrite';
 export * from './walRgba';
 export * from './project';
+export * from './quaked';
+export * from './entityMerge';
+export { parseMd2, type Md2Wireframe } from './md2';
+export { parsePts } from './pts';

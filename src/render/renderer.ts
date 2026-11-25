@@ -1,6 +1,6 @@
 import { dot } from '@core/geom/index';
 import type { Mat4 } from '@core/geom/index';
-import type { Id, MapDocument, Patch, Vec3 } from '@core/types/index';
+import type { MapNode, Id, MapDocument, Patch, Vec3 } from '@core/types/index';
 import type { FaceClass } from './brushMesh';
 import {
   aabbInFrustum,
@@ -40,6 +40,13 @@ export interface RendererOptions {
   readonly lineWidth?: number;
   /** The gap between the four views in CSS pixels: the splitter size. */
   readonly gap?: number;
+  /** Class colour lookup for point entities (0..1 rgb). */
+  readonly entityColorOf?: (node: MapNode) => readonly [number, number, number] | null;
+  readonly entityWireframeOf?: (
+    node: MapNode,
+  ) =>
+    | readonly (readonly [readonly [number, number, number], readonly [number, number, number]])[]
+    | null;
 }
 
 export interface RendererStats {
@@ -86,6 +93,7 @@ const LINE_UNIFORMS = [
   'uEntityColor',
   'uSelectColor',
   'uInvalidColor',
+  'uLeakColor',
 ] as const;
 const GRID_UNIFORMS = [
   'uViewportOrigin',
@@ -174,7 +182,7 @@ export class Renderer {
     this.grid = { program: grid, uniforms: uniformLocations(gl, grid, GRID_UNIFORMS) };
     this.emptyVao = gl.createVertexArray();
 
-    this.cache = new GeometryCache(gl);
+    this.cache = new GeometryCache(gl, options.entityColorOf, options.entityWireframeOf);
     this.textures = new TextureManager(
       gl,
       options.loadTexture ?? null,
@@ -218,6 +226,23 @@ export class Renderer {
     }
   }
 
+  /** Draws the qbsp3 leak polyline in the leak colour (empty clears it). */
+  setLeakPath(segments: readonly (readonly [Vec3, Vec3])[]): void {
+    this.cache.setLeakPath(segments);
+  }
+
+  /** Rebuilds one node's geometry, e.g. when its model finished loading. */
+  refreshNode(id: string): void {
+    if (!this.doc) return;
+    this.cache.refreshNode(this.doc, id);
+  }
+
+  /** Dims everything outside the entered scope (null clears the scope). */
+  setScope(scopeId: string | null): void {
+    if (!this.doc) return;
+    this.cache.setScope(this.doc, scopeId);
+  }
+
   /** Transient editing lines: ghost previews and drag rectangles. */
   setToolPreview(
     segments: readonly (readonly [Vec3, Vec3])[],
@@ -225,6 +250,11 @@ export class Renderer {
   ): void {
     this.cache.setToolPreview(segments, invalid);
     this.invalidate();
+  }
+
+  /** Persistent target–targetname link lines in the 2D views. */
+  setTargetLinks(segments: readonly (readonly [Vec3, Vec3])[]): void {
+    this.cache.setTargetLinks(segments);
   }
 
   setCamera(view: ViewId, camera: Camera): void {
@@ -423,6 +453,7 @@ export class Renderer {
     gl.uniform4fv(u.uEntityColor, this.colors['vp-entity']);
     gl.uniform4fv(u.uSelectColor, this.colors['vp-select']);
     gl.uniform4fv(u.uInvalidColor, this.colors['vp-invalid']);
+    gl.uniform4fv(u.uLeakColor, this.colors['vp-leak']);
     gl.bindVertexArray(this.cache.lines.vao);
     for (const pass of [0, 1]) {
       gl.uniform1i(u.uPass, pass);

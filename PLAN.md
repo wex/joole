@@ -630,7 +630,7 @@ Goal: Qoole-level geometry operations, and textures that look exactly the same i
 
 Goal: everything needed to build a complete playable single-player level.
 
-### [ ] P4.1 Entity definition parser (`core/formats`)
+### [x] P4.1 Entity definition parser (`core/formats`)
 
 - **Goal:** parse `/*QUAKED … */` blocks from `.def` and `.c` text.
 - **Scope:**
@@ -640,7 +640,7 @@ Goal: everything needed to build a complete playable single-player level.
 - **Depends on:** P1.1
 - **Done when:** every vanilla block parses.
 
-### [ ] P4.2 Generating vanilla definitions (`scripts`, `game/q2`)
+### [x] P4.2 Generating vanilla definitions (`scripts`, `game/q2`)
 
 - **Goal:** create the committed `q2.def` file and the md2 model table.
 - **Scope:**
@@ -651,7 +651,7 @@ Goal: everything needed to build a complete playable single-player level.
 - **Depends on:** P4.1
 - **Done when:** both files are generated and reviewed, and the script is documented in AGENTS.md.
 
-### [ ] P4.3 Mod entity definitions (`platform`, `app`)
+### [x] P4.3 Mod entity definitions (`platform`, `app`)
 
 - **Goal:** support entities from mods.
 - **Scope:** load a `.def` file or a set of mod `.c` files, parse them with P4.1, and let the mod's classes override vanilla classes with the same name. The choice is stored in the project file.
@@ -659,7 +659,7 @@ Goal: everything needed to build a complete playable single-player level.
 - **Depends on:** P4.1
 - **Done when:** CTF (`ext/Quake-2/ctf`) classes can be loaded as a mod example. The CTF files used in tests are copied into fixtures with provenance.
 
-### [ ] P4.4 Entity tool (E) and entity rendering
+### [x] P4.4 Entity tool (E) and entity rendering
 
 - **Goal:** place and draw entities.
 - **Scope:**
@@ -671,7 +671,7 @@ Goal: everything needed to build a complete playable single-player level.
 - **Depends on:** P4.2, P2.5
 - **Done when:** entities can be placed and converted.
 
-### [ ] P4.5 Entity panel
+### [x] P4.5 Entity panel
 
 - **Goal:** a form generated from the definitions.
 - **Scope:** implements the design system's `EntityProperties`. A class picker (category, then class), spawnflag checkboxes, a `_color` picker, an `angle` compass, `target` and `targetname` drop-downs filled from the names in the map, and a raw key–value table for unknown keys. `target` links are drawn as lines in the 2D views.
@@ -679,7 +679,7 @@ Goal: everything needed to build a complete playable single-player level.
 - **Depends on:** P4.4
 - **Done when:** the spec's panel features exist.
 
-### [ ] P4.6 Tree view, groups, hide and lock
+### [x] P4.6 Tree view, groups, hide and lock
 
 - **Goal:** show and edit the structure of the map.
 - **Scope:**
@@ -691,7 +691,7 @@ Goal: everything needed to build a complete playable single-player level.
 - **Depends on:** P2.1
 - **Done when:** grouping survives saving the project and exporting the `.map`.
 
-### [ ] P4.7 Scope (entering a group)
+### [x] P4.7 Scope (entering a group)
 
 - **Goal:** work inside one group.
 - **Scope:** double-clicking a group enters it. Selection and new brushes are then limited to that group, and the rest of the map is dimmed.
@@ -699,7 +699,7 @@ Goal: everything needed to build a complete playable single-player level.
 - **Depends on:** P4.6
 - **Done when:** the spec's behaviour is reproduced.
 
-### [ ] P4.8 Prefabs ⇄
+### [x] P4.8 Prefabs ⇄
 
 - **Goal:** reuse pieces of a map.
 - **Scope:** save the selection as a full-precision `.map` snippet in OPFS, a prefab browser, and dragging a prefab into a view.
@@ -707,7 +707,7 @@ Goal: everything needed to build a complete playable single-player level.
 - **Depends on:** P2.8, P2.9
 - **Done when:** a prefab can be saved and placed again.
 
-### [ ] P4.9 md2 preview
+### [x] P4.9 md2 preview
 
 - **Goal:** show models for point entities.
 - **Scope:** an md2 parser (`IDP2`, version 8, frame 0) in `core/formats`, models loaded through the virtual filesystem, and a wireframe drawing. Classes without a model fall back to their box.
@@ -715,7 +715,7 @@ Goal: everything needed to build a complete playable single-player level.
 - **Depends on:** P4.2, P1.8
 - **Done when:** vanilla monsters and items show their models.
 
-**[ ] Gate 4:** a single-player sample level made entirely in Joole is committed as a self-made fixture (`tests/fixtures/maps/sp-sample.map`). It has a player start, a door, a button that opens the door, and a monster. It compiles without warnings, and it is played through in q2pro by hand, with the result recorded.
+**[x] Gate 4:** a single-player sample level made entirely in Joole is committed as a self-made fixture (`tests/fixtures/maps/sp-sample.map`). It has a player start, a door, a button that opens the door, and a monster. It compiles without warnings, and it is played through in q2pro by hand, with the result recorded. **Passed 25.11.2026:** the lit full-chain artifact plays through in q2pro with every actor working.
 
 ---
 
@@ -723,7 +723,7 @@ Goal: everything needed to build a complete playable single-player level.
 
 Goal: the full compile cycle in the browser, plus the performance targets, browser support, offline use and release.
 
-### [ ] P5.1 Compilers in the browser
+### [x] P5.1 Compilers in the browser
 
 - **Goal:** run qbsp3, qvis3 and qrad3 in Web Workers.
 - **Scope:**
@@ -737,7 +737,7 @@ Goal: the full compile cycle in the browser, plus the performance targets, brows
 - **Depends on:** P2.11
 - **Done when:** all three tools run in Chromium with threads.
 
-### [ ] P5.2 Compile pipeline and profiles
+### [x] P5.2 Compile pipeline and profiles
 
 - **Goal:** compile with one command.
 - **Scope:**
@@ -750,7 +750,7 @@ Goal: the full compile cycle in the browser, plus the performance targets, brows
 - **Depends on:** P5.1, P1.8
 - **Done when:** the Gate 4 sample map compiles with every profile in the browser.
 
-### [ ] P5.3 Leak display
+### [x] P5.3 Leak display
 
 - **Goal:** make leaks easy to find and fix.
 - **Scope:** a `.pts` parser, the leak path drawn in all views in `vp-leak`, and a _Next leak point_ command (N) that moves the camera along the path.

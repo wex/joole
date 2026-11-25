@@ -23,6 +23,8 @@ import { unionAabb, type Aabb } from './camera';
 export const STATE_SELECTED = 1;
 export const STATE_ENTITY = 2;
 export const STATE_INVALID = 4;
+export const STATE_DIMMED = 8;
+export const STATE_LEAK = 16;
 
 /** The state texture is this many texels wide, one byte per node index. */
 const STATE_WIDTH = 1024;
@@ -157,19 +159,37 @@ export class GeometryCache {
   readonly lines: GpuStore;
   private readonly cornerBuffer: WebGLBuffer;
   private readonly stateTexture: WebGLTexture;
-  private state = new Uint8Array(STATE_WIDTH);
+  /** RGBA per node index: R flags, GBA the class colour for entities. */
+  private state = new Uint8Array(STATE_WIDTH * 4);
   private stateDirty = true;
   private stateRowsOnGpu = 0;
   private readonly freeIndices: number[] = [];
   private nextIndex = 1;
   private selected = new Set<Id>();
   private toolSegments: readonly LineSegment[] = [];
+  private linkSegments: readonly LineSegment[] = [];
   private invalidSegments: readonly LineSegment[] = [];
   private readonly invalidIndex: number;
+  private readonly leakIndex: number;
+  private leakSegments: readonly LineSegment[] = [];
 
-  constructor(private readonly gl: WebGL2RenderingContext) {
+  constructor(
+    private readonly gl: WebGL2RenderingContext,
+    /** Class colour lookup for point entities, injected from the app layer. */
+    private readonly entityColorOf: (
+      node: MapNode,
+    ) => readonly [number, number, number] | null = () => null,
+    /** Wireframe edges in model space for point entities with an md2, injected from the app layer. */
+    private readonly entityWireframeOf: (
+      node: MapNode,
+    ) =>
+      | readonly (readonly [readonly [number, number, number], readonly [number, number, number]])[]
+      | null = () => null,
+  ) {
     this.invalidIndex = this.takeIndex();
-    this.state[this.invalidIndex] = STATE_SELECTED | STATE_INVALID;
+    this.state[this.invalidIndex * 4] = STATE_SELECTED | STATE_INVALID;
+    this.leakIndex = this.takeIndex();
+    this.state[this.leakIndex * 4] = STATE_SELECTED | STATE_LEAK;
     this.cornerBuffer = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, this.cornerBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([0, -1, 0, 1, 1, -1, 1, 1]), gl.STATIC_DRAW);
@@ -189,7 +209,29 @@ export class GeometryCache {
 
   /** Rebuilds only the nodes that a patch created, changed or removed. */
   applyPatch(doc: Readonly<MapDocument>, patch: Patch): void {
+    // Hidden group flags propagate down the tree, so descendants must be
+    // re-evaluated when the inheritance can change: a group in the patch (its
+    // flag may have toggled) or a reparented node (its ancestors changed).
+    // Entity containers like worldspawn never carry the flags, so the hot
+    // path of adding and editing brushes stays patch-sized.
+    const affected = new Set<Id>();
+    const walk = (id: Id) => {
+      if (affected.has(id)) return;
+      affected.add(id);
+      const node = doc.nodes.get(id);
+      if (node && (node.kind === 'entity' || node.kind === 'group')) {
+        for (const child of node.children) walk(child);
+      }
+    };
     for (const id of patch.after.keys()) {
+      const node = doc.nodes.get(id);
+      if (node?.kind === 'group') walk(id);
+    }
+    for (const id of patch.parentAfter.keys()) walk(id);
+    for (const id of patch.after.keys()) {
+      affected.add(id);
+    }
+    for (const id of affected) {
       this.removeNode(id);
       const node = doc.nodes.get(id);
       if (node) {
@@ -203,6 +245,36 @@ export class GeometryCache {
    * Marks the selection: the given nodes and, for entities and groups, every
    * brush and point entity below them.
    */
+  private scopeId: Id | null = null;
+  private scopeMembers = new Set<Id>();
+
+  /** Sets the entered scope: nodes outside it are dimmed. null shows everything. */
+  setScope(doc: Readonly<MapDocument>, scopeId: Id | null): void {
+    this.scopeId = scopeId;
+    this.scopeMembers.clear();
+    if (scopeId) {
+      const walk = (at: Id) => {
+        this.scopeMembers.add(at);
+        const node = doc.nodes.get(at);
+        if (node && (node.kind === 'entity' || node.kind === 'group')) {
+          for (const child of node.children) walk(child);
+        }
+      };
+      walk(scopeId);
+    }
+    this.refreshStates();
+    this.rebuildOverlay();
+  }
+
+  /** Rewrites every node's state bits from the selection and the scope. */
+  private refreshStates(): void {
+    for (const [id, record] of this.records) {
+      const dimmed = this.scopeId !== null && !this.scopeMembers.has(id);
+      this.setState(record.index, record.kind, this.selected.has(id), dimmed);
+    }
+    this.stateDirty = true;
+  }
+
   setSelection(doc: Readonly<MapDocument>, ids: Iterable<Id>): void {
     const selected = new Set<Id>();
     const walk = (id: Id) => {
@@ -221,7 +293,8 @@ export class GeometryCache {
     for (const id of new Set([...this.selected, ...selected])) {
       const record = this.records.get(id);
       if (record) {
-        this.setState(record.index, record.kind, selected.has(id));
+        const dimmed = this.scopeId !== null && !this.scopeMembers.has(id);
+        this.setState(record.index, record.kind, selected.has(id), dimmed);
       }
     }
     this.selected = selected;
@@ -235,8 +308,20 @@ export class GeometryCache {
     this.rebuildOverlay();
   }
 
+  /** Persistent target–targetname link lines, recomputed by the app on document changes. */
+  setTargetLinks(segments: readonly LineSegment[]): void {
+    this.linkSegments = segments;
+    this.rebuildOverlay();
+  }
+
+  /** The leak polyline from a qbsp3 pointfile, drawn in the leak colour. */
+  setLeakPath(segments: readonly LineSegment[]): void {
+    this.leakSegments = segments;
+    this.rebuildOverlay();
+  }
+
   private rebuildOverlay(): void {
-    const segments: LineSegment[] = [...this.toolSegments];
+    const segments: LineSegment[] = [...this.toolSegments, ...this.linkSegments];
     // Handles are small world-space crosses at every selected brush's corners.
     for (const id of this.selected) {
       const box = this.records.get(id)?.aabb;
@@ -276,6 +361,15 @@ export class GeometryCache {
         this.invalidSegments.length,
       );
     }
+    if (this.leakSegments.length === 0) {
+      this.lines.remove('__overlayLeak');
+    } else {
+      this.lines.write(
+        '__overlayLeak',
+        writeLines(this.leakSegments, this.leakIndex),
+        this.leakSegments.length,
+      );
+    }
     this.state[0] = STATE_SELECTED;
     this.stateDirty = true;
   }
@@ -293,17 +387,17 @@ export class GeometryCache {
     if (!this.stateDirty) {
       return;
     }
-    const rows = this.state.length / STATE_WIDTH;
+    const rows = this.state.length / 4 / STATE_WIDTH;
     gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
     if (rows !== this.stateRowsOnGpu) {
       gl.texImage2D(
         gl.TEXTURE_2D,
         0,
-        gl.R8UI,
+        gl.RGBA8UI,
         STATE_WIDTH,
         rows,
         0,
-        gl.RED_INTEGER,
+        gl.RGBA_INTEGER,
         gl.UNSIGNED_BYTE,
         this.state,
       );
@@ -318,7 +412,7 @@ export class GeometryCache {
         0,
         STATE_WIDTH,
         rows,
-        gl.RED_INTEGER,
+        gl.RGBA_INTEGER,
         gl.UNSIGNED_BYTE,
         this.state,
       );
@@ -337,7 +431,61 @@ export class GeometryCache {
     this.gl.deleteTexture(this.stateTexture);
   }
 
+  /**
+   * The facing arrow of a point entity: a stem in the yaw direction of the
+   * angle key with two barbs, drawn only when the entity has an angle.
+   * Quake 2 yaw: 0 is +x (east), 90 is +y (north).
+   */
+  private entityAngleArrow(
+    props: readonly (readonly [string, string])[],
+    origin: readonly [number, number, number],
+    box: {
+      readonly min: readonly [number, number, number];
+      readonly max: readonly [number, number, number];
+    },
+  ): LineSegment[] | null {
+    const raw = props.find(([k]) => k === 'angle')?.[1];
+    if (raw === undefined) return null;
+    const degrees = Number(raw);
+    if (!Number.isFinite(degrees)) return null;
+    const yaw = (degrees * Math.PI) / 180;
+    const dx = Math.cos(yaw);
+    const dy = Math.sin(yaw);
+    const size = Math.max(box.max[0] - box.min[0], box.max[1] - box.min[1]) / 2;
+    const len = size + 16;
+    const tip: [number, number, number] = [origin[0] + dx * len, origin[1] + dy * len, origin[2]];
+    const barbLen = len * 0.3;
+    const barbAngle = (30 * Math.PI) / 180;
+    const barb = (sign: number): LineSegment => {
+      const a = yaw + sign * (Math.PI - barbAngle);
+      const end: [number, number, number] = [
+        tip[0] + Math.cos(a) * barbLen,
+        tip[1] + Math.sin(a) * barbLen,
+        tip[2],
+      ];
+      return [[tip[0], tip[1], tip[2]], end];
+    };
+    const start: [number, number, number] = [origin[0], origin[1], origin[2]];
+    const stem: LineSegment = [start, [tip[0], tip[1], tip[2]]];
+    return [stem, barb(1), barb(-1)];
+  }
+
+  /** A node inside a hidden group chain is not drawn (Qoole's group hide). */
+  private isHidden(doc: Readonly<MapDocument>, id: Id): boolean {
+    let at: Id | undefined = doc.parent.get(id);
+    while (at !== undefined) {
+      const node = doc.nodes.get(at);
+      if (node?.kind === 'group' && node.hidden) return true;
+      at = doc.parent.get(at);
+    }
+    return false;
+  }
+
   private addNode(doc: Readonly<MapDocument>, node: MapNode): void {
+    if (this.isHidden(doc, node.id)) {
+      this.removeNode(node.id);
+      return;
+    }
     if (node.kind === 'brush') {
       const index = this.takeIndex();
       const mesh = buildBrushMesh(node, index);
@@ -368,10 +516,35 @@ export class GeometryCache {
     }
     const index = this.takeIndex();
     const box = entityBox(origin);
-    const edges = boxEdges(box);
-    this.lines.write(node.id, writeLines(edges, index), edges.length);
+    const wireframe = this.entityWireframeOf(node);
+    let edges: LineSegment[];
+    if (wireframe && wireframe.length > 0) {
+      // The model replaces the box, translated to the entity origin. md2 models
+      // are Z-up like the map, and frame 0 stands at the origin.
+      edges = wireframe.map(
+        ([a, b]) =>
+          [
+            [a[0] + origin[0], a[1] + origin[1], a[2] + origin[2]],
+            [b[0] + origin[0], b[1] + origin[1], b[2] + origin[2]],
+          ] as LineSegment,
+      );
+    } else {
+      edges = boxEdges(box);
+    }
+    const arrow = this.entityAngleArrow(node.props, origin, box);
+    const segments = arrow ? [...edges, ...arrow] : edges;
+    this.lines.write(node.id, writeLines(segments, index), segments.length);
     this.records.set(node.id, { kind: 'entity', index, aabb: box, batchKeys: [] });
     this.setState(index, 'entity', this.selected.has(node.id));
+    this.setEntityColor(index, this.entityColorOf(node));
+  }
+
+  /** Rebuilds one node's geometry, e.g. when its model finished loading. */
+  refreshNode(doc: Readonly<MapDocument>, id: Id): void {
+    const node = doc.nodes.get(id);
+    this.removeNode(id);
+    if (node) this.addNode(doc, node);
+    this.rebuildOverlay();
   }
 
   private removeNode(id: Id): void {
@@ -384,7 +557,9 @@ export class GeometryCache {
     }
     this.lines.remove(id);
     this.records.delete(id);
-    this.state[record.index] = 0;
+    // The R byte of the index's texel: GBA keep the stale class colour, which
+    // is harmless because the state texture is only read through live indices.
+    this.state[record.index * 4] = 0;
     this.stateDirty = true;
     this.freeIndices.push(record.index);
   }
@@ -405,12 +580,36 @@ export class GeometryCache {
       const grown = new Uint8Array(this.state.length * 2);
       grown.set(this.state);
       this.state = grown;
+      // (stride is RGBA per node index)
     }
     return index;
   }
 
-  private setState(index: number, kind: NodeRecord['kind'], selected: boolean): void {
-    this.state[index] = (kind === 'entity' ? STATE_ENTITY : 0) | (selected ? STATE_SELECTED : 0);
+  private setState(
+    index: number,
+    kind: NodeRecord['kind'],
+    selected: boolean,
+    dimmed = false,
+  ): void {
+    this.state[index * 4] =
+      (kind === 'entity' ? STATE_ENTITY : 0) |
+      (selected ? STATE_SELECTED : 0) |
+      (dimmed ? STATE_DIMMED : 0);
+    this.stateDirty = true;
+  }
+
+  /** Writes the definition colour of an entity into the state's GBA bytes. */
+  private setEntityColor(index: number, rgb: readonly [number, number, number] | null): void {
+    const at = index * 4;
+    if (rgb) {
+      this.state[at + 1] = Math.round(Math.max(0, Math.min(1, rgb[0])) * 255);
+      this.state[at + 2] = Math.round(Math.max(0, Math.min(1, rgb[1])) * 255);
+      this.state[at + 3] = Math.round(Math.max(0, Math.min(1, rgb[2])) * 255);
+    } else {
+      this.state[at + 1] = 0;
+      this.state[at + 2] = 0;
+      this.state[at + 3] = 0;
+    }
     this.stateDirty = true;
   }
 

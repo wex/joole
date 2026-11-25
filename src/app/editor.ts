@@ -1,5 +1,7 @@
-import { addNodePatch, createEmptyDocument, createId } from '@core/doc/index';
+import { reparentNodePatch, addNodePatch, createEmptyDocument, createId } from '@core/doc/index';
 import {
+  mergeEntityDefs,
+  parseQuakedBlocks,
   parseMap,
   readPcxPalette,
   readProject,
@@ -7,6 +9,24 @@ import {
   writeMap,
   writeProject,
 } from '@core/formats/index';
+import q2defText from '../game/q2/q2.def?raw';
+import { convertBrushesToEntityPatch } from './entities';
+import {
+  entityPanelState,
+  renameEntityPropPatch,
+  setEntityClassPatch,
+  setEntityPropPatch,
+  targetLinks,
+  toggleSpawnflagPatch,
+} from './entityPanel';
+import {
+  effectiveGroupState,
+  groupNodesPatch,
+  setGroupFlagPatch,
+  ungroupNodesPatch,
+} from './groups';
+import { runCompilePipeline, type CompileProfile, type CompileRunner } from './compile';
+import type { EntityClassDef } from '@core/formats/index';
 import type {
   Command,
   ConvertedTexture,
@@ -24,6 +44,9 @@ import {
 import type { GameFileEntry } from '@platform/index';
 import { CommandBus } from './commandBus';
 import { SelectionManager } from './selection';
+import type { PrefabStore } from '@platform/index';
+import { parseMd2, parsePts, type Md2Wireframe } from '@core/formats/index';
+import { CLASS_MODELS } from '@game/q2/models';
 import { mapTextToPastePatch, removeSelectionPatch, selectionToMapText } from './clipboard';
 import { hollowSelectionPatch, intersectSelectionPatch, subtractSelectionPatch } from './csg';
 import {
@@ -52,6 +75,7 @@ import {
   VertexTool,
   type ToolOutput,
   type ToolPointerEvent,
+  EntityTool,
 } from './tools';
 import type { PrimitiveKind } from '@core/geom/index';
 import { entriesFromFileList, entriesFromSinglePak, openGameVfs } from '@platform/index';
@@ -113,7 +137,7 @@ export type EditorEvent =
   | { readonly type: 'recovery' };
 
 export type EditorListener = (event: EditorEvent) => void;
-export type EditorToolMode = 'select' | 'brush' | 'clip' | 'vertex' | 'face' | 'texture';
+export type EditorToolMode = 'select' | 'brush' | 'clip' | 'vertex' | 'face' | 'texture' | 'entity';
 
 const MAX_LOG_ENTRIES = 500;
 
@@ -159,6 +183,7 @@ export class EditorApp {
   private readonly clipTool: ClipTool;
   private readonly vertexTool: VertexTool;
   private readonly textureTool: TextureTool;
+  private readonly entityTool: EntityTool;
   private toolMode: EditorToolMode = 'select';
   private map: string | null = null;
   private vfs: Awaited<ReturnType<typeof openGameVfs>> | null = null;
@@ -196,6 +221,8 @@ export class EditorApp {
     this.brushTool = new BrushTool(
       () => this.document,
       () => this.gridSize,
+      undefined,
+      () => this.insertionParent,
     );
     this.clipTool = new ClipTool(
       () => this.document,
@@ -208,6 +235,12 @@ export class EditorApp {
     );
     this.textureTool = new TextureTool(
       () => this.document,
+      () => this.gridSize,
+    );
+    this.entityTool = new EntityTool(
+      () => this.document,
+      () => this.currentEntityClassValue,
+      () => this.document.worldspawn,
       () => this.gridSize,
     );
     this.bus.subscribe((event) => {
@@ -309,6 +342,224 @@ export class EditorApp {
   }
 
   /** Texture lock toggle: textures stick to surfaces on move and rotate when on. */
+  /** The merged entity definitions: vanilla plus any mod overrides. */
+  entityDefs(): readonly EntityClassDef[] {
+    return this.entityDefsValue;
+  }
+
+  /** Replaces the mod definition layer; an empty list returns to vanilla. */
+  setModEntityDefs(texts: readonly string[]): void {
+    const vanilla = parseQuakedBlocks(q2defText);
+    const mod = texts.flatMap((text) => parseQuakedBlocks(text));
+    this.entityDefsValue = mod.length > 0 ? mergeEntityDefs(vanilla, mod) : vanilla;
+    this.modEntityDefTexts = [...texts];
+  }
+
+  /** The class the entity tool places, 'light' until one is chosen. */
+  get currentEntityClass(): string {
+    return this.currentEntityClassValue;
+  }
+
+  setCurrentEntityClass(classname: string): void {
+    this.currentEntityClassValue = classname;
+  }
+
+  private currentEntityClassValue = 'light';
+
+  /**
+   * Turns the selected brushes into a brush entity of the given class
+   * (func_*, trigger_*). Returns false with a log line when the selection
+   * cannot form one.
+   */
+  convertSelectionToEntity(classname: string): boolean {
+    const brushIds = [...this.selection].filter(
+      (id) => this.document.nodes.get(id)?.kind === 'brush',
+    );
+    try {
+      const { patch, id } = convertBrushesToEntityPatch(
+        this.document,
+        classname,
+        brushIds,
+        createId,
+      );
+      this.executeCommand({ label: `Convert to ${classname}`, run: () => patch });
+      this.setSelection([id]);
+      this.log('ok', `Converted ${plural(brushIds.length, 'brush')} to ${classname}.`);
+      return true;
+    } catch (error) {
+      this.log('warning', `Convert to entity failed: ${errorText(error)}`);
+      return false;
+    }
+  }
+
+  /** The group the editor is scoped into, or null for the whole map. */
+  get scope(): string | null {
+    return this.scopeId;
+  }
+
+  private scopeId: string | null = null;
+
+  /** A node is inside the scope when it is the scope or one of its descendants. */
+  inScope(id: string): boolean {
+    if (!this.scopeId) return true;
+    let at: string | undefined = id;
+    while (at !== undefined) {
+      if (at === this.scopeId) return true;
+      at = this.document.parent.get(at);
+    }
+    return false;
+  }
+
+  /**
+   * Enters a group: selection and new brushes are limited to it and the rest
+   * of the map is dimmed (Qoole's scope, OpScopeChange).
+   */
+  enterScope(id: string): boolean {
+    const node = this.document.nodes.get(id);
+    if (!node || node.kind !== 'group') {
+      this.log('warning', 'Only a group can be entered.');
+      return false;
+    }
+    this.scopeId = id;
+    this.selectionManager.setSelection([...this.selection].filter((sel) => this.inScope(sel)));
+    this.emit({ type: 'document' });
+    this.log('info', `Entered group ${node.name}; the rest of the map is dimmed.`);
+    return true;
+  }
+
+  /** Leaves the scope back to the whole map. */
+  exitScope(): void {
+    if (!this.scopeId) return;
+    this.scopeId = null;
+    this.emit({ type: 'document' });
+    this.log('info', 'Left the group scope.');
+  }
+
+  /** The parent new top-level content goes to: the scope group or worldspawn. */
+  get insertionParent(): string {
+    return this.scopeId ?? this.document.worldspawn;
+  }
+
+  /** Groups the selected nodes under a new group (one undo step). */
+  groupSelection(): boolean {
+    const ids = [...this.selection].filter((id) => id !== this.document.worldspawn);
+    try {
+      const { patch, id } = groupNodesPatch(this.document, ids, createId);
+      this.executeCommand({ label: 'Group', run: () => patch });
+      this.setSelection([id]);
+      this.log('ok', `Grouped ${plural(ids.length, 'node')}.`);
+      return true;
+    } catch (error) {
+      this.log('warning', `Group failed: ${errorText(error)}`);
+      return false;
+    }
+  }
+
+  /** Dissolves the selected group, moving its children to its parent. */
+  ungroupSelection(): boolean {
+    const groupId = [...this.selection].find((id) => this.document.nodes.get(id)?.kind === 'group');
+    if (!groupId) {
+      this.log('warning', 'Ungroup needs a selected group.');
+      return false;
+    }
+    try {
+      const patch = ungroupNodesPatch(this.document, groupId);
+      const children = (this.document.nodes.get(groupId) as { children: string[] }).children;
+      this.executeCommand({ label: 'Ungroup', run: () => patch });
+      this.setSelection(children);
+      this.log('ok', 'Ungrouped.');
+      return true;
+    } catch (error) {
+      this.log('warning', `Ungroup failed: ${errorText(error)}`);
+      return false;
+    }
+  }
+
+  /** Sets or clears the hidden or locked flag of a group. */
+  setGroupFlag(groupId: string, flag: 'hidden' | 'locked', value: boolean): boolean {
+    try {
+      const patch = setGroupFlagPatch(this.document, groupId, flag, value);
+      this.executeCommand({ label: value ? `${flag} group` : `un${flag} group`, run: () => patch });
+      return true;
+    } catch (error) {
+      this.log('warning', errorText(error));
+      return false;
+    }
+  }
+
+  /** Reparents a node in the tree, as one undoable command. */
+  reparentNode(id: string, newParentId: string): boolean {
+    try {
+      const patch = reparentNodePatch(this.document, id, newParentId);
+      this.executeCommand({ label: 'Reparent', run: () => patch });
+      return true;
+    } catch (error) {
+      this.log('warning', `Reparent failed: ${errorText(error)}`);
+      return false;
+    }
+  }
+
+  /** Hidden/locked inherited state of a node. */
+  nodeGroupState(id: string): { hidden: boolean; locked: boolean } {
+    return effectiveGroupState(this.document, id);
+  }
+
+  /** The entity panel state of the current selection. */
+  entityPanel() {
+    return entityPanelState(this.document, this.selection, this.entityDefsValue);
+  }
+
+  /** Undoable entity key edit; empty value removes the key. */
+  setEntityProp(id: string, key: string, value: string): boolean {
+    return this.runEntityPatch(`Edit ${key}`, () =>
+      setEntityPropPatch(this.document, id, key, value),
+    );
+  }
+
+  renameEntityProp(id: string, oldKey: string, newKey: string): boolean {
+    return this.runEntityPatch(`Rename ${oldKey}`, () =>
+      renameEntityPropPatch(this.document, id, oldKey, newKey),
+    );
+  }
+
+  toggleSpawnflag(id: string, bit: number): boolean {
+    return this.runEntityPatch('Toggle spawnflag', () =>
+      toggleSpawnflagPatch(this.document, id, bit),
+    );
+  }
+
+  /** Changes the class of a point entity. For brush classes on a brush selection use convertSelectionToEntity. */
+  setEntityClass(id: string, classname: string): boolean {
+    return this.runEntityPatch(`Class ${classname}`, () =>
+      setEntityClassPatch(this.document, id, classname),
+    );
+  }
+
+  /** Target–targetname link pairs for the 2D link lines. */
+  targetLinks() {
+    return targetLinks(this.document);
+  }
+
+  private runEntityPatch(label: string, build: () => Patch): boolean {
+    try {
+      const patch = build();
+      this.executeCommand({ label, run: () => patch });
+      return true;
+    } catch (error) {
+      this.log('warning', errorText(error));
+      return false;
+    }
+  }
+
+  /** Whether the class is a brush entity (func_*, trigger_* and the ? form). */
+  isBrushClass(classname: string): boolean {
+    const def = this.entityDefsValue.find((d) => d.className === classname);
+    return def ? def.bbox === 'brush' : /^(func|trigger|path|multi)_/.test(classname);
+  }
+
+  private entityDefsValue: readonly EntityClassDef[] = parseQuakedBlocks(q2defText);
+  private modEntityDefTexts: string[] = [];
+
   setTextureLock(enabled: boolean): void {
     if (enabled !== this.textureLock) {
       this.textureLock = enabled;
@@ -420,7 +671,11 @@ export class EditorApp {
   }
 
   setSelection(ids: Iterable<string>): void {
-    this.selectionManager.setSelection(ids);
+    // Locked groups lock their whole subtree out of the selection.
+    const filtered = [...ids].filter(
+      (id) => !effectiveGroupState(this.document, id).locked && this.inScope(id),
+    );
+    this.selectionManager.setSelection(filtered);
   }
 
   /** Minimal entity placement for Gate 2; the full class-aware entity tool is P4.4. */
@@ -443,7 +698,7 @@ export class EditorApp {
     try {
       this.executeCommand({
         label: `Add ${classname}`,
-        run: (doc) => addNodePatch(doc, doc.worldspawn, entity),
+        run: (doc) => addNodePatch(doc, this.insertionParent, entity),
       });
       this.setSelection([entity.id]);
       this.log('ok', `Added ${classname} at ${entity.props[1]![1]}.`);
@@ -602,6 +857,63 @@ export class EditorApp {
     return this.pasteMapText(await this.clipboard.readText());
   }
 
+  /** Saves the current selection as a named prefab snippet in OPFS. */
+  async savePrefab(name: string): Promise<boolean> {
+    const text = this.copySelectionText();
+    if (!text) {
+      this.log('warning', 'Nothing selected for the prefab.');
+      return false;
+    }
+    if (!this.prefabStore) {
+      this.log('warning', 'Prefab storage is unavailable.');
+      return false;
+    }
+    await this.prefabStore.save(name, text);
+    this.emit({ type: 'game' });
+    this.log('ok', `Prefab ${name} saved.`);
+    return true;
+  }
+
+  /** Lists the stored prefabs, newest first. */
+  async listPrefabs(): Promise<readonly { name: string; savedAt: number }[]> {
+    if (!this.prefabStore) return [];
+    const entries = await this.prefabStore.list();
+    return entries.map(({ name, savedAt }) => ({ name, savedAt }));
+  }
+
+  /** Inserts a prefab at the given world offset, as one undoable command. */
+  async insertPrefab(name: string, offset: [number, number, number] = [0, 0, 0]): Promise<boolean> {
+    if (!this.prefabStore) return false;
+    const text = await this.prefabStore.load(name);
+    if (!text) {
+      this.log('warning', `Prefab ${name} is missing.`);
+      return false;
+    }
+    try {
+      const pasted = mapTextToPastePatch(this.document, text, offset, this.insertionParent);
+      if (!pasted.patch) return false;
+      this.executeCommand({ label: `Insert prefab ${name}`, run: () => pasted.patch! });
+      this.setSelection(pasted.ids);
+      this.log('ok', `Prefab ${name} placed.`);
+      return true;
+    } catch (error) {
+      this.log('warning', `Prefab insert failed: ${errorText(error)}`);
+      return false;
+    }
+  }
+
+  async deletePrefab(name: string): Promise<void> {
+    await this.prefabStore?.remove(name);
+    this.emit({ type: 'game' });
+  }
+
+  private prefabStore: PrefabStore | null = null;
+
+  /** Attaches the OPFS prefab store after start-up. */
+  setPrefabStore(store: PrefabStore): void {
+    this.prefabStore = store;
+  }
+
   duplicateSelection(): boolean {
     const text = this.copySelectionText();
     return text ? this.pasteMapText(text, [this.gridSize, this.gridSize, 0]) : false;
@@ -626,6 +938,7 @@ export class EditorApp {
     this.clipTool.cancel();
     this.vertexTool.cancel();
     this.textureTool.cancel();
+    this.entityTool.cancel();
     this.toolMode = mode;
     this.emit({ type: 'tool' });
   }
@@ -651,7 +964,9 @@ export class EditorApp {
             ? this.vertexTool
             : this.toolMode === 'texture'
               ? this.textureTool
-              : this.selectTool;
+              : this.toolMode === 'entity'
+                ? this.entityTool
+                : this.selectTool;
     const output = tool.pointer(event);
     for (const command of output.commands) {
       try {
@@ -731,7 +1046,114 @@ export class EditorApp {
   }
 
   projectText(): string {
-    return writeProject(this.document, { gridSize: this.gridSize });
+    return writeProject(this.document, {
+      gridSize: this.gridSize,
+      ...(this.modEntityDefTexts.length > 0 ? { modEntityDefs: this.modEntityDefTexts } : {}),
+    });
+  }
+
+  /** Injected by main.ts: runs one compile step in a worker. */
+  compileRunner: CompileRunner | null = null;
+
+  /** Injected by main.ts: saves binary output (the compiled .bsp). */
+  saveBinaryFile: ((name: string, data: Uint8Array) => Promise<boolean>) | null = null;
+
+  /** Injected by main.ts: cancels the running compile. */
+  cancelCompileWorker: (() => void) | null = null;
+
+  private compiling = false;
+
+  /** The parsed leak path of the last compile, or null when there is none. */
+  leakPath: readonly [number, number, number][] | null = null;
+  private leakIndex = 0;
+
+  /** The next leak point for the camera stepping command (N), advancing each time. */
+  nextLeakPoint(): [number, number, number] | null {
+    if (!this.leakPath || this.leakPath.length === 0) return null;
+    const point = this.leakPath[this.leakIndex % this.leakPath.length]!;
+    this.leakIndex++;
+    return [point[0], point[1], point[2]];
+  }
+
+  /** True while a compile runs; the UI shows the cancel action. */
+  get isCompiling(): boolean {
+    return this.compiling;
+  }
+
+  /** Cancels the running compile, if any. */
+  cancelCompile(): void {
+    this.cancelCompileWorker?.();
+  }
+
+  /**
+   * Compiles the current map with the chosen profile: exports in export
+   * mode (warnings first), feeds the used textures' .wal headers and the
+   * colormap from the game data into the tools, streams the output into
+   * the log and saves the .bsp. A leak stops the chain and keeps the
+   * pointfile for the leak display.
+   */
+  async compileMap(profile: CompileProfile): Promise<boolean> {
+    if (!this.compileRunner || !this.vfs) {
+      this.log('warning', 'Open a game folder before compiling.');
+      return false;
+    }
+    if (this.compiling) {
+      this.log('warning', 'A compile is already running.');
+      return false;
+    }
+    const exported = this.exportMapText();
+    for (const warning of exported.warnings) {
+      this.log('warning', warning);
+    }
+    const mapName = (this.map?.replace(/\.(map|joole\.json)$/i, '') || 'untitled') + '.map';
+    // The .wal headers of every texture the map uses.
+    const wals: { name: string; data: Uint8Array }[] = [];
+    const missing: string[] = [];
+    for (const name of this.texturesInUse()) {
+      const bytes = await this.vfs.readFile(`textures/${name}.wal`);
+      if (bytes) {
+        wals.push({ name, data: bytes });
+      } else {
+        missing.push(name);
+      }
+    }
+    if (missing.length > 0) {
+      this.log('warning', `Textures missing from the game data: ${missing.join(', ')}`);
+    }
+    const colormap = await this.vfs.readFile('pics/colormap.pcx');
+    this.compiling = true;
+    this.log('info', `Compiling ${mapName} (${profile})…`);
+    this.emit({ type: 'document' });
+    try {
+      const result = await runCompilePipeline(
+        this.compileRunner,
+        profile,
+        mapName,
+        exported.text,
+        wals,
+        colormap ?? null,
+      );
+      if (result.leaked) {
+        this.leakPath = result.pts ? parsePts(new TextDecoder().decode(result.pts)) : null;
+        this.log(
+          'error',
+          `The map leaks; the path is drawn in the views. N steps the camera along it.`,
+        );
+        return false;
+      }
+      this.leakPath = null;
+      this.leakIndex = 0;
+      const bspName = mapName.replace(/\.map$/i, '.bsp');
+      const saved = this.saveBinaryFile ? await this.saveBinaryFile(bspName, result.bsp) : false;
+      this.log('ok', `Compiled ${bspName} (${result.bsp.byteLength} bytes).`);
+      return saved;
+    } catch (error) {
+      this.log('error', `Compile failed: ${errorText(error)}`);
+      return false;
+    } finally {
+      this.compiling = false;
+      this.emit({ type: 'document' });
+    }
   }
 
   exportMapText(): { text: string; warnings: string[] } {
@@ -957,6 +1379,10 @@ export class EditorApp {
   async openProjectText(name: string, text: string): Promise<boolean> {
     try {
       const doc = readProject(text);
+      const editorField = (JSON.parse(text) as { editor?: { modEntityDefs?: unknown } }).editor;
+      if (Array.isArray(editorField?.modEntityDefs)) {
+        this.setModEntityDefs(editorField.modEntityDefs.filter((t) => typeof t === 'string'));
+      }
       this.bus.reset(doc);
       this.selectionManager.clear();
       this.selectTool.syncDocument(doc);
@@ -997,6 +1423,56 @@ export class EditorApp {
   }
 
   /** The renderer's lazy texture loader, over the open VFS, worker and cache. */
+  /** The parsed frame-0 wireframe of a model path, once loaded. */
+  readonly modelWireframes = new Map<string, Md2Wireframe | null>();
+
+  /**
+   * Loads an md2 model through the virtual filesystem and parses its frame-0
+   * wireframe. null entries mark failed lookups so they are not retried.
+   */
+  async loadModel(path: string): Promise<Md2Wireframe | null> {
+    if (this.modelWireframes.has(path)) return this.modelWireframes.get(path) ?? null;
+    if (!this.vfs) return null;
+    const hit = this.vfs.find(path);
+    if (!hit) {
+      this.modelWireframes.set(path, null);
+      return null;
+    }
+    try {
+      const bytes = await hit.read();
+      const wire = parseMd2(
+        bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer,
+      );
+      this.modelWireframes.set(path, wire);
+      return wire;
+    } catch {
+      this.modelWireframes.set(path, null);
+      return null;
+    }
+  }
+
+  /** The wireframe edges of a point entity's model, when one is loaded. */
+  entityWireframe(node: {
+    readonly kind: string;
+    readonly props?: [string, string][];
+  }):
+    | readonly (readonly [readonly [number, number, number], readonly [number, number, number]])[]
+    | null {
+    const classname = node.props?.find(([k]) => k === 'classname')?.[1];
+    if (!classname) return null;
+    const model = CLASS_MODELS[classname];
+    if (!model) return null;
+    const wire = this.modelWireframes.get(model);
+    if (!wire) {
+      // Trigger the asynchronous load; the caller re-asks when it arrives.
+      void this.loadModel(model).then((loaded) => {
+        if (loaded) this.emit({ type: 'document' });
+      });
+      return null;
+    }
+    return wire.edges;
+  }
+
   async loadTexture(name: string): Promise<ConvertedTexture | null> {
     if (!this.vfs || !this.palette) {
       return null;

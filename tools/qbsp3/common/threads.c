@@ -398,6 +398,121 @@ void RunThreadsOn (int workcnt, qboolean showpacifier, void(*func)(int))
 /*
 =======================================================================
 
+  EMSCRIPTEN PTHREADS
+
+  Joole addition, 25.11.2026: the WIN32 and OSF1 sections predate POSIX
+  threads (the OSF1 one uses the draft-4 DCE API), so the Emscripten port
+  is written against modern pthreads. Emscripten implements them over web
+  workers with a shared memory, which is why the tools build with
+  -pthread into the threaded variant.
+
+=======================================================================
+*/
+
+#ifdef __EMSCRIPTEN_THREADS
+#define	USED
+
+#include <pthread.h>
+#include <unistd.h>
+
+int		numthreads = -1;
+
+/* PTHREAD_MUTEX_INITIALIZER is enough: the mutex protects only the tiny
+   dispatch counters, and static initialisation needs no teardown. */
+static pthread_mutex_t	crit = PTHREAD_MUTEX_INITIALIZER;
+
+void ThreadLock (void)
+{
+	pthread_mutex_lock (&crit);
+}
+
+void ThreadUnlock (void)
+{
+	pthread_mutex_unlock (&crit);
+}
+
+void ThreadSetDefault (void)
+{
+	if (numthreads == -1)	// not set manually
+	{
+#ifdef _SC_NPROCESSORS_ONLN
+		long n = sysconf (_SC_NPROCESSORS_ONLN);
+		numthreads = n > 0 ? (int)n : 4;
+#else
+		numthreads = 4;
+#endif
+		if (numthreads < 1 || numthreads > 32)
+			numthreads = 1;
+	}
+	printf ("threads: %i\n", numthreads);
+}
+
+
+/*
+   pthread's start routine is void *(*)(void *), while the tools pass
+   void (*)(int). The indirection is safe because RunThreadsOn joins all
+   threads before returning, so the static is never shared by two runs.
+*/
+static void	(*thread_func)(int);
+
+static void *thread_entry (void *arg)
+{
+	thread_func ((int)(size_t)arg);
+	return NULL;
+}
+
+/*
+=============
+RunThreadsOn
+=============
+*/
+void RunThreadsOn (int workcnt, qboolean showpacifier, void(*func)(int))
+{
+	int		i;
+	pthread_t	work_threads[MAX_THREADS];
+	int		start, end;
+
+	start = I_FloatTime ();
+	dispatch = 0;
+	workcount = workcnt;
+	oldf = -1;
+	pacifier = showpacifier;
+	threaded = true;
+	thread_func = func;
+
+	if (pacifier)
+		setbuf (stdout, NULL);
+
+	if (numthreads == 1)
+	{	// use same thread
+		func (0);
+	}
+	else
+	{
+		for (i=0 ; i<numthreads ; i++)
+		{
+			if (pthread_create (&work_threads[i], NULL, thread_entry, (void *)(size_t)i) != 0)
+				Error ("pthread_create failed");
+		}
+		for (i=0 ; i<numthreads ; i++)
+		{
+			if (pthread_join (work_threads[i], NULL) != 0)
+				Error ("pthread_join failed");
+		}
+	}
+
+	threaded = false;
+
+	end = I_FloatTime ();
+	if (pacifier)
+		printf (" (%i)\n", end-start);
+}
+
+#endif
+
+/*
+=======================================================================
+
   SINGLE THREAD
 
 =======================================================================

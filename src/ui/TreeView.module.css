@@ -1,0 +1,74 @@
+.tree {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow-y: auto;
+  background: var(--surface-1);
+  font-size: 12px;
+}
+
+.actions {
+  display: flex;
+  gap: 6px;
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--surface-3);
+}
+
+.actionButton {
+  background: var(--surface-2);
+  color: var(--ink);
+  border: 1px solid var(--surface-3);
+  border-radius: 2px;
+  padding: 2px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.actionButton:hover {
+  background: var(--surface-3);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 6px;
+  cursor: default;
+  color: var(--ink);
+}
+
+.row:hover {
+  background: var(--surface-2);
+}
+
+.rowSelected {
+  background: var(--surface-2);
+}
+
+.rowSelected .rowLabel {
+  color: var(--select);
+}
+
+.rowLabel {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.flagButton {
+  width: 18px;
+  height: 16px;
+  font-size: 10px;
+  background: var(--surface-2);
+  color: var(--ink-muted);
+  border: 1px solid var(--surface-3);
+  border-radius: 2px;
+  cursor: pointer;
+  padding: 0;
+}
+
+.flagOn {
+  color: var(--select);
+  border-color: var(--select);
+}

@@ -17,6 +17,8 @@ import {
 import { Icon } from './Icon';
 import { LogPanel } from './LogPanel';
 import { PanelTabs, type BottomTab } from './PanelTabs';
+import { TreeView } from './TreeView';
+import { PrefabBrowser } from './PrefabBrowser';
 import { PropertiesPanel } from './PropertiesPanel';
 import { TextureBrowser } from './TextureBrowser';
 import { Toolbar } from './Toolbar';
@@ -98,6 +100,7 @@ export function EditorShell(props: EditorShellProps) {
   const [entries, setEntries] = createSignal<readonly LogEntry[]>(app.logEntries());
   const [activeView, setActiveView] = createSignal<ViewId>('3d');
   const [maximizedView, setMaximizedView] = createSignal<ViewId | null>(null);
+  const [compileMenuOpen, setCompileMenuOpen] = createSignal(false);
   const [bottomTab, setBottomTab] = createSignal<BottomTab>('textures');
   const [theme, setTheme] = createSignal<'dark' | 'light'>('dark');
   const [coordinates, setCoordinates] = createSignal(coordinateDefaults(false));
@@ -108,6 +111,27 @@ export function EditorShell(props: EditorShellProps) {
     y: number;
     point: [number, number, number];
   } | null>(null);
+  /** The open entity sub-menu: 'add' or 'apply' plus the chosen category. */
+  const [entityMenu, setEntityMenu] = createSignal<{
+    mode: 'add' | 'apply';
+    category: string | null;
+  } | null>(null);
+
+  /** Entity classes grouped by their prefix category, for the context menus. */
+  const entityCategories = () => {
+    const groups = new Map<string, string[]>();
+    const mode = entityMenu()?.mode ?? 'add';
+    for (const def of app.entityDefs()) {
+      if (def.className === 'worldspawn') continue;
+      // Add places point entities; Apply converts brushes into brush entities.
+      const brushClass = app.isBrushClass(def.className);
+      if (mode === 'add' ? brushClass : !brushClass) continue;
+      const category = def.className.includes('_') ? def.className.split('_')[0]! : 'misc';
+      if (!groups.has(category)) groups.set(category, []);
+      groups.get(category)!.push(def.className);
+    }
+    return [...groups.entries()].sort(([a], [b]) => a.localeCompare(b));
+  };
   const [activeTool, setActiveTool] = createSignal(app.activeTool);
   const [brushPrimitive, setBrushPrimitive] = createSignal(app.brushPrimitive);
   const [brushSides, setBrushSides] = createSignal(app.brushSides);
@@ -535,6 +559,20 @@ export function EditorShell(props: EditorShellProps) {
         shift: event.shiftKey,
         alt: event.altKey,
       });
+      // N steps the cameras along the leak path after a leaking compile.
+      if ((event.key === 'n' || event.key === 'N') && !event.ctrlKey && !event.metaKey) {
+        const point = app.nextLeakPoint();
+        if (point) {
+          event.preventDefault();
+          for (const view of ['top', 'front', 'side'] as const) {
+            const camera = controller.get(view);
+            if (camera.kind === 'ortho') {
+              controller.setCamera(view, { ...camera, center: [...point] });
+            }
+          }
+          return;
+        }
+      }
       if (action === 'undo' || action === 'redo') {
         event.preventDefault();
         if (action === 'undo') {
@@ -568,7 +606,8 @@ export function EditorShell(props: EditorShellProps) {
           action === 'tool-clip' ||
           action === 'tool-vertex-edge' ||
           action === 'tool-face' ||
-          action === 'tool-texture') &&
+          action === 'tool-texture' ||
+          action === 'tool-entity') &&
         !(pointerLocked || rightFly)
       ) {
         event.preventDefault();
@@ -583,7 +622,9 @@ export function EditorShell(props: EditorShellProps) {
                   ? 'vertex'
                   : action === 'tool-face'
                     ? 'face'
-                    : 'texture',
+                    : action === 'tool-entity'
+                      ? 'entity'
+                      : 'texture',
         );
         return;
       }
@@ -695,6 +736,8 @@ export function EditorShell(props: EditorShellProps) {
         onOpenSinglePak={() => pakInput?.click()}
         onOpenMap={chooseMap}
         onExportMap={() => void app.exportMap()}
+        gameOpen={gameOpen()}
+        onCompile={() => setCompileMenuOpen((v) => !v)}
         onCsgSubtract={() => app.csgSubtract()}
         onCsgIntersect={() => app.csgIntersect()}
         onHollow={(direction) => app.hollowSelection(direction)}
@@ -715,6 +758,41 @@ export function EditorShell(props: EditorShellProps) {
         onTool={(tool) => app.setToolMode(tool)}
         onBrushPrimitive={(kind, sides) => app.setBrushPrimitive(kind, sides)}
       />
+      <Show when={compileMenuOpen()}>
+        <div class={styles.compileMenu} role="menu" aria-label="Compile profile">
+          <For each={['fast', 'normal', 'final'] as const}>
+            {(profile) => (
+              <button
+                type="button"
+                role="menuitem"
+                class={styles.contextMenuItem}
+                data-testid={`compile-${profile}`}
+                onClick={() => {
+                  setCompileMenuOpen(false);
+                  void app.compileMap(profile);
+                }}
+              >
+                {profile[0]!.toUpperCase() + profile.slice(1)}
+              </button>
+            )}
+          </For>
+          <Show when={app.isCompiling}>
+            <button
+              type="button"
+              role="menuitem"
+              class={styles.contextMenuItem}
+              data-testid="compile-cancel"
+              onClick={() => {
+                setCompileMenuOpen(false);
+                app.cancelCompile();
+              }}
+            >
+              Cancel
+            </button>
+          </Show>
+        </div>
+      </Show>
+
       <div class={styles.main} ref={(el) => (mainElement = el)}>
         <div class={styles.center} ref={(el) => (centerElement = el)}>
           <div
@@ -722,6 +800,35 @@ export function EditorShell(props: EditorShellProps) {
             tabindex="0"
             aria-label="Editor views"
             data-testid="viewport-area"
+            onDragOver={(event) => {
+              if (event.dataTransfer?.types.includes('application/x-joole-prefab')) {
+                event.preventDefault();
+              }
+            }}
+            onDrop={(event) => {
+              const name = event.dataTransfer?.getData('application/x-joole-prefab');
+              if (!name) return;
+              event.preventDefault();
+              const hit = hitView(event.clientX, event.clientY);
+              if (!hit || hit.view === '3d') {
+                // The 3D view has no ground-plane projection here; place at origin.
+                void app.insertPrefab(name);
+                return;
+              }
+              const camera = orthoCamera(hit.view);
+              if (!camera) {
+                void app.insertPrefab(name);
+                return;
+              }
+              const world = orthoWorldPoint(camera, hit.point, hit.size, hit.ratio);
+              const grid = app.gridSize;
+              const snapped = world.map((v) => Math.round(v / grid) * grid) as [
+                number,
+                number,
+                number,
+              ];
+              void app.insertPrefab(name, snapped);
+            }}
             ref={(el) => {
               viewportElement = el;
               if (canvasElement.parentElement !== el) {
@@ -789,6 +896,7 @@ export function EditorShell(props: EditorShellProps) {
                     class={styles.contextMenuItem}
                     onClick={() => {
                       setViewMenu(null);
+                      setEntityMenu(null);
                       app.setToolMode('brush');
                     }}
                   >
@@ -801,11 +909,100 @@ export function EditorShell(props: EditorShellProps) {
                     onClick={() => {
                       const point = menu().point;
                       setViewMenu(null);
+                      setEntityMenu(null);
                       app.addEntityAt('info_player_start', point);
                     }}
                   >
                     Add Player Start
                   </button>
+                  <Show when={!entityMenu()}>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      class={styles.contextMenuItem}
+                      data-testid="menu-add-entity"
+                      onClick={() => setEntityMenu({ mode: 'add', category: null })}
+                    >
+                      Add Entity →
+                    </button>
+                    <Show
+                      when={[...app.selection].some(
+                        (id) => app.document.nodes.get(id)?.kind === 'brush',
+                      )}
+                    >
+                      <button
+                        type="button"
+                        role="menuitem"
+                        class={styles.contextMenuItem}
+                        data-testid="menu-apply-entity"
+                        onClick={() => setEntityMenu({ mode: 'apply', category: null })}
+                      >
+                        Apply Entity →
+                      </button>
+                    </Show>
+                  </Show>
+                  <Show when={entityMenu()}>
+                    {(sub) => (
+                      <>
+                        <button
+                          type="button"
+                          role="menuitem"
+                          class={styles.contextMenuItem}
+                          onClick={() => {
+                            if (sub().category) {
+                              setEntityMenu({ mode: sub().mode, category: null });
+                            } else {
+                              setEntityMenu(null);
+                            }
+                          }}
+                        >
+                          ← Back
+                        </button>
+                        <For each={sub().category === null ? entityCategories() : []}>
+                          {([category]) => (
+                            <button
+                              type="button"
+                              role="menuitem"
+                              class={styles.contextMenuItem}
+                              onClick={() => setEntityMenu({ mode: sub().mode, category })}
+                            >
+                              {category} →
+                            </button>
+                          )}
+                        </For>
+                        <For
+                          each={
+                            sub().category !== null
+                              ? (entityCategories().find(([c]) => c === sub().category)?.[1] ?? [])
+                              : []
+                          }
+                        >
+                          {(classname) => (
+                            <button
+                              type="button"
+                              role="menuitem"
+                              class={styles.contextMenuItem}
+                              data-testid={`menu-class-${classname}`}
+                              onClick={() => {
+                                const point = menu().point;
+                                const mode = sub().mode;
+                                setViewMenu(null);
+                                setEntityMenu(null);
+                                if (mode === 'add') {
+                                  app.setCurrentEntityClass(classname);
+                                  app.addEntityAt(classname, point);
+                                } else {
+                                  app.convertSelectionToEntity(classname);
+                                }
+                              }}
+                            >
+                              {classname}
+                            </button>
+                          )}
+                        </For>
+                      </>
+                    )}
+                  </Show>
                 </div>
               )}
             </Show>
@@ -827,28 +1024,32 @@ export function EditorShell(props: EditorShellProps) {
               onSelect={setBottomTab}
               onView={toggleMaximized}
             />
-            <Show
-              when={bottomTab() === 'log'}
-              fallback={
-                <Show
-                  when={gameOpen()}
-                  fallback={
-                    <div class={styles.texturePlaceholder} data-testid="texture-placeholder">
-                      Open a game folder to index textures.
-                    </div>
-                  }
-                >
-                  <TextureBrowser
-                    entries={textureList()}
-                    inUse={() => app.texturesInUse()}
-                    selected={() => currentTexture()}
-                    onSelect={(name) => app.setCurrentTexture(name)}
-                    load={(name) => app.loadTexture(name)}
-                  />
-                </Show>
-              }
-            >
+            <Show when={bottomTab() === 'tree'}>
+              <TreeView app={app} version={panelVersion} />
+            </Show>
+            <Show when={bottomTab() === 'prefabs'}>
+              <PrefabBrowser app={app} version={panelVersion} />
+            </Show>
+            <Show when={bottomTab() === 'log'}>
               <LogPanel entries={entries()} />
+            </Show>
+            <Show when={bottomTab() === 'textures'}>
+              <Show
+                when={gameOpen()}
+                fallback={
+                  <div class={styles.texturePlaceholder} data-testid="texture-placeholder">
+                    Open a game folder to index textures.
+                  </div>
+                }
+              >
+                <TextureBrowser
+                  entries={textureList()}
+                  inUse={() => app.texturesInUse()}
+                  selected={() => currentTexture()}
+                  onSelect={(name) => app.setCurrentTexture(name)}
+                  load={(name) => app.loadTexture(name)}
+                />
+              </Show>
             </Show>
           </section>
         </div>

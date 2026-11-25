@@ -23,5 +23,5 @@ void main() {
   vShade = 0.75 + 0.25 * dot(normalize(aNormal), normalize(SHADE_DIRECTION));
   ivec2 size = textureSize(uState, 0);
   int i = int(aIndex);
-  vSelected = texelFetch(uState, ivec2(i % size.x, i / size.x), 0).r & 1u;
+  vSelected = texelFetch(uState, ivec2(i % size.x, i / size.x), 0).r & 9u;
 }
