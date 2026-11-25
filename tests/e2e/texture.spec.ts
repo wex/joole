@@ -133,5 +133,7 @@ test('applying a texture through the UI changes faces and renders in the views',
 
   // The textured checker fallback renders identically regardless of the name,
   // so the screenshot is a regression baseline of the editor after editing.
-  await expect(page.locator('[data-testid=viewport-area]').locator('canvas')).toHaveScreenshot('texture-tool-applied.png');
+  await expect(page.locator('[data-testid=viewport-area]').locator('canvas')).toHaveScreenshot(
+    'texture-tool-applied.png',
+  );
 });
