@@ -467,6 +467,7 @@ The implementation proceeds in five phases. Each phase ends with a usable versio
 
 - **Performance baseline ordering:** P1.12 measures the map-open path and records preliminary memory/rendering numbers. The CSG benchmark is not moved earlier than P3.1, because implementing CSG only to measure it would violate the phase order. Drag latency likewise remains a later measurement because brush editing does not exist in phase 1. Reference-hardware GPU measurements remain phase-gate checks, with the final target pass in P5.6.
 - **Undo history memory calibration:** the initial structural constants are 72 bytes per node, 185 bytes per brush face before the texture-name charge, 16 bytes per entity/group property entry, and 16 bytes plus 1 byte per character per string. They were calibrated on 25.11.2026 with Playwright Chromium 159.0.8154.6 CDP forced-GC heap measurements of 20,000 realistically shaped six-face brush objects (about 1,332 bytes per node). Entity strings are often shared or interned, so the formula is deliberately conservative for entity-heavy histories; it is an estimate, not an exact heap profiler.
+- **Selection redo behaviour:** undo restores the selection captured immediately before the command. Redo does not rewrite the user's current selection; it only restores the metadata needed for a later undo. This avoids surprising selection changes when the user has selected something else while the command was undone.
 
 **To be refined later:**
 

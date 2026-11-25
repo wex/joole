@@ -387,7 +387,7 @@ Goal: editing through commands with unlimited undo, project files and autosave, 
 - **Depends on:** P1.7
 - **Done when:** the properties hold, and the calibrated constants are recorded in the spec.
 
-### [ ] P2.2 Selection and selection restore (`app`)
+### [x] P2.2 Selection and selection restore (`app`)
 
 - **Goal:** keep selection out of the document while undo still restores it.
 - **Scope:** a selection set of `Id`s, selection change events, and the selection taken before each command and restored on undo (after Qoole's `OpSelectNewObjs`).
