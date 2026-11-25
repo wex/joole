@@ -773,7 +773,7 @@ Goal: the full compile cycle in the browser, plus the performance targets, brows
 - **Depends on:** Phases 1 to 4
 - **Done when:** the E2E suite passes on all three engines at the latest two major versions of each browser, apart from features that are documented as Chromium-only.
 
-### [ ] P5.6 Performance targets
+### [x] P5.6 Performance targets
 
 - **Goal:** meet the spec's table.
 - **Targets:**
