@@ -5,3 +5,4 @@ export * from './plane';
 export * from './winding';
 export * from './brush';
 export * from './integerPoints';
+export * from './texAxes';
