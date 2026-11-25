@@ -1045,9 +1045,18 @@ export class EntityTool {
     void this.getDocument;
   }
 
-  syncDocument(_doc: Readonly<MapDocument>): void {}
-  applyPatch(_doc: Readonly<MapDocument>, _patch: Patch): void {}
-  setSelection(_ids: Iterable<Id>): void {}
+  syncDocument(doc: Readonly<MapDocument>): void {
+    void doc;
+  }
+
+  applyPatch(doc: Readonly<MapDocument>, patch: Patch): void {
+    void doc;
+    void patch;
+  }
+
+  setSelection(ids: Iterable<Id>): void {
+    void ids;
+  }
   cancel(): void {}
 
   pointer(event: ToolPointerEvent): ToolOutput {

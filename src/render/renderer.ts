@@ -1,6 +1,6 @@
 import { dot } from '@core/geom/index';
 import type { Mat4 } from '@core/geom/index';
-import type { Id, MapDocument, Patch, Vec3 } from '@core/types/index';
+import type { MapNode, Id, MapDocument, Patch, Vec3 } from '@core/types/index';
 import type { FaceClass } from './brushMesh';
 import {
   aabbInFrustum,
@@ -41,9 +41,7 @@ export interface RendererOptions {
   /** The gap between the four views in CSS pixels: the splitter size. */
   readonly gap?: number;
   /** Class colour lookup for point entities (0..1 rgb). */
-  readonly entityColorOf?: (
-    node: import('@core/types/index').MapNode,
-  ) => readonly [number, number, number] | null;
+  readonly entityColorOf?: (node: MapNode) => readonly [number, number, number] | null;
 }
 
 export interface RendererStats {
