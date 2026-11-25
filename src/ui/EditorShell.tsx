@@ -100,6 +100,7 @@ export function EditorShell(props: EditorShellProps) {
   const [entries, setEntries] = createSignal<readonly LogEntry[]>(app.logEntries());
   const [activeView, setActiveView] = createSignal<ViewId>('3d');
   const [maximizedView, setMaximizedView] = createSignal<ViewId | null>(null);
+  const [compileMenuOpen, setCompileMenuOpen] = createSignal(false);
   const [bottomTab, setBottomTab] = createSignal<BottomTab>('textures');
   const [theme, setTheme] = createSignal<'dark' | 'light'>('dark');
   const [coordinates, setCoordinates] = createSignal(coordinateDefaults(false));
@@ -721,6 +722,8 @@ export function EditorShell(props: EditorShellProps) {
         onOpenSinglePak={() => pakInput?.click()}
         onOpenMap={chooseMap}
         onExportMap={() => void app.exportMap()}
+        gameOpen={gameOpen()}
+        onCompile={() => setCompileMenuOpen((v) => !v)}
         onCsgSubtract={() => app.csgSubtract()}
         onCsgIntersect={() => app.csgIntersect()}
         onHollow={(direction) => app.hollowSelection(direction)}
@@ -741,6 +744,41 @@ export function EditorShell(props: EditorShellProps) {
         onTool={(tool) => app.setToolMode(tool)}
         onBrushPrimitive={(kind, sides) => app.setBrushPrimitive(kind, sides)}
       />
+      <Show when={compileMenuOpen()}>
+        <div class={styles.compileMenu} role="menu" aria-label="Compile profile">
+          <For each={['fast', 'normal', 'final'] as const}>
+            {(profile) => (
+              <button
+                type="button"
+                role="menuitem"
+                class={styles.contextMenuItem}
+                data-testid={`compile-${profile}`}
+                onClick={() => {
+                  setCompileMenuOpen(false);
+                  void app.compileMap(profile);
+                }}
+              >
+                {profile[0]!.toUpperCase() + profile.slice(1)}
+              </button>
+            )}
+          </For>
+          <Show when={app.isCompiling}>
+            <button
+              type="button"
+              role="menuitem"
+              class={styles.contextMenuItem}
+              data-testid="compile-cancel"
+              onClick={() => {
+                setCompileMenuOpen(false);
+                app.cancelCompile();
+              }}
+            >
+              Cancel
+            </button>
+          </Show>
+        </div>
+      </Show>
+
       <div class={styles.main} ref={(el) => (mainElement = el)}>
         <div class={styles.center} ref={(el) => (centerElement = el)}>
           <div

@@ -31,6 +31,8 @@ export interface ToolbarProps {
   readonly onToggleTextureLock: () => void;
   readonly onTool: (tool: ToolbarTool) => void;
   readonly onBrushPrimitive: (kind: PrimitiveKind, sides: number) => void;
+  readonly onCompile: () => void;
+  readonly gameOpen: boolean;
 }
 
 function tool(
@@ -375,7 +377,14 @@ export function Toolbar(props: ToolbarProps) {
       >
         <Icon name="sunMoon" />
       </button>
-      <button type="button" class={styles.compileButton} disabled>
+      <button
+        type="button"
+        class={styles.compileButton}
+        data-testid="compile-button"
+        disabled={!props.gameOpen}
+        title={props.gameOpen ? 'Compile the map' : 'Open a game folder before compiling'}
+        onClick={() => props.onCompile()}
+      >
         <Icon name="play" /> Compile
       </button>
     </div>

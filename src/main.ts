@@ -9,6 +9,7 @@ import {
   pickGameDirectory,
   TextureCache,
   TextureClient,
+  CompileClient,
   PrefabStore,
   ProjectStore,
 } from '@platform/index';
@@ -78,6 +79,36 @@ async function saveTextFile(name: string, text: string): Promise<boolean> {
   return downloadText(name, text);
 }
 
+async function saveBinaryFile(name: string, data: Uint8Array): Promise<boolean> {
+  const picker = (
+    window as unknown as {
+      showSaveFilePicker?: (options: { suggestedName: string }) => Promise<FileSystemFileHandle>;
+    }
+  ).showSaveFilePicker;
+  if (picker) {
+    try {
+      const handle = await picker({ suggestedName: name });
+      const writable = await handle.createWritable();
+      await writable.write(data.slice(0));
+      await writable.close();
+      return true;
+    } catch {
+      return false;
+    }
+  }
+  // Fallback for browsers without the picker: a download of the bytes.
+  const blob = new Blob([data.slice(0).buffer as ArrayBuffer], {
+    type: 'application/octet-stream',
+  });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = name;
+  a.click();
+  URL.revokeObjectURL(url);
+  return true;
+}
+
 const app = new EditorApp({
   inflate: browserInflate,
   textureClient,
@@ -99,6 +130,22 @@ const app = new EditorApp({
   autosaveStore: projectStore ?? undefined,
 });
 if (prefabStore) app.setPrefabStore(prefabStore);
+
+// The compile pipeline: every tool runs in a fresh worker through the
+// client; stdout streams into the editor log line by line.
+const compileClient = new CompileClient();
+app.compileRunner = async (step) => {
+  const result = await compileClient.run({
+    tool: step.tool,
+    args: step.args,
+    files: step.files,
+    outputs: step.outputs,
+    onLog: (_stream, text) => app.log('info', text),
+  });
+  return { files: result.files, output: result.output };
+};
+app.saveBinaryFile = saveBinaryFile;
+app.cancelCompileWorker = () => compileClient.cancel();
 
 const canvas = document.createElement('canvas');
 const renderer = new Renderer(canvas, {

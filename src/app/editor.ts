@@ -25,6 +25,7 @@ import {
   setGroupFlagPatch,
   ungroupNodesPatch,
 } from './groups';
+import { runCompilePipeline, type CompileProfile, type CompileRunner } from './compile';
 import type { EntityClassDef } from '@core/formats/index';
 import type {
   Command,
@@ -1049,6 +1050,92 @@ export class EditorApp {
       gridSize: this.gridSize,
       ...(this.modEntityDefTexts.length > 0 ? { modEntityDefs: this.modEntityDefTexts } : {}),
     });
+  }
+
+  /** Injected by main.ts: runs one compile step in a worker. */
+  compileRunner: CompileRunner | null = null;
+
+  /** Injected by main.ts: saves binary output (the compiled .bsp). */
+  saveBinaryFile: ((name: string, data: Uint8Array) => Promise<boolean>) | null = null;
+
+  /** Injected by main.ts: cancels the running compile. */
+  cancelCompileWorker: (() => void) | null = null;
+
+  private compiling = false;
+
+  /** True while a compile runs; the UI shows the cancel action. */
+  get isCompiling(): boolean {
+    return this.compiling;
+  }
+
+  /** Cancels the running compile, if any. */
+  cancelCompile(): void {
+    this.cancelCompileWorker?.();
+  }
+
+  /**
+   * Compiles the current map with the chosen profile: exports in export
+   * mode (warnings first), feeds the used textures' .wal headers and the
+   * colormap from the game data into the tools, streams the output into
+   * the log and saves the .bsp. A leak stops the chain and keeps the
+   * pointfile for the leak display.
+   */
+  async compileMap(profile: CompileProfile): Promise<boolean> {
+    if (!this.compileRunner || !this.vfs) {
+      this.log('warning', 'Open a game folder before compiling.');
+      return false;
+    }
+    if (this.compiling) {
+      this.log('warning', 'A compile is already running.');
+      return false;
+    }
+    const exported = this.exportMapText();
+    for (const warning of exported.warnings) {
+      this.log('warning', warning);
+    }
+    const mapName = (this.map?.replace(/\.(map|joole\.json)$/i, '') || 'untitled') + '.map';
+    // The .wal headers of every texture the map uses.
+    const wals: { name: string; data: Uint8Array }[] = [];
+    const missing: string[] = [];
+    for (const name of this.texturesInUse()) {
+      const bytes = await this.vfs.readFile(`textures/${name}.wal`);
+      if (bytes) {
+        wals.push({ name, data: bytes });
+      } else {
+        missing.push(name);
+      }
+    }
+    if (missing.length > 0) {
+      this.log('warning', `Textures missing from the game data: ${missing.join(', ')}`);
+    }
+    const colormap = await this.vfs.readFile('pics/colormap.pcx');
+    this.compiling = true;
+    this.log('info', `Compiling ${mapName} (${profile})…`);
+    this.emit({ type: 'document' });
+    try {
+      const result = await runCompilePipeline(
+        this.compileRunner,
+        profile,
+        mapName,
+        exported.text,
+        wals,
+        colormap ?? null,
+      );
+      if (result.leaked) {
+        this.log('error', 'The map leaks. The pointfile is ready for the leak display.');
+        return false;
+      }
+      const bspName = mapName.replace(/\.map$/i, '.bsp');
+      const saved = this.saveBinaryFile ? await this.saveBinaryFile(bspName, result.bsp) : false;
+      this.log('ok', `Compiled ${bspName} (${result.bsp.byteLength} bytes).`);
+      return saved;
+    } catch (error) {
+      this.log('error', `Compile failed: ${errorText(error)}`);
+      return false;
+    } finally {
+      this.compiling = false;
+      this.emit({ type: 'document' });
+    }
   }
 
   exportMapText(): { text: string; warnings: string[] } {

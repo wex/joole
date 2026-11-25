@@ -5,18 +5,12 @@
  * pnpm exec vite-node tests/fixtures/build-sp-sample.ts
  */
 import { mkdirSync, writeFileSync } from 'node:fs';
-import {
-  addNodePatch,
-  applyPatch,
-  buildDocument,
-  createId,
-  mergePatches,
-} from '../../src/core/doc/index';
+import { buildDocument, createId } from '../../src/core/doc/index';
 import { subtractBrush } from '../../src/core/geom/csg';
 import { makeBox as rawBox } from '../../src/core/geom/__tests__/helpers';
 import { writeMap } from '../../src/core/formats/mapWrite';
 import { parseMap } from '../../src/core/formats/mapParse';
-import type { BrushNode, EntityNode, MapNode, Patch, Vec3 } from '../../src/core/types/index';
+import type { BrushNode, EntityNode, MapNode, Vec3 } from '../../src/core/types/index';
 
 const TEX = 'e2u1/mine10_1';
 
