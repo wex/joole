@@ -204,8 +204,11 @@ export class GeometryCache {
 
   /** Rebuilds only the nodes that a patch created, changed or removed. */
   applyPatch(doc: Readonly<MapDocument>, patch: Patch): void {
-    // A changed container re-evaluates its whole subtree, because hidden and
-    // locked group flags propagate to the children.
+    // Hidden group flags propagate down the tree, so descendants must be
+    // re-evaluated when the inheritance can change: a group in the patch (its
+    // flag may have toggled) or a reparented node (its ancestors changed).
+    // Entity containers like worldspawn never carry the flags, so the hot
+    // path of adding and editing brushes stays patch-sized.
     const affected = new Set<Id>();
     const walk = (id: Id) => {
       if (affected.has(id)) return;
@@ -215,7 +218,14 @@ export class GeometryCache {
         for (const child of node.children) walk(child);
       }
     };
-    for (const id of patch.after.keys()) walk(id);
+    for (const id of patch.after.keys()) {
+      const node = doc.nodes.get(id);
+      if (node?.kind === 'group') walk(id);
+    }
+    for (const id of patch.parentAfter.keys()) walk(id);
+    for (const id of patch.after.keys()) {
+      affected.add(id);
+    }
     for (const id of affected) {
       this.removeNode(id);
       const node = doc.nodes.get(id);
