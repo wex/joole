@@ -707,7 +707,7 @@ Goal: everything needed to build a complete playable single-player level.
 - **Depends on:** P2.8, P2.9
 - **Done when:** a prefab can be saved and placed again.
 
-### [ ] P4.9 md2 preview
+### [x] P4.9 md2 preview
 
 - **Goal:** show models for point entities.
 - **Scope:** an md2 parser (`IDP2`, version 8, frame 0) in `core/formats`, models loaded through the virtual filesystem, and a wireframe drawing. Classes without a model fall back to their box.
