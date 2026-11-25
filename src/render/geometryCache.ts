@@ -1,4 +1,4 @@
-import type { Id, MapDocument, MapNode, Patch } from '@core/types/index';
+import type { Id, MapDocument, MapNode, Patch, Vec3 } from '@core/types/index';
 import { RangeAllocator } from './allocator';
 import {
   boxEdges,
@@ -26,6 +26,7 @@ export const STATE_ENTITY = 2;
 /** The state texture is this many texels wide, one byte per node index. */
 const STATE_WIDTH = 1024;
 const INITIAL_CAPACITY = 1024;
+type LineSegment = readonly [Vec3, Vec3];
 
 interface Range {
   offset: number;
@@ -159,8 +160,9 @@ export class GeometryCache {
   private stateDirty = true;
   private stateRowsOnGpu = 0;
   private readonly freeIndices: number[] = [];
-  private nextIndex = 0;
+  private nextIndex = 1;
   private selected = new Set<Id>();
+  private toolSegments: readonly LineSegment[] = [];
 
   constructor(private readonly gl: WebGL2RenderingContext) {
     this.cornerBuffer = gl.createBuffer();
@@ -189,6 +191,7 @@ export class GeometryCache {
         this.addNode(doc, node);
       }
     }
+    this.rebuildOverlay();
   }
 
   /**
@@ -217,6 +220,49 @@ export class GeometryCache {
       }
     }
     this.selected = selected;
+    this.rebuildOverlay();
+  }
+
+  /** Replaces the transient editing preview: brush ghosts and drag rectangles. */
+  setToolPreview(segments: readonly LineSegment[]): void {
+    this.toolSegments = segments;
+    this.rebuildOverlay();
+  }
+
+  private rebuildOverlay(): void {
+    const segments: LineSegment[] = [...this.toolSegments];
+    // Handles are small world-space crosses at every selected brush's corners.
+    for (const id of this.selected) {
+      const box = this.records.get(id)?.aabb;
+      if (!box) continue;
+      for (const x of [box.min[0], box.max[0]]) {
+        for (const y of [box.min[1], box.max[1]]) {
+          for (const z of [box.min[2], box.max[2]]) {
+            segments.push(
+              [
+                [x - 4, y, z],
+                [x + 4, y, z],
+              ],
+              [
+                [x, y - 4, z],
+                [x, y + 4, z],
+              ],
+              [
+                [x, y, z - 4],
+                [x, y, z + 4],
+              ],
+            );
+          }
+        }
+      }
+    }
+    if (segments.length === 0) {
+      this.lines.remove('__overlay');
+    } else {
+      this.lines.write('__overlay', writeLines(segments, 0), segments.length);
+    }
+    this.state[0] = STATE_SELECTED;
+    this.stateDirty = true;
   }
 
   /** The bounds of everything drawn. */

@@ -1,5 +1,6 @@
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
+import { readFile } from 'node:fs/promises';
 import { expect, test, type Page } from '@playwright/test';
 
 interface JooleWindow {
@@ -10,6 +11,8 @@ interface JooleWindow {
       nodes: number;
       textures: readonly { name: string; width: number; height: number }[];
     };
+    selection(): string[];
+    autosave(): Promise<boolean>;
   };
 }
 
@@ -77,6 +80,13 @@ test('the shell has the workspace, file menu, panels, splitters, theme and view 
   await expect(page.getByRole('menuitem', { name: 'Open Game Folder…' })).toBeVisible();
   await expect(page.getByRole('menuitem', { name: 'Open Map…' })).toBeVisible();
   await page.keyboard.press('Escape');
+
+  const top = await viewPoint(page, 'top');
+  await page.mouse.click(top.x, top.y, { button: 'right' });
+  await expect(page.locator('[data-testid=view-context-menu]')).toBeVisible();
+  await expect(page.getByRole('menuitem', { name: 'Add Brush' })).toBeEnabled();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('[data-testid=view-context-menu]')).toHaveCount(0);
 
   await page.keyboard.press('F2');
   await expect(page.locator('[data-testid=view-title-top]')).toBeVisible();
@@ -176,5 +186,160 @@ test('2D pan and zoom and 3D fly change the rendered views', async ({ page }) =>
   expect(await page.evaluate(() => (window as unknown as JooleWindow).joole!.stats().frames)).toBe(
     framesAtIdle,
   );
+  expect(errors).toEqual([]);
+});
+
+test('selecting and dragging a brush moves it, and Ctrl+Z undoes the move', async ({ page }) => {
+  const errors = consoleErrors(page);
+  await openFixtureMap(page);
+  const initial = await canvasScreenshot(page);
+  const top = await viewPoint(page, 'top');
+
+  await page.mouse.click(top.x, top.y, { button: 'left' });
+  await expect
+    .poll(() => page.evaluate(() => (window as unknown as JooleWindow).joole!.selection().length))
+    .toBe(1);
+  await page.evaluate(() => (window as unknown as JooleWindow).joole!.whenIdle());
+  const selected = await canvasScreenshot(page);
+  expect(selected.equals(initial)).toBe(false);
+
+  await page.mouse.move(top.x, top.y);
+  await page.mouse.down({ button: 'left' });
+  await page.mouse.move(top.x + 72, top.y + 40, { steps: 5 });
+  await page.mouse.up({ button: 'left' });
+  await page.evaluate(() => (window as unknown as JooleWindow).joole!.whenIdle());
+  const moved = await canvasScreenshot(page);
+  expect(moved.equals(selected)).toBe(false);
+
+  await page.keyboard.press('Control+z');
+  await page.evaluate(() => (window as unknown as JooleWindow).joole!.whenIdle());
+  const undone = await canvasScreenshot(page);
+  expect(undone.equals(selected)).toBe(true);
+  expect(errors).toEqual([]);
+});
+
+test('the brush tool creates a primitive in a 2D view and undo removes it', async ({ page }) => {
+  const errors = consoleErrors(page);
+  await openFixtureMap(page);
+  const initial = await canvasScreenshot(page);
+  const nodesBefore = await page.evaluate(
+    () => (window as unknown as JooleWindow).joole!.stats().nodes,
+  );
+
+  await page.getByRole('button', { name: 'Brush (B)' }).click();
+  await expect(page.getByLabel('Brush primitive')).toBeVisible();
+  await page.getByLabel('Brush primitive').selectOption('wedge');
+
+  const top = await viewPoint(page, 'top');
+  await page.mouse.move(top.x, top.y);
+  await page.mouse.down({ button: 'left' });
+  await page.mouse.move(top.x + 80, top.y + 80, { steps: 6 });
+  await page.mouse.up({ button: 'left' });
+  await page.evaluate(() => (window as unknown as JooleWindow).joole!.whenIdle());
+
+  await expect
+    .poll(() => page.evaluate(() => (window as unknown as JooleWindow).joole!.selection().length))
+    .toBe(1);
+  await expect
+    .poll(() => page.evaluate(() => (window as unknown as JooleWindow).joole!.stats().nodes))
+    .toBe(nodesBefore + 1);
+  const created = await canvasScreenshot(page);
+  expect(created.equals(initial)).toBe(false);
+
+  await page.keyboard.press('Control+z');
+  await page.evaluate(() => (window as unknown as JooleWindow).joole!.whenIdle());
+  await expect
+    .poll(() => page.evaluate(() => (window as unknown as JooleWindow).joole!.stats().nodes))
+    .toBe(nodesBefore);
+  expect(errors).toEqual([]);
+});
+
+test('copy, paste, cut and duplicate operate on the selection', async ({ page, context }) => {
+  const errors = consoleErrors(page);
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  await openFixtureMap(page);
+  const nodesBefore = await page.evaluate(
+    () => (window as unknown as JooleWindow).joole!.stats().nodes,
+  );
+  const top = await viewPoint(page, 'top');
+  await page.mouse.click(top.x, top.y, { button: 'left' });
+  await expect
+    .poll(() => page.evaluate(() => (window as unknown as JooleWindow).joole!.selection().length))
+    .toBe(1);
+
+  await page.keyboard.press('Control+c');
+  await page.keyboard.press('Control+v');
+  await expect
+    .poll(() => page.evaluate(() => (window as unknown as JooleWindow).joole!.stats().nodes))
+    .toBe(nodesBefore + 1);
+
+  await page.keyboard.press('Control+x');
+  await expect
+    .poll(() => page.evaluate(() => (window as unknown as JooleWindow).joole!.stats().nodes))
+    .toBe(nodesBefore);
+
+  await page.mouse.click(top.x, top.y, { button: 'left' });
+  await page.keyboard.press('Control+d');
+  await expect
+    .poll(() => page.evaluate(() => (window as unknown as JooleWindow).joole!.stats().nodes))
+    .toBe(nodesBefore + 1);
+  expect(errors).toEqual([]);
+});
+
+test('Ctrl+S downloads a project and the project reloads without loss', async ({ page }) => {
+  const errors = consoleErrors(page);
+  await page.addInitScript(() => {
+    Object.defineProperty(window, 'showSaveFilePicker', { value: undefined, configurable: true });
+  });
+  await openFixtureMap(page);
+  const nodesBefore = await page.evaluate(
+    () => (window as unknown as JooleWindow).joole!.stats().nodes,
+  );
+
+  const downloadPromise = page.waitForEvent('download');
+  await page.keyboard.press('Control+s');
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toBe('room.joole.json');
+  const path = await download.path();
+  expect(path).not.toBeNull();
+
+  await page.locator('[data-testid=map-input]').setInputFiles({
+    name: download.suggestedFilename(),
+    mimeType: 'application/json',
+    buffer: await readFile(path!),
+  });
+  await expect(page.locator('[data-testid=properties-panel]')).toContainText('room.joole.json');
+  await page.evaluate(() => (window as unknown as JooleWindow).joole!.whenIdle());
+  expect(await page.evaluate(() => (window as unknown as JooleWindow).joole!.stats().nodes)).toBe(
+    nodesBefore,
+  );
+  expect(errors).toEqual([]);
+});
+
+test('an edit autosaves and reload offers recovery', async ({ page }) => {
+  const errors = consoleErrors(page);
+  await contextlessOpen(page);
+
+  async function contextlessOpen(page: Page) {
+    await openFixtureMap(page);
+  }
+  const nodesBefore = await page.evaluate(
+    () => (window as unknown as JooleWindow).joole!.stats().nodes,
+  );
+  const top = await viewPoint(page, 'top');
+  await page.mouse.click(top.x, top.y, { button: 'left' });
+  await page.keyboard.press('Control+d');
+  await expect
+    .poll(() => page.evaluate(() => (window as unknown as JooleWindow).joole!.stats().nodes))
+    .toBe(nodesBefore + 1);
+  await page.evaluate(() => (window as unknown as JooleWindow).joole!.autosave());
+
+  await page.reload();
+  await expect(page.locator('[data-testid=recovery-prompt]')).toBeVisible();
+  await page.getByRole('button', { name: 'Recover' }).click();
+  await page.evaluate(() => (window as unknown as JooleWindow).joole!.whenIdle());
+  await expect
+    .poll(() => page.evaluate(() => (window as unknown as JooleWindow).joole!.stats().nodes))
+    .toBe(nodesBefore + 1);
   expect(errors).toEqual([]);
 });

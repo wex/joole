@@ -1,6 +1,6 @@
 import { dot } from '@core/geom/index';
 import type { Mat4 } from '@core/geom/index';
-import type { Id, MapDocument, Patch } from '@core/types/index';
+import type { Id, MapDocument, Patch, Vec3 } from '@core/types/index';
 import type { FaceClass } from './brushMesh';
 import {
   aabbInFrustum,
@@ -215,6 +215,12 @@ export class Renderer {
       this.cache.setSelection(this.doc, ids);
       this.invalidate();
     }
+  }
+
+  /** Transient editing lines: ghost previews and drag rectangles. */
+  setToolPreview(segments: readonly (readonly [Vec3, Vec3])[]): void {
+    this.cache.setToolPreview(segments);
+    this.invalidate();
   }
 
   setCamera(view: ViewId, camera: Camera): void {

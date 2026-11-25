@@ -6,3 +6,5 @@ test-results/
 .tsbuild/
 .agents/
 pnpm-lock.yaml
+
+workers/wasm/*.mjs

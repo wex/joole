@@ -17,6 +17,7 @@ export default tseslint.config(
       'test-results/**',
       '.tsbuild/**',
       '.agents/**',
+      'workers/wasm/*.mjs',
     ],
   },
   ...tseslint.configs.recommended,

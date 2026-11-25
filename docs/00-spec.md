@@ -279,6 +279,18 @@ The tolerances are constants in one place: `PLANE_EPS = 1e-4` (classifying a poi
 
 In the 2D views, a point's position snaps to the grid (1, 2, 4 … 256 units, 8 by default). Grid-aligned brushes are written as integer points, which avoids qbsp3's precision problems. After a rotation, the plane points are rounded to the grid only if the user chooses the _Snap to grid_ command, because automatic rounding can make a brush non-convex.
 
+The approximate sphere primitive is an octahedron in the first editing implementation: always convex, integer-pointed on an integer grid and cheap to validate. A higher-detail segmented sphere is a possible later refinement, not a correctness requirement. Until the multi-view height workflow arrives, a brush drawn in a 2D view receives a 64-unit depth centred on that view plane.
+
+Editing feedback uses the same incremental GPU cache as document edits: selected brush corners carry small cross handles, brush-tool drags show a red wireframe ghost, and only patch-affected brush ranges are rebuilt. The drag-bandwidth benchmark remains a hardware reference measurement for P5.6; SwiftShader numbers are not meaningful for the 8 ms target.
+
+Clipboard editing serialises the selected brushes in clipboard mode (full float precision). Pasted brushes always receive fresh nanoids; duplicate offsets the copy by one grid step in X and Y. The interoperability check is at the format level in this phase: the emitted text is canonical Q2 `.map`, and the automated round trip parses it back without loss.
+
+Project saving is implemented as versioned `joole-project` JSON with exact JSON float round trips and a migration chain entry point. Ctrl+S uses the File System Access save picker in Chromium and the download path elsewhere or when the picker is unavailable; grid settings and recent-file metadata are persisted in OPFS. Exporting `.map` remains a separate writer path with integer-point warnings.
+
+Autosave writes the current project to OPFS every 30 seconds once a command has made it dirty, and again on `pagehide`. The dirty flag is cleared only by an explicit project save/download. On start-up, a dirty autosave produces a recovery prompt; accepting loads it as `recovered.joole.json`, and discarding clears the recovery metadata.
+
+The qbsp3 oracle is built with Emscripten without `DOUBLEVEC_T`: the upstream makefile defines it for native double-precision experiments, but the wasm build crashed while parsing with that ABI-altering typedef. The browser/editor geometry core remains float64 independently of the oracle. The committed wasm output was rebuilt twice on 25.11.2026 and was bit-for-bit deterministic.
+
 ## Rendering with WebGL2
 
 All four views are drawn into one WebGL2 context and one `<canvas>` element using `gl.scissor` and `gl.viewport`. Textures and buffers are then shared between the views, and four browser contexts are not used up. Qoole's `QDraw` abstraction (OpenGL, Glide, DirectX, MGL, software rendering) is replaced by a single renderer.
@@ -333,6 +345,8 @@ The default layout has four views in a 2×2 grid (3D, top, front, side), a prope
 | Texture (T)                                            | selecting a face in the 3D view, setting and adjusting its texture                                                             | `QPropSrf`, `QPropTex`                      |
 
 **Commands in menus and as shortcuts:** cut, copy, paste and duplicate (as `.map` text on the clipboard, so transfer to another editor works). Also CSG subtract, CSG intersect, hollow inwards and outwards, mirror X/Y/Z, rotate 90°, group and ungroup, hide and show, lock, and grid size \[ and \]. The views have a right-click context menu with Add Brush, Add Entity and Apply Entity → category → class.
+
+**Keyboard shortcut map (defined in P2.5):** tool keys are S, B, E, C, V, F and T as above; grid size is \[ and \]; N steps to the next leak point. Platform-convention command shortcuts use Ctrl on Windows/Linux and Cmd on macOS: Ctrl/Cmd+Z undo, Ctrl/Cmd+Shift+Z and Ctrl/Cmd+Y redo, Ctrl/Cmd+S save, Ctrl/Cmd+X cut, Ctrl/Cmd+C copy, Ctrl/Cmd+V paste, Ctrl/Cmd+D duplicate, Ctrl/Cmd+H hide and Ctrl/Cmd+L lock. Plain tool keys do not fire while 3D fly mode owns WASD, and text-entry controls are never intercepted.
 
 **Tree view and entering a group.** The side panel's tree shows worldspawn, entities and groups, and nodes can be moved by dragging (Qoole's `QTrView` and `OpTreeViewDragMove`). Double-clicking enters a group, so that selection and new brushes are limited to it and the rest of the map is dimmed. This is Qoole's _scope_ concept (`OpScopeChange`).
 
@@ -415,6 +429,8 @@ The targets are sized so that a large Q2 map works on an integrated GPU. They ar
 
 The texture conversion proxy measured on the same machine was 72 ms for 512 synthetic 256×256 textures, single-threaded in Node. No valid measurement shows a target clearly at risk. The GPU frame rate still needs reference-hardware measurement, and P5.6 already contains the profiling/culling work package, so P1.12 adds no new mitigation WP.
 
+**P2.3 picking benchmark (25.11.2026):** measured in Node with Vitest on the same Ryzen 7 7800X3D/WSL2 development machine, using 20,000 valid 96³ box brushes on a 128-unit lattice. Building the initial BVH, including brush analysis and wireframe caches, took about 0.8–1.0 s in this non-reference environment. The steady-state picking measurements were a mean of 3.45 ms for batches of 100 ray picks (about 35 µs per pick) and 44.4 ms for batches of 1,000 2D picks (about 44 µs per pick). Incremental patch updates do not rebuild the whole tree.
+
 **Testing:**
 
 - **Unit tests (Vitest)** for the geometry core and the parsers, with a target of at least 90 % line coverage in the `core/` folder. Every CSG operation gets property-based tests (fast-check): for random convex brushes, the result must be valid, and in subtraction the sum of the volumes must match within tolerance.
@@ -466,6 +482,10 @@ The implementation proceeds in five phases. Each phase ends with a usable versio
 **Decisions 25.11.2026:**
 
 - **Performance baseline ordering:** P1.12 measures the map-open path and records preliminary memory/rendering numbers. The CSG benchmark is not moved earlier than P3.1, because implementing CSG only to measure it would violate the phase order. Drag latency likewise remains a later measurement because brush editing does not exist in phase 1. Reference-hardware GPU measurements remain phase-gate checks, with the final target pass in P5.6.
+- **Undo history memory calibration:** the initial structural constants are 72 bytes per node, 185 bytes per brush face before the texture-name charge, 16 bytes per entity/group property entry, and 16 bytes plus 1 byte per character per string. They were calibrated on 25.11.2026 with Playwright Chromium 159.0.8154.6 CDP forced-GC heap measurements of 20,000 realistically shaped six-face brush objects (about 1,332 bytes per node). Entity strings are often shared or interned, so the formula is deliberately conservative for entity-heavy histories; it is an estimate, not an exact heap profiler.
+- **Selection redo behaviour:** undo restores the selection captured immediately before the command. Redo does not rewrite the user's current selection; it only restores the metadata needed for a later undo. This avoids surprising selection changes when the user has selected something else while the command was undone.
+- **View framing during editing:** opening or replacing a document frames the views on its bounds, but ordinary editing commands do not reframe or rezoom the cameras. Continuous reframing makes drag endpoints view-dependent and is disruptive while constructing geometry; the user can pan, zoom or use a later explicit frame command instead.
+- **Overlapping selected-object priority:** when a Select-tool drag begins where several brushes overlap in a 2D projection and one hit is already selected, the selected hit is used. This lets the user move the current selection in dense projections. Repeated clicks still use the overlap cycler when no already-selected object is hit.
 
 **To be refined later:**
 

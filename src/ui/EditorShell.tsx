@@ -1,5 +1,6 @@
 import { createSignal, For, onSettled, Show, untrack } from 'solid-js';
-import type { EditorApp, LogEntry } from '@app/index';
+import type { EditorApp, LogEntry, ToolPointerEvent } from '@app/index';
+import { shortcutAction } from '@app/index';
 import type { OrthoCamera, PerspectiveCamera, Renderer, ViewId, ViewRect } from '@render/index';
 import { VIEW_ORDER } from '@render/index';
 import {
@@ -7,7 +8,9 @@ import {
   lookPerspective,
   movePerspective,
   orthoCoordinates,
+  orthoWorldPoint,
   panOrtho,
+  perspectiveRayDirection,
   WHEEL_ZOOM_STEP,
   zoomOrthoAt,
 } from './cameras';
@@ -98,6 +101,15 @@ export function EditorShell(props: EditorShellProps) {
   const [coordinates, setCoordinates] = createSignal(coordinateDefaults(false));
   const [rightWidth, setRightWidth] = createSignal(initialRightWidth);
   const [bottomHeight, setBottomHeight] = createSignal(initialBottomHeight);
+  const [viewMenu, setViewMenu] = createSignal<{
+    x: number;
+    y: number;
+    point: [number, number, number];
+  } | null>(null);
+  const [activeTool, setActiveTool] = createSignal(app.activeTool);
+  const [brushPrimitive, setBrushPrimitive] = createSignal(app.brushPrimitive);
+  const [brushSides, setBrushSides] = createSignal(app.brushSides);
+  const [recoveryAvailable, setRecoveryAvailable] = createSignal(app.recoveryProject !== null);
 
   let viewportElement: HTMLDivElement | undefined;
   let mainElement: HTMLDivElement | undefined;
@@ -235,6 +247,7 @@ export function EditorShell(props: EditorShellProps) {
       lastX: number;
       lastY: number;
     } | null = null;
+    let toolPointer: { readonly pointerId: number; readonly view: ViewId } | null = null;
     let rightFly = false;
     let pointerLocked = false;
     let frame: number | null = null;
@@ -292,6 +305,52 @@ export function EditorShell(props: EditorShellProps) {
       }
     };
 
+    const toolEvent = (
+      hit: HitView,
+      type: 'down' | 'move' | 'up',
+      event: PointerEvent,
+    ): ToolPointerEvent => {
+      if (hit.view === '3d') {
+        const camera = perspectiveCamera();
+        return {
+          type,
+          button: event.button,
+          view: '3d' as const,
+          point: camera?.position ?? [0, 0, 0],
+          direction: camera ? perspectiveRayDirection(camera, hit.point, hit.size) : [1, 0, 0],
+          tolerance: 4,
+          shift: event.shiftKey,
+          ctrl: event.ctrlKey || event.metaKey,
+        };
+      }
+      const camera = orthoCamera(hit.view);
+      const axis =
+        hit.view === 'top'
+          ? ('xy' as const)
+          : hit.view === 'front'
+            ? ('xz' as const)
+            : ('yz' as const);
+      return {
+        type,
+        button: event.button,
+        view: axis,
+        point: camera ? orthoWorldPoint(camera, hit.point, hit.size, hit.ratio) : [0, 0, 0],
+        tolerance: camera ? (4 * hit.ratio) / camera.zoom : 4,
+        shift: event.shiftKey,
+        ctrl: event.ctrlKey || event.metaKey,
+      };
+    };
+
+    const sendToolEvent = (type: 'down' | 'move' | 'up', event: PointerEvent) => {
+      const hit = hitView(event.clientX, event.clientY);
+      if (!hit || (toolPointer && hit.view !== toolPointer.view)) {
+        return false;
+      }
+      const output = app.selectPointer(toolEvent(hit, type, event));
+      renderer.setToolPreview(output.preview ?? []);
+      return true;
+    };
+
     const pointerDown = (event: PointerEvent) => {
       const hit = hitView(event.clientX, event.clientY);
       if (!hit) {
@@ -299,6 +358,14 @@ export function EditorShell(props: EditorShellProps) {
       }
       setActiveView(hit.view);
       viewport.focus();
+      if (event.button === 0) {
+        setViewMenu(null);
+        toolPointer = { pointerId: event.pointerId, view: hit.view };
+        viewport.setPointerCapture(event.pointerId);
+        sendToolEvent('down', event);
+        event.preventDefault();
+        return;
+      }
       if (hit.view !== '3d' && event.button === 1) {
         pan = {
           pointerId: event.pointerId,
@@ -338,6 +405,11 @@ export function EditorShell(props: EditorShellProps) {
     };
 
     const pointerMove = (event: PointerEvent) => {
+      if (toolPointer && event.pointerId === toolPointer.pointerId) {
+        sendToolEvent('move', event);
+        event.preventDefault();
+        return;
+      }
       if (pan && event.pointerId === pan.pointerId) {
         const camera = orthoCamera(pan.view);
         if (camera) {
@@ -365,6 +437,12 @@ export function EditorShell(props: EditorShellProps) {
     };
 
     const pointerEnd = (event: PointerEvent) => {
+      if (toolPointer && event.pointerId === toolPointer.pointerId) {
+        sendToolEvent('up', event);
+        toolPointer = null;
+        event.preventDefault();
+        return;
+      }
       if (pan && event.pointerId === pan.pointerId) {
         pan = null;
       }
@@ -393,8 +471,29 @@ export function EditorShell(props: EditorShellProps) {
       pointerLocked = document.pointerLockElement === canvas;
       updateFlyState();
     };
-    const contextMenu = (event: MouseEvent) => event.preventDefault();
+    const contextMenu = (event: MouseEvent) => {
+      event.preventDefault();
+      const hit = hitView(event.clientX, event.clientY);
+      if (!hit || hit.view === '3d') {
+        setViewMenu(null);
+        return;
+      }
+      const camera = orthoCamera(hit.view);
+      if (!camera) {
+        setViewMenu(null);
+        return;
+      }
+      const bounds = viewport.getBoundingClientRect();
+      setViewMenu({
+        x: event.clientX - bounds.left,
+        y: event.clientY - bounds.top,
+        point: orthoWorldPoint(camera, hit.point, hit.size, hit.ratio),
+      });
+    };
     const keyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setViewMenu(null);
+      }
       const maximized = functionKeys[event.key];
       if (maximized) {
         event.preventDefault();
@@ -404,9 +503,52 @@ export function EditorShell(props: EditorShellProps) {
       if (isEditableTarget(event.target)) {
         return;
       }
-      if (event.key === '[' || event.key === ']') {
+      const action = shortcutAction({
+        key: event.key,
+        ctrl: event.ctrlKey || event.metaKey,
+        shift: event.shiftKey,
+        alt: event.altKey,
+      });
+      if (action === 'undo' || action === 'redo') {
         event.preventDefault();
-        stepGrid(event.key === '[' ? -1 : 1);
+        if (action === 'undo') {
+          app.undo();
+        } else {
+          app.redo();
+        }
+        return;
+      }
+      if (action === 'save') {
+        event.preventDefault();
+        void app.saveProject();
+        return;
+      }
+      if (action === 'copy' || action === 'cut' || action === 'paste' || action === 'duplicate') {
+        event.preventDefault();
+        if (action === 'copy') void app.copySelection();
+        if (action === 'cut') void app.cutSelection();
+        if (action === 'paste') void app.pasteClipboard();
+        if (action === 'duplicate') app.duplicateSelection();
+        return;
+      }
+      if (action === 'grid-down' || action === 'grid-up') {
+        event.preventDefault();
+        stepGrid(action === 'grid-down' ? -1 : 1);
+        return;
+      }
+      if ((action === 'tool-select' || action === 'tool-brush') && !(pointerLocked || rightFly)) {
+        event.preventDefault();
+        app.setToolMode(action === 'tool-select' ? 'select' : 'brush');
+        return;
+      }
+      if (action && action.startsWith('tool-') && !(pointerLocked || rightFly)) {
+        event.preventDefault();
+        return;
+      }
+      if (action) {
+        // Commands whose work packages have not arrived yet are still
+        // captured here so the browser never performs its own Ctrl/Cmd action.
+        event.preventDefault();
         return;
       }
       const key = event.key.toLowerCase();
@@ -429,6 +571,7 @@ export function EditorShell(props: EditorShellProps) {
       flyKeys.clear();
       rightFly = false;
       pan = null;
+      toolPointer = null;
       updateFlyState();
     };
 
@@ -446,7 +589,9 @@ export function EditorShell(props: EditorShellProps) {
     const unsubscribe = app.subscribe((event) => {
       if (event.type === 'document') {
         setMapName(app.mapName);
-        controller.frame(renderer.bounds(), renderer.viewRects());
+        if (!event.patch) {
+          controller.frame(renderer.bounds(), renderer.viewRects());
+        }
       } else if (event.type === 'game') {
         setGameOpen(app.gameOpen);
         setTextureCount(app.textureCount);
@@ -454,6 +599,12 @@ export function EditorShell(props: EditorShellProps) {
         setEntries(app.logEntries());
       } else if (event.type === 'grid') {
         setGridSize(app.gridSize);
+      } else if (event.type === 'tool') {
+        setActiveTool(app.activeTool);
+        setBrushPrimitive(app.brushPrimitive);
+        setBrushSides(app.brushSides);
+      } else if (event.type === 'recovery') {
+        setRecoveryAvailable(app.recoveryProject !== null);
       }
     });
     const initialFrame = requestAnimationFrame(() => {
@@ -485,8 +636,14 @@ export function EditorShell(props: EditorShellProps) {
         onOpenGameFolder={chooseGameFolder}
         onOpenSinglePak={() => pakInput?.click()}
         onOpenMap={chooseMap}
+        onExportMap={() => void app.exportMap()}
         onGridSize={(size) => app.setGridSize(size)}
         onToggleTheme={toggleTheme}
+        activeTool={activeTool()}
+        brushPrimitive={brushPrimitive()}
+        brushSides={brushSides()}
+        onTool={(tool) => app.setToolMode(tool)}
+        onBrushPrimitive={(kind, sides) => app.setBrushPrimitive(kind, sides)}
       />
       <div class={styles.main} ref={(el) => (mainElement = el)}>
         <div class={styles.center} ref={(el) => (centerElement = el)}>
@@ -544,6 +701,44 @@ export function EditorShell(props: EditorShellProps) {
                 )}
               </For>
             </div>
+            <Show when={viewMenu()}>
+              {(menu) => (
+                <div
+                  class={styles.contextMenu}
+                  role="menu"
+                  aria-label="View actions"
+                  data-testid="view-context-menu"
+                  style={{ left: `${menu().x}px`, top: `${menu().y}px` }}
+                  ref={(el) => {
+                    el.addEventListener('pointerdown', (event) => event.stopPropagation());
+                  }}
+                >
+                  <button
+                    type="button"
+                    role="menuitem"
+                    class={styles.contextMenuItem}
+                    onClick={() => {
+                      setViewMenu(null);
+                      app.setToolMode('brush');
+                    }}
+                  >
+                    Add Brush
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    class={styles.contextMenuItem}
+                    onClick={() => {
+                      const point = menu().point;
+                      setViewMenu(null);
+                      app.addEntityAt('info_player_start', point);
+                    }}
+                  >
+                    Add Player Start
+                  </button>
+                </div>
+              )}
+            </Show>
           </div>
           <div
             class={[styles.splitter, styles.horizontalSplitter]}
@@ -588,6 +783,23 @@ export function EditorShell(props: EditorShellProps) {
         />
         <PropertiesPanel mapName={mapName()} gameOpen={gameOpen()} />
       </div>
+      <Show when={recoveryAvailable()}>
+        <div
+          class={styles.recoveryPrompt}
+          role="alertdialog"
+          aria-label="Recover autosave"
+          data-testid="recovery-prompt"
+        >
+          <strong>Recover unsaved work?</strong>
+          <span>An autosaved project is available.</span>
+          <button type="button" onClick={() => void app.acceptRecovery()}>
+            Recover
+          </button>
+          <button type="button" onClick={() => void app.discardRecovery()}>
+            Discard
+          </button>
+        </div>
+      </Show>
       <input
         ref={(el) => (gameInput = el)}
         class={styles.fileInput}
@@ -623,7 +835,7 @@ export function EditorShell(props: EditorShellProps) {
         ref={(el) => (mapInput = el)}
         class={styles.fileInput}
         type="file"
-        accept=".map"
+        accept=".map,.joole.json"
         aria-label="Choose map"
         data-testid="map-input"
         onChange={(event) => {

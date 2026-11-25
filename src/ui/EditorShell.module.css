@@ -181,3 +181,52 @@
 .fileInput {
   display: none;
 }
+
+.contextMenu {
+  position: absolute;
+  z-index: 4;
+  min-width: 144px;
+  padding: 2px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  box-shadow: 0 8px 20px rgb(0 0 0 / 35%);
+}
+
+.contextMenuItem {
+  display: flex;
+  width: 100%;
+  height: var(--size-row);
+  align-items: center;
+  padding: 0 var(--space-md);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--ink);
+  font: var(--text-ui-body);
+  text-align: left;
+}
+
+.contextMenuItem:hover:not(:disabled) {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.contextMenuItem:disabled {
+  color: var(--ink-disabled);
+}
+
+.recoveryPrompt {
+  position: absolute;
+  z-index: 20;
+  right: var(--space-md);
+  bottom: var(--space-md);
+  display: flex;
+  gap: var(--space-sm);
+  align-items: center;
+  padding: var(--space-md);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  color: var(--ink);
+}

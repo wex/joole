@@ -40,4 +40,13 @@ interface Window {
     types?: FilePickerAcceptType[];
     excludeAcceptAllOption?: boolean;
   }): Promise<FileSystemFileHandle[]>;
+  showSaveFilePicker(options?: {
+    suggestedName?: string;
+    types?: FilePickerAcceptType[];
+  }): Promise<FileSystemFileHandle>;
+}
+
+declare module '*qbsp3.mjs' {
+  const createQbsp3: unknown;
+  export default createQbsp3;
 }

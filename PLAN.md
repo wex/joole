@@ -371,7 +371,7 @@ Goal: read Q2 game data and `.map` files without loss, and show the map in four 
 
 Goal: editing through commands with unlimited undo, project files and autosave, and qbsp3 available as a test oracle.
 
-### [ ] P2.1 Commands and history (`core/doc`, `app`)
+### [x] P2.1 Commands and history (`core/doc`, `app`)
 
 - **Goal:** route every document change through one bus.
 - **Scope:**
@@ -387,14 +387,14 @@ Goal: editing through commands with unlimited undo, project files and autosave, 
 - **Depends on:** P1.7
 - **Done when:** the properties hold, and the calibrated constants are recorded in the spec.
 
-### [ ] P2.2 Selection and selection restore (`app`)
+### [x] P2.2 Selection and selection restore (`app`)
 
 - **Goal:** keep selection out of the document while undo still restores it.
 - **Scope:** a selection set of `Id`s, selection change events, and the selection taken before each command and restored on undo (after Qoole's `OpSelectNewObjs`).
 - **Depends on:** P2.1
 - **Done when:** undo restores the selection in unit tests.
 
-### [ ] P2.3 Picking and BVH (`core/geom`)
+### [x] P2.3 Picking and BVH (`core/geom`)
 
 - **Goal:** CPU picking that is shared by tools and tests.
 - **Scope:**
@@ -409,7 +409,7 @@ Goal: editing through commands with unlimited undo, project files and autosave, 
 - **Depends on:** P1.2
 - **Done when:** picks are correct, and the benchmark is recorded.
 
-### [ ] P2.4 Transforms and grid (`core/geom`, `app`)
+### [x] P2.4 Transforms and grid (`core/geom`, `app`)
 
 - **Goal:** move, rotate and scale brushes as the spec describes.
 - **Scope:**
@@ -422,7 +422,7 @@ Goal: editing through commands with unlimited undo, project files and autosave, 
 - **Depends on:** P2.1
 - **Done when:** commands exist for move, rotate, scale and snap.
 
-### [ ] P2.5 Tool framework and Select tool (`app`, `ui`)
+### [x] P2.5 Tool framework and Select tool (`app`, `ui`)
 
 - **Goal:** tool logic that can be tested in Node, with the UI only translating input.
 - **Scope:**
@@ -437,7 +437,7 @@ Goal: editing through commands with unlimited undo, project files and autosave, 
 - **Depends on:** P2.2, P2.3, P2.4
 - **Done when:** a brush can be selected, moved, rotated and scaled in the views, and every step can be undone.
 
-### [ ] P2.6 Brush tool and primitives (`core/geom`, `app`)
+### [x] P2.6 Brush tool and primitives (`core/geom`, `app`)
 
 - **Goal:** create new brushes.
 - **Scope:**
@@ -449,7 +449,7 @@ Goal: editing through commands with unlimited undo, project files and autosave, 
 - **Depends on:** P2.5
 - **Done when:** all primitives can be created in the views.
 
-### [ ] P2.7 Renderer editing support (`render`)
+### [x] P2.7 Renderer editing support (`render`)
 
 - **Goal:** visual feedback for editing.
 - **Scope:** selection drawn in red, handles, ghost previews from the tool's preview state, incremental cache updates driven by patches, and BVH-driven redraws.
@@ -458,7 +458,7 @@ Goal: editing through commands with unlimited undo, project files and autosave, 
 - **Depends on:** P2.5
 - **Done when:** dragging updates only the affected brush.
 
-### [ ] P2.8 Clipboard (`app`, `platform`) ⇄
+### [x] P2.8 Clipboard (`app`, `platform`) ⇄
 
 - **Goal:** cut, copy, paste and duplicate as `.map` text.
 - **Scope:** the clipboard writer mode (full precision), the system clipboard API, new ids on paste, and an offset for duplicates.
@@ -466,7 +466,7 @@ Goal: editing through commands with unlimited undo, project files and autosave, 
 - **Depends on:** P1.5, P2.1
 - **Done when:** a selection pasted into another editor's `.map` format parses there. This is checked manually once and recorded.
 
-### [ ] P2.9 Project format and saving (`core/formats`, `platform`, `app`)
+### [x] P2.9 Project format and saving (`core/formats`, `platform`, `app`)
 
 - **Goal:** `.joole.json` as the primary save format.
 - **Scope:**
@@ -481,7 +481,7 @@ Goal: editing through commands with unlimited undo, project files and autosave, 
 - **Depends on:** P1.5, P1.6, P2.1
 - **Done when:** projects save and reload without loss in Chromium and through the download path.
 
-### [ ] P2.10 Autosave and recovery (`app`, `platform`)
+### [x] P2.10 Autosave and recovery (`app`, `platform`)
 
 - **Goal:** never lose work.
 - **Scope:** autosave to OPFS every 30 s and on `pagehide`, an unsaved-changes flag that is cleared by a save or a download, and a recovery prompt on start when the flag is set.
@@ -489,7 +489,7 @@ Goal: editing through commands with unlimited undo, project files and autosave, 
 - **Depends on:** P2.9
 - **Done when:** recovery works in Chromium and in the download path.
 
-### [ ] P2.11 qbsp3 for Node (`tools`, `workers`) ⇄ (may start right after P1.5)
+### [x] P2.11 qbsp3 for Node (`tools`, `workers`) ⇄ (may start right after P1.5)
 
 - **Goal:** use qbsp3 as an automated test oracle from phase 2 onwards.
 - **Scope:**
@@ -512,7 +512,7 @@ Goal: editing through commands with unlimited undo, project files and autosave, 
 - **Depends on:** P1.5, P1.6, Gate 0
 - **Done when:** the compiler test runs in CI, and the reproducibility job is green.
 
-**[ ] Gate 2:** a simple room (four walls, a floor, a ceiling and an `info_player_start`, which qbsp3 needs for its flood fill (`FloodEntities` in `portals.c`)) can be built from scratch in the UI and saved as a project, and its exported `.map` passes qbsp3 with no warnings. This is an E2E script plus the compiler test. The entity is placed through the raw key–value editor or a minimal placement command, because the full entity tool arrives in P4.4.
+**[x] Gate 2:** a simple room (four walls, a floor, a ceiling and an `info_player_start`, which qbsp3 needs for its flood fill (`FloodEntities` in `portals.c`)) can be built from scratch in the UI and saved as a project, and its exported `.map` passes qbsp3 with no warnings. This is an E2E script plus the compiler test. The entity is placed through the raw key–value editor or a minimal placement command, because the full entity tool arrives in P4.4.
 
 ---
 

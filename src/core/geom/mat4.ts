@@ -76,3 +76,54 @@ export function mat4RotationZ(degrees: number): Mat4 {
   const s = Math.sin(r);
   return [c, -s, 0, 0, s, c, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
 }
+
+/**
+ * Inverts an affine matrix whose bottom row is [0 0 0 1]. Returns null for a
+ * singular linear part. Projective matrices are not needed for brush editing.
+ */
+export function mat4Invert(m: Mat4): Mat4 | null {
+  const a = m[0];
+  const b = m[1];
+  const c = m[2];
+  const d = m[4];
+  const e = m[5];
+  const f = m[6];
+  const g = m[8];
+  const h = m[9];
+  const i = m[10];
+  const det = a * (e * i - f * h) - b * (d * i - f * g) + c * (d * h - e * g);
+  if (Math.abs(det) < 1e-15) {
+    return null;
+  }
+  const invDet = 1 / det;
+  const ia = (e * i - f * h) * invDet;
+  const ib = (c * h - b * i) * invDet;
+  const ic = (b * f - c * e) * invDet;
+  const id = (f * g - d * i) * invDet;
+  const ie = (a * i - c * g) * invDet;
+  const if_ = (c * d - a * f) * invDet;
+  const ig = (d * h - e * g) * invDet;
+  const ih = (b * g - a * h) * invDet;
+  const ii = (a * e - b * d) * invDet;
+  const tx = m[3];
+  const ty = m[7];
+  const tz = m[11];
+  return [
+    ia,
+    ib,
+    ic,
+    -(ia * tx + ib * ty + ic * tz),
+    id,
+    ie,
+    if_,
+    -(id * tx + ie * ty + if_ * tz),
+    ig,
+    ih,
+    ii,
+    -(ig * tx + ih * ty + ii * tz),
+    0,
+    0,
+    0,
+    1,
+  ];
+}

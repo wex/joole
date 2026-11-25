@@ -121,6 +121,13 @@ describe('EditorApp', () => {
     expect(app.gridSize).toBe(8);
     expect(app.setGridSize(512)).toBe(false);
     expect(app.setGridSize(1)).toBe(true);
+    expect(app.increaseGridSize()).toBe(true);
+    expect(app.gridSize).toBe(2);
+    app.setGridSize(256);
+    expect(app.increaseGridSize()).toBe(true);
+    expect(app.gridSize).toBe(256);
+    expect(app.decreaseGridSize()).toBe(true);
+    expect(app.gridSize).toBe(128);
   });
 
   it('caps the log and keeps the newest entries', () => {
@@ -133,5 +140,21 @@ describe('EditorApp', () => {
     expect(entries).toHaveLength(500);
     expect(entries[0]?.text).toBe('line 10');
     expect(entries.at(-1)?.text).toBe('line 509');
+  });
+
+  it('addEntityAt places a grid-snapped point entity as an undoable command', () => {
+    const { app } = makeApp();
+    const id = app.addEntityAt('info_player_start', [3, 5, 1]);
+    expect(id).not.toBeNull();
+    const entity = app.document.nodes.get(id!);
+    expect(entity?.kind).toBe('entity');
+    if (entity?.kind === 'entity') {
+      expect(entity.props).toEqual([
+        ['classname', 'info_player_start'],
+        ['origin', '0 8 0'],
+      ]);
+    }
+    expect(app.undo()).toBe(true);
+    expect(app.document.nodes.has(id!)).toBe(false);
   });
 });
