@@ -449,7 +449,7 @@ Goal: editing through commands with unlimited undo, project files and autosave, 
 - **Depends on:** P2.5
 - **Done when:** all primitives can be created in the views.
 
-### [ ] P2.7 Renderer editing support (`render`)
+### [x] P2.7 Renderer editing support (`render`)
 
 - **Goal:** visual feedback for editing.
 - **Scope:** selection drawn in red, handles, ghost previews from the tool's preview state, incremental cache updates driven by patches, and BVH-driven redraws.

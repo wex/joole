@@ -36,9 +36,24 @@ export interface ToolPointerEvent {
   readonly ctrl: boolean;
 }
 
+export type PreviewSegment = readonly [Vec3, Vec3];
+
 export interface ToolOutput {
   readonly commands: Command[];
   readonly selection?: ReadonlySet<Id>;
+  readonly preview?: readonly PreviewSegment[];
+}
+
+function boxSegments(min: Vec3, max: Vec3): PreviewSegment[] {
+  const v: Vec3[] = [];
+  for (const x of [min[0], max[0]])
+    for (const y of [min[1], max[1]]) for (const z of [min[2], max[2]]) v.push([x, y, z]);
+  const at = (x: number, y: number, z: number) => (x * 2 + y) * 2 + z;
+  const out: PreviewSegment[] = [];
+  for (const x of [0, 1]) for (const y of [0, 1]) out.push([v[at(x, y, 0)]!, v[at(x, y, 1)]!]);
+  for (const x of [0, 1]) for (const z of [0, 1]) out.push([v[at(x, 0, z)]!, v[at(x, 1, z)]!]);
+  for (const y of [0, 1]) for (const z of [0, 1]) out.push([v[at(0, y, z)]!, v[at(1, y, z)]!]);
+  return out;
 }
 
 export interface BoxPreview {
@@ -167,7 +182,17 @@ export class BrushTool {
       return { commands: [] };
     }
     if (event.type === 'move') {
-      return { commands: [] };
+      if (this.mode.kind !== 'draw') return { commands: [] };
+      const start = this.mode.start;
+      const min: Vec3 = [...point] as Vec3;
+      const max: Vec3 = [...point] as Vec3;
+      for (const axis of [axis0, axis1]) {
+        min[axis] = Math.min(start[axis], point[axis]);
+        max[axis] = Math.max(start[axis], point[axis]);
+      }
+      min[depth] = snap(start[depth], grid) - 32;
+      max[depth] = snap(start[depth], grid) + 32;
+      return { commands: [], preview: boxSegments(min, max) };
     }
     if (event.type !== 'up' || this.mode.kind !== 'draw') {
       return { commands: [] };

@@ -341,7 +341,8 @@ export function EditorShell(props: EditorShellProps) {
       if (!hit || (toolPointer && hit.view !== toolPointer.view)) {
         return false;
       }
-      app.selectPointer(toolEvent(hit, type, event));
+      const output = app.selectPointer(toolEvent(hit, type, event));
+      renderer.setToolPreview(output.preview ?? []);
       return true;
     };
 
