@@ -24,10 +24,17 @@ import { TextureBrowser } from './TextureBrowser';
 import { Toolbar } from './Toolbar';
 import styles from './EditorShell.module.css';
 
+/** The PWA update lifecycle, wired in main.ts when the service worker is active. */
+export interface PwaUpdateFlow {
+  readonly updateAvailable: () => boolean;
+  reload: () => void;
+}
+
 export interface EditorShellProps {
   readonly app: EditorApp;
   readonly renderer: Renderer;
   readonly canvas: HTMLCanvasElement;
+  readonly pwa?: PwaUpdateFlow;
 }
 
 const viewLabels: Record<ViewId, string> = {
@@ -1084,6 +1091,20 @@ export function EditorShell(props: EditorShellProps) {
           </button>
           <button type="button" onClick={() => void app.discardRecovery()}>
             Discard
+          </button>
+        </div>
+      </Show>
+      <Show when={props.pwa?.updateAvailable()}>
+        <div
+          class={styles.recoveryPrompt}
+          role="alertdialog"
+          aria-label="Update available"
+          data-testid="update-prompt"
+        >
+          <strong>A new version of Joole is ready.</strong>
+          <span>Reload to use it. Your work is autosaved.</span>
+          <button type="button" onClick={() => props.pwa?.reload()}>
+            Reload
           </button>
         </div>
       </Show>

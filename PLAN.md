@@ -758,7 +758,7 @@ Goal: the full compile cycle in the browser, plus the performance targets, brows
 - **Depends on:** P5.2
 - **Done when:** a leak found by qbsp3 is displayed automatically.
 
-### [ ] P5.4 PWA
+### [x] P5.4 PWA
 
 - **Goal:** offline use and installability.
 - **Scope:** vite-plugin-pwa with Workbox precaching (the app, workers and `.wasm`), an update prompt, and a check that the service worker works with COOP, COEP and the CSP.

@@ -50,3 +50,20 @@ declare module '*qbsp3.mjs' {
   const createQbsp3: unknown;
   export default createQbsp3;
 }
+
+// The service worker registration entry vite-plugin-pwa provides at build
+// time. The plugin ships framework type files that do not resolve cleanly
+// under the project's `types: []` setup, so the small used surface is
+// declared here instead.
+declare module 'virtual:pwa-register' {
+  export interface RegisterSWOptions {
+    immediate?: boolean;
+    onNeedRefresh?: () => void;
+    onOfflineReady?: () => void;
+    onRegistered?: (registration: ServiceWorkerRegistration | undefined) => void;
+    onRegisterError?: (error: unknown) => void;
+  }
+
+  /** Registers the service worker; the return reloads the page for an update. */
+  export function registerSW(options?: RegisterSWOptions): (reloadPage?: boolean) => Promise<void>;
+}
