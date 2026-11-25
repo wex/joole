@@ -9,6 +9,7 @@ import {
   pickGameDirectory,
   TextureCache,
   TextureClient,
+  PrefabStore,
   ProjectStore,
 } from '@platform/index';
 import { Renderer } from '@render/index';
@@ -23,6 +24,7 @@ if (!root) {
 
 const textureCache = await TextureCache.openOpfs().catch(() => null);
 const projectStore = await ProjectStore.openOpfs().catch(() => null);
+const prefabStore = await PrefabStore.openOpfs().catch(() => null);
 const settings = (await projectStore?.loadSettings()) ?? null;
 const textureClient = new TextureClient();
 
@@ -96,6 +98,7 @@ const app = new EditorApp({
   saveMapText: saveTextFile,
   autosaveStore: projectStore ?? undefined,
 });
+if (prefabStore) app.setPrefabStore(prefabStore);
 
 const canvas = document.createElement('canvas');
 const renderer = new Renderer(canvas, {

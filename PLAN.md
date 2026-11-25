@@ -699,7 +699,7 @@ Goal: everything needed to build a complete playable single-player level.
 - **Depends on:** P4.6
 - **Done when:** the spec's behaviour is reproduced.
 
-### [ ] P4.8 Prefabs ⇄
+### [x] P4.8 Prefabs ⇄
 
 - **Goal:** reuse pieces of a map.
 - **Scope:** save the selection as a full-precision `.map` snippet in OPFS, a prefab browser, and dragging a prefab into a view.

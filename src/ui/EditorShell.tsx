@@ -18,6 +18,7 @@ import { Icon } from './Icon';
 import { LogPanel } from './LogPanel';
 import { PanelTabs, type BottomTab } from './PanelTabs';
 import { TreeView } from './TreeView';
+import { PrefabBrowser } from './PrefabBrowser';
 import { PropertiesPanel } from './PropertiesPanel';
 import { TextureBrowser } from './TextureBrowser';
 import { Toolbar } from './Toolbar';
@@ -747,6 +748,35 @@ export function EditorShell(props: EditorShellProps) {
             tabindex="0"
             aria-label="Editor views"
             data-testid="viewport-area"
+            onDragOver={(event) => {
+              if (event.dataTransfer?.types.includes('application/x-joole-prefab')) {
+                event.preventDefault();
+              }
+            }}
+            onDrop={(event) => {
+              const name = event.dataTransfer?.getData('application/x-joole-prefab');
+              if (!name) return;
+              event.preventDefault();
+              const hit = hitView(event.clientX, event.clientY);
+              if (!hit || hit.view === '3d') {
+                // The 3D view has no ground-plane projection here; place at origin.
+                void app.insertPrefab(name);
+                return;
+              }
+              const camera = orthoCamera(hit.view);
+              if (!camera) {
+                void app.insertPrefab(name);
+                return;
+              }
+              const world = orthoWorldPoint(camera, hit.point, hit.size, hit.ratio);
+              const grid = app.gridSize;
+              const snapped = world.map((v) => Math.round(v / grid) * grid) as [
+                number,
+                number,
+                number,
+              ];
+              void app.insertPrefab(name, snapped);
+            }}
             ref={(el) => {
               viewportElement = el;
               if (canvasElement.parentElement !== el) {
@@ -944,6 +974,9 @@ export function EditorShell(props: EditorShellProps) {
             />
             <Show when={bottomTab() === 'tree'}>
               <TreeView app={app} version={panelVersion} />
+            </Show>
+            <Show when={bottomTab() === 'prefabs'}>
+              <PrefabBrowser app={app} version={panelVersion} />
             </Show>
             <Show when={bottomTab() === 'log'}>
               <LogPanel entries={entries()} />

@@ -43,6 +43,7 @@ import {
 import type { GameFileEntry } from '@platform/index';
 import { CommandBus } from './commandBus';
 import { SelectionManager } from './selection';
+import type { PrefabStore } from '@platform/index';
 import { mapTextToPastePatch, removeSelectionPatch, selectionToMapText } from './clipboard';
 import { hollowSelectionPatch, intersectSelectionPatch, subtractSelectionPatch } from './csg';
 import {
@@ -851,6 +852,63 @@ export class EditorApp {
   async pasteClipboard(): Promise<boolean> {
     if (!this.clipboard) return false;
     return this.pasteMapText(await this.clipboard.readText());
+  }
+
+  /** Saves the current selection as a named prefab snippet in OPFS. */
+  async savePrefab(name: string): Promise<boolean> {
+    const text = this.copySelectionText();
+    if (!text) {
+      this.log('warning', 'Nothing selected for the prefab.');
+      return false;
+    }
+    if (!this.prefabStore) {
+      this.log('warning', 'Prefab storage is unavailable.');
+      return false;
+    }
+    await this.prefabStore.save(name, text);
+    this.emit({ type: 'game' });
+    this.log('ok', `Prefab ${name} saved.`);
+    return true;
+  }
+
+  /** Lists the stored prefabs, newest first. */
+  async listPrefabs(): Promise<readonly { name: string; savedAt: number }[]> {
+    if (!this.prefabStore) return [];
+    const entries = await this.prefabStore.list();
+    return entries.map(({ name, savedAt }) => ({ name, savedAt }));
+  }
+
+  /** Inserts a prefab at the given world offset, as one undoable command. */
+  async insertPrefab(name: string, offset: [number, number, number] = [0, 0, 0]): Promise<boolean> {
+    if (!this.prefabStore) return false;
+    const text = await this.prefabStore.load(name);
+    if (!text) {
+      this.log('warning', `Prefab ${name} is missing.`);
+      return false;
+    }
+    try {
+      const pasted = mapTextToPastePatch(this.document, text, offset, this.insertionParent);
+      if (!pasted.patch) return false;
+      this.executeCommand({ label: `Insert prefab ${name}`, run: () => pasted.patch! });
+      this.setSelection(pasted.ids);
+      this.log('ok', `Prefab ${name} placed.`);
+      return true;
+    } catch (error) {
+      this.log('warning', `Prefab insert failed: ${errorText(error)}`);
+      return false;
+    }
+  }
+
+  async deletePrefab(name: string): Promise<void> {
+    await this.prefabStore?.remove(name);
+    this.emit({ type: 'game' });
+  }
+
+  private prefabStore: PrefabStore | null = null;
+
+  /** Attaches the OPFS prefab store after start-up. */
+  setPrefabStore(store: PrefabStore): void {
+    this.prefabStore = store;
   }
 
   duplicateSelection(): boolean {
