@@ -39,13 +39,12 @@ async function worldScreen(page: Page, view: OrthoView, point: Vec3) {
       const axes: Record<string, [number, number]> = { xy: [0, 1], xz: [0, 2], yz: [1, 2] };
       const [hAxis, vAxis] = axes[camera.axis]!;
       const horizontal =
-        (point[hAxis!]! - camera.center[hAxis!]!) * (camera.zoom / ratio) + rect.width / ratio / 2;
+        (point[hAxis!]! - camera.center[hAxis!]!) * (camera.zoom / ratio) + rect.width / 2;
       const vertical =
-        -(point[vAxis!]! - camera.center[vAxis!]!) * (camera.zoom / ratio) +
-        rect.height / ratio / 2;
+        -(point[vAxis!]! - camera.center[vAxis!]!) * (camera.zoom / ratio) + rect.height / 2;
       return {
-        x: canvas.left + rect.x / ratio + horizontal,
-        y: canvas.top + rect.y / ratio + vertical,
+        x: canvas.left + rect.x + horizontal,
+        y: canvas.top + rect.y + vertical,
       };
     },
     { view, point },
