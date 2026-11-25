@@ -13,7 +13,7 @@ import type { GameFileEntry } from '@platform/index';
 import { CommandBus } from './commandBus';
 import { SelectionManager } from './selection';
 import { mapTextToPastePatch, removeSelectionPatch, selectionToMapText } from './clipboard';
-import { subtractSelectionPatch } from './csg';
+import { intersectSelectionPatch, subtractSelectionPatch } from './csg';
 import { BrushTool, SelectTool, type ToolOutput, type ToolPointerEvent } from './tools';
 import type { PrimitiveKind } from '@core/geom/index';
 import { entriesFromFileList, entriesFromSinglePak, openGameVfs } from '@platform/index';
@@ -382,6 +382,24 @@ export class EditorApp {
       return true;
     } catch (error) {
       this.log('warning', `CSG Subtract failed: ${errorText(error)}`);
+      return false;
+    }
+  }
+
+  /** Replaces two or more selected brushes by their convex intersection. */
+  csgIntersect(): boolean {
+    const result = intersectSelectionPatch(this.document, this.selection);
+    if (!result) {
+      this.log('warning', 'CSG Intersect needs overlapping selected brushes with one parent.');
+      return false;
+    }
+    try {
+      this.executeCommand({ label: 'CSG Intersect', run: () => result.patch });
+      this.setSelection(result.ids);
+      this.log('ok', `CSG Intersect merged ${plural(result.targets, 'brush')}.`);
+      return true;
+    } catch (error) {
+      this.log('warning', `CSG Intersect failed: ${errorText(error)}`);
       return false;
     }
   }

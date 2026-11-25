@@ -1,5 +1,5 @@
 import { applyPatch, createId, mergePatches } from '@core/doc/index';
-import { analyzeBrush, subtractBrush } from '@core/geom/index';
+import { analyzeBrush, intersectBrushes, subtractBrush } from '@core/geom/index';
 import { PLANE_EPS } from '@core/geom/constants';
 import type { BrushNode, Id, MapDocument, MapNode, Patch } from '@core/types/index';
 
@@ -92,4 +92,43 @@ export function subtractSelectionPatch(
     changedTargets++;
   }
   return patch ? { patch, ids: fragmentIds, targets: changedTargets } : null;
+}
+
+/**
+ * Builds Qoole's CSG Intersect edit: all selected brushes are replaced by
+ * their single convex intersection. The current document has no scope support
+ * yet, so the brushes must share one container parent.
+ */
+export function intersectSelectionPatch(
+  doc: Readonly<MapDocument>,
+  selection: ReadonlySet<Id>,
+): CsgSubtractResult | null {
+  const brushes = [...selection]
+    .map((id) => doc.nodes.get(id))
+    .filter((node): node is BrushNode => node?.kind === 'brush');
+  if (brushes.length < 2) return null;
+  const parentId = doc.parent.get(brushes[0]!.id);
+  if (!parentId || brushes.some((brush) => doc.parent.get(brush.id) !== parentId)) return null;
+  const parent = doc.nodes.get(parentId);
+  if (!parent || parent.kind === 'brush') return null;
+  const intersection = intersectBrushes(brushes);
+  if (!intersection.ok) return null;
+
+  const keepId = brushes[0]!.id;
+  const replacement: BrushNode = { ...intersection.value, id: keepId };
+  const effective = emptyPatch();
+  record(effective, keepId, brushes[0]!, replacement);
+  effective.parentBefore.set(keepId, parentId);
+  effective.parentAfter.set(keepId, parentId);
+  for (const brush of brushes.slice(1)) {
+    record(effective, brush.id, brush, null);
+    effective.parentBefore.set(brush.id, parentId);
+    effective.parentAfter.set(brush.id, null);
+  }
+  const removed = new Set(brushes.slice(1).map((brush) => brush.id));
+  record(effective, parentId, parent, {
+    ...parent,
+    children: parent.children.filter((child) => !removed.has(child)),
+  });
+  return { patch: effective, ids: [keepId], targets: brushes.length };
 }

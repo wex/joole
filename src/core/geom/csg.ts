@@ -94,6 +94,37 @@ export function subtractBrush(target: BrushNode, cutter: BrushNode): Result<Brus
   return { ok: true, value: output };
 }
 
+/**
+ * Intersects convex brushes by merging their plane sets. Faces made redundant
+ * by the intersection are dropped. Returns null-valued output as an error when
+ * the intersection is empty.
+ */
+export function intersectBrushes(brushes: readonly BrushNode[]): Result<BrushNode, CsgError> {
+  if (brushes.length === 0) return { ok: false, error: 'invalid-target' };
+  for (const brush of brushes) {
+    if (!validateBrush(analyzeBrush(brush)).valid) return { ok: false, error: 'invalid-target' };
+  }
+  const first = brushes[0]!;
+  const seen: Plane[] = [];
+  const faces: Face[] = [];
+  for (const brush of brushes) {
+    for (const face of brush.faces) {
+      const plane = planeFromPoints(...face.points);
+      if (!plane) return { ok: false, error: 'invalid-target' };
+      if (seen.some((existing) => samePlane(existing, plane))) continue;
+      seen.push(plane);
+      faces.push({
+        points: face.points.map((point) => [...point] as Vec3) as Face['points'],
+        tex: { ...face.tex },
+      });
+    }
+  }
+  const merged: BrushNode = { ...first, faces };
+  const tight = tightBrush(merged);
+  if (!tight) return { ok: false, error: 'invalid-result' };
+  return { ok: true, value: tight };
+}
+
 /** Used by volume tests: every point is classified as outside when it is in front of at least one cutter plane. */
 export function insideConvexPlanes(point: Vec3, planes: readonly Plane[]): boolean {
   return planes.every((plane) => dot(point, plane.n) - plane.d < -PLANE_EPS);

@@ -65,3 +65,20 @@ describe('subtractSelectionPatch', () => {
     expect(subtractSelectionPatch(doc, new Set(['cutter']))).toBeNull();
   });
 });
+
+describe('intersectSelectionPatch', () => {
+  it('replaces selected brushes with their intersection as one undoable patch', async () => {
+    const { intersectSelectionPatch } = await import('./csg');
+    const a = { ...makeBox([0, 0, 0], [64, 64, 64]), id: 'a' };
+    const b = { ...makeBox([32, 0, 0], [96, 64, 64]), id: 'b' };
+    const doc = documentWith([a, b]);
+    const result = intersectSelectionPatch(doc, new Set(['a', 'b']))!;
+    const edited = applyPatch(doc, result.patch);
+    expect(edited.nodes.has('b')).toBe(false);
+    const intersection = edited.nodes.get('a') as BrushNode;
+    expect(analyzeBrush(intersection).volume).toBeCloseTo(32 * 64 * 64, 5);
+    const undone = applyPatch(edited, invertPatch(result.patch));
+    expect(undone.nodes.get('a')).toEqual(a);
+    expect(undone.nodes.get('b')).toEqual(b);
+  });
+});

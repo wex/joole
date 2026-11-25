@@ -638,6 +638,7 @@ export function EditorShell(props: EditorShellProps) {
         onOpenMap={chooseMap}
         onExportMap={() => void app.exportMap()}
         onCsgSubtract={() => app.csgSubtract()}
+        onCsgIntersect={() => app.csgIntersect()}
         onGridSize={(size) => app.setGridSize(size)}
         onToggleTheme={toggleTheme}
         activeTool={activeTool()}

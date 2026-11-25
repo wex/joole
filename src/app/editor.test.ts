@@ -187,4 +187,25 @@ describe('EditorApp', () => {
     expect(app.document.nodes.get('target')).toEqual(target);
     expect([...app.selection]).toEqual(['cutter']);
   });
+  it('CSG Intersect replaces overlapping selections and is undoable', () => {
+    const { app } = makeApp();
+    const a = { ...makeBox([0, 0, 0], [64, 64, 64]), id: 'a' };
+    const b = { ...makeBox([32, 0, 0], [96, 64, 64]), id: 'b' };
+    for (const brush of [a, b]) {
+      app.executeCommand({
+        label: 'Add brush',
+        run: (doc) => addNodePatch(doc, doc.worldspawn, brush),
+      });
+    }
+    app.setSelection(['a', 'b']);
+    expect(app.csgIntersect()).toBe(true);
+    expect(app.document.nodes.has('b')).toBe(false);
+    expect(analyzeBrush(app.document.nodes.get('a') as BrushNode).volume).toBeCloseTo(
+      32 * 64 * 64,
+      5,
+    );
+    expect(app.undo()).toBe(true);
+    expect(app.document.nodes.get('a')).toEqual(a);
+    expect(app.document.nodes.get('b')).toEqual(b);
+  });
 });

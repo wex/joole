@@ -16,6 +16,7 @@ export interface ToolbarProps {
   readonly onOpenMap: () => void;
   readonly onExportMap: () => void;
   readonly onCsgSubtract: () => void;
+  readonly onCsgIntersect: () => void;
   readonly onGridSize: (size: number) => void;
   readonly onToggleTheme: () => void;
   readonly onTool: (tool: ToolbarTool) => void;
@@ -135,6 +136,11 @@ export function Toolbar(props: ToolbarProps) {
             <li role="none">
               <button type="button" role="menuitem" onClick={() => choose(props.onCsgSubtract)}>
                 CSG Subtract
+              </button>
+            </li>
+            <li role="none">
+              <button type="button" role="menuitem" onClick={() => choose(props.onCsgIntersect)}>
+                CSG Intersect
               </button>
             </li>
           </ul>

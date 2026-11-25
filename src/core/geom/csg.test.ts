@@ -108,3 +108,92 @@ describe('subtractBrush', () => {
     ).toBe(true);
   });
 });
+
+describe('intersectBrushes', () => {
+  it('intersects overlapping boxes and drops redundant faces', async () => {
+    const { intersectBrushes } = await import('./csg');
+    const a = makeBox([0, 0, 0], [64, 64, 64]);
+    const b = makeBox([32, 16, 8], [96, 80, 72]);
+    const result = intersectBrushes([a, b]);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const analysis = analyzeBrush(result.value);
+    expect(validateBrush(analysis).valid).toBe(true);
+    expect(analysis.volume).toBeCloseTo(32 * 48 * 56, 5);
+    expect(analysis.aabb?.min).toEqual([32, 16, 8]);
+    expect(analysis.aabb?.max).toEqual([64, 64, 64]);
+  });
+
+  it('is idempotent for a valid intersection', async () => {
+    const { intersectBrushes } = await import('./csg');
+    const a = makeBox([0, 0, 0], [64, 64, 64]);
+    const b = makeBox([32, 0, 0], [96, 64, 64]);
+    const once = intersectBrushes([a, b]);
+    expect(once.ok).toBe(true);
+    if (!once.ok) return;
+    const twice = intersectBrushes([once.value, once.value]);
+    expect(twice.ok).toBe(true);
+    if (!twice.ok) return;
+    expect(analyzeBrush(twice.value).volume).toBeCloseTo(analyzeBrush(once.value).volume, 8);
+    expect(twice.value.faces).toHaveLength(once.value.faces.length);
+  });
+
+  it('fast-check: random box intersections are valid, contained and idempotent', async () => {
+    const { intersectBrushes } = await import('./csg');
+    fc.assert(
+      fc.property(
+        fc.integer({ min: -32, max: 48 }),
+        fc.integer({ min: -32, max: 48 }),
+        fc.integer({ min: -32, max: 48 }),
+        fc.integer({ min: 8, max: 48 }),
+        (x, y, z, size) => {
+          const a = makeBox([0, 0, 0], [64, 64, 64]);
+          const b = makeBox([x, y, z], [x + size, y + size, z + size]);
+          const result = intersectBrushes([a, b]);
+          const overlap = [0, 1, 2].reduce(
+            (product, axis) =>
+              product *
+              Math.max(0, Math.min(64, [x, y, z][axis]! + size) - Math.max(0, [x, y, z][axis]!)),
+            1,
+          );
+          if (overlap === 0) {
+            expect(result).toEqual({ ok: false, error: 'invalid-result' });
+            return;
+          }
+          expect(result.ok).toBe(true);
+          if (!result.ok) return;
+          const analysis = analyzeBrush(result.value);
+          expect(validateBrush(analysis).valid).toBe(true);
+          expect(analysis.volume).toBeCloseTo(overlap, 3);
+          const inputPlanes = [...a.faces, ...b.faces].map((face) =>
+            planeFromPoints(...face.points)!,
+          );
+          for (const polygon of analysis.polygons) {
+            for (const point of polygon ?? []) {
+              expect(
+                inputPlanes.every(
+                  (plane) =>
+                    plane.n[0]! * point[0]! +
+                      plane.n[1]! * point[1]! +
+                      plane.n[2]! * point[2]! -
+                      plane.d <=
+                    1e-3,
+                ),
+              ).toBe(true);
+            }
+          }
+          const twice = intersectBrushes([result.value, result.value]);
+          expect(twice.ok).toBe(true);
+        },
+      ),
+      { numRuns: 30 },
+    );
+  });
+
+  it('rejects an empty intersection', async () => {
+    const { intersectBrushes } = await import('./csg');
+    expect(
+      intersectBrushes([makeBox([0, 0, 0], [8, 8, 8]), makeBox([64, 0, 0], [72, 8, 8])]),
+    ).toEqual({ ok: false, error: 'invalid-result' });
+  });
+});

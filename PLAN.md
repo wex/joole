@@ -530,7 +530,7 @@ Goal: Qoole-level geometry operations, and textures that look exactly the same i
 - **Depends on:** P2.1
 - **Done when:** the properties and the benchmark pass.
 
-### [ ] P3.2 CSG intersect ⇄
+### [x] P3.2 CSG intersect ⇄
 
 - **Goal:** merge brush plane sets and drop redundant faces.
 - **Tests:** properties (the result is contained in every input, and is idempotent).
