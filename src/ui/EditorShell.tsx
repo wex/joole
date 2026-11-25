@@ -503,6 +503,16 @@ export function EditorShell(props: EditorShellProps) {
       if (isEditableTarget(event.target)) {
         return;
       }
+      if (
+        app.activeTool === 'clip' &&
+        (event.key === 'Enter' || event.key === 'Tab' || event.key === 'Escape') &&
+        !(pointerLocked || rightFly)
+      ) {
+        event.preventDefault();
+        const output = app.clipKey(event.key);
+        renderer.setToolPreview(output.preview ?? []);
+        return;
+      }
       const action = shortcutAction({
         key: event.key,
         ctrl: event.ctrlKey || event.metaKey,
@@ -536,9 +546,14 @@ export function EditorShell(props: EditorShellProps) {
         stepGrid(action === 'grid-down' ? -1 : 1);
         return;
       }
-      if ((action === 'tool-select' || action === 'tool-brush') && !(pointerLocked || rightFly)) {
+      if (
+        (action === 'tool-select' || action === 'tool-brush' || action === 'tool-clip') &&
+        !(pointerLocked || rightFly)
+      ) {
         event.preventDefault();
-        app.setToolMode(action === 'tool-select' ? 'select' : 'brush');
+        app.setToolMode(
+          action === 'tool-select' ? 'select' : action === 'tool-brush' ? 'brush' : 'clip',
+        );
         return;
       }
       if (action && action.startsWith('tool-') && !(pointerLocked || rightFly)) {
@@ -600,6 +615,7 @@ export function EditorShell(props: EditorShellProps) {
       } else if (event.type === 'grid') {
         setGridSize(app.gridSize);
       } else if (event.type === 'tool') {
+        renderer.setToolPreview([]);
         setActiveTool(app.activeTool);
         setBrushPrimitive(app.brushPrimitive);
         setBrushSides(app.brushSides);

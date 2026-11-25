@@ -19,6 +19,8 @@ import { createId } from '@core/doc/index';
 import { addNodePatch } from '@core/doc/commands';
 import { DEFAULT_TEXTURE } from '@game/q2/index';
 import { createTransformCommand } from './transformCommands';
+import { clipSelectionPatch } from './csg';
+import { clipPlaneFromPoints } from '@core/geom/csg';
 
 export type ToolView = PickAxis | '3d';
 
@@ -236,6 +238,109 @@ export class BrushTool {
 
   cancel(): void {
     this.mode = { kind: 'idle' };
+  }
+}
+
+type ClipMode =
+  | { kind: 'idle' }
+  | { kind: 'first'; first: Vec3; current: Vec3; view: PickAxis }
+  | { kind: 'defined'; first: Vec3; second: Vec3; view: PickAxis; side: 'front' | 'back' | 'both' };
+
+/** The plane Clip tool: two clicks define the plane, Tab cycles the kept side and Enter applies. */
+export class ClipTool {
+  private mode: ClipMode = { kind: 'idle' };
+  private selected = new Set<Id>();
+
+  constructor(
+    private readonly getDocument: () => Readonly<MapDocument>,
+    private readonly gridSize: () => number,
+  ) {}
+
+  setSelection(ids: Iterable<Id>): void {
+    this.selected = new Set(ids);
+  }
+
+  cancel(): void {
+    this.mode = { kind: 'idle' };
+  }
+
+  get side(): 'front' | 'back' | 'both' | null {
+    return this.mode.kind === 'defined' ? this.mode.side : null;
+  }
+
+  private snapped(point: Vec3, view: PickAxis): Vec3 {
+    const out = [...point] as Vec3;
+    const grid = this.gridSize();
+    for (const axis of planeAxes(view)) out[axis] = snap(out[axis], grid);
+    return out;
+  }
+
+  private previewSegments(): PreviewSegment[] {
+    if (this.mode.kind === 'first') return [[this.mode.first, this.mode.current]];
+    if (this.mode.kind === 'defined') return [[this.mode.first, this.mode.second]];
+    return [];
+  }
+
+  pointer(event: ToolPointerEvent): ToolOutput {
+    if (event.button !== 0 || event.view === '3d') return { commands: [] };
+    const point = this.snapped(event.point, event.view);
+    if (event.type === 'down') {
+      if (this.mode.kind === 'first') {
+        const axes = planeAxes(this.mode.view);
+        const sameView = event.view === this.mode.view;
+        const separated =
+          sameView &&
+          Math.hypot(
+            point[axes[0]]! - this.mode.first[axes[0]]!,
+            point[axes[1]]! - this.mode.first[axes[1]]!,
+          ) > 0;
+        if (separated) {
+          this.mode = {
+            kind: 'defined',
+            first: this.mode.first,
+            second: point,
+            view: this.mode.view,
+            side: 'front',
+          };
+        }
+      } else {
+        this.mode = { kind: 'first', first: point, current: point, view: event.view };
+      }
+    } else if (
+      event.type === 'move' &&
+      this.mode.kind === 'first' &&
+      event.view === this.mode.view
+    ) {
+      this.mode = { ...this.mode, current: point };
+    } else if (event.type === 'up') {
+      // The tool is click-click rather than drag-based; mouse-up only preserves state.
+    }
+    return { commands: [], preview: this.previewSegments() };
+  }
+
+  key(key: string): ToolOutput {
+    if (key === 'Escape') {
+      this.cancel();
+      return { commands: [], preview: [] };
+    }
+    if (this.mode.kind !== 'defined') return { commands: [], preview: this.previewSegments() };
+    if (key === 'Tab') {
+      const side =
+        this.mode.side === 'front' ? 'back' : this.mode.side === 'back' ? 'both' : 'front';
+      this.mode = { ...this.mode, side };
+      return { commands: [], preview: this.previewSegments() };
+    }
+    if (key !== 'Enter') return { commands: [], preview: this.previewSegments() };
+    const plane = clipPlaneFromPoints(this.mode.first, this.mode.second, this.mode.view);
+    if (!plane) return { commands: [], preview: this.previewSegments() };
+    const result = clipSelectionPatch(this.getDocument(), this.selected, plane, this.mode.side);
+    if (!result) return { commands: [], preview: this.previewSegments() };
+    this.cancel();
+    return {
+      commands: [{ label: 'Clip selection', run: () => result.patch }],
+      selection: new Set(result.ids),
+      preview: [],
+    };
   }
 }
 

@@ -218,3 +218,34 @@ describe('hollowBrush', () => {
     expect(volumeSum(result.value)).toBeCloseTo(80 ** 3 - 64 ** 3, 3);
   });
 });
+
+describe('clipBrush', () => {
+  it('clips a box to either side of a plane as valid halves', async () => {
+    const { clipBrush } = await import('./csg');
+    const box = makeBox([0, 0, 0], [64, 64, 64]);
+    const tex = box.faces[0]!.tex;
+    const plane = { n: [1, 0, 0] as [number, number, number], d: 32 };
+    for (const [side, minX, maxX] of [
+      ['front', 32, 64],
+      ['back', 0, 32],
+    ] as const) {
+      const result = clipBrush(box, plane, tex, side);
+      expect(result.ok).toBe(true);
+      if (!result.ok) continue;
+      expect(result.value).not.toBeNull();
+      const analysis = analyzeBrush(result.value!);
+      expect(validateBrush(analysis).valid).toBe(true);
+      expect(analysis.volume).toBeCloseTo(32 * 64 * 64, 5);
+      expect(analysis.aabb?.min[0]).toBeCloseTo(minX, 5);
+      expect(analysis.aabb?.max[0]).toBeCloseTo(maxX, 5);
+    }
+  });
+
+  it('builds clipping planes from two points in every 2D view', async () => {
+    const { clipPlaneFromPoints } = await import('./csg');
+    for (const view of ['xy', 'xz', 'yz'] as const) {
+      expect(clipPlaneFromPoints([0, 0, 0], [64, 64, 0], view)).not.toBeNull();
+    }
+    expect(clipPlaneFromPoints([0, 0, 0], [0, 0, 0], 'xy')).toBeNull();
+  });
+});

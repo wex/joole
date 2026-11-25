@@ -3,7 +3,7 @@ import { analyzeBrush, validateBrush } from './brush';
 import { PLANE_EPS, POINT_EPS } from './constants';
 import { planeFromPoints } from './plane';
 import { baseWindingForPlane } from './winding';
-import { cross, distance, dot, length, sub } from './vec3';
+import { cross, distance, dot, length, normalize, sub } from './vec3';
 
 export type CsgError = 'invalid-target' | 'invalid-cutter' | 'invalid-result';
 
@@ -92,6 +92,39 @@ export function subtractBrush(target: BrushNode, cutter: BrushNode): Result<Brus
     return { ok: false, error: 'invalid-result' };
   }
   return { ok: true, value: output };
+}
+
+export type ClipSide = 'front' | 'back' | 'both';
+
+/** Clips a brush to one side of a plane. `front` keeps the positive-normal side. */
+export function clipBrush(
+  brush: BrushNode,
+  plane: Plane,
+  tex: FaceTexture,
+  side: 'front' | 'back',
+): Result<BrushNode | null, CsgError> {
+  if (!validateBrush(analyzeBrush(brush)).valid) return { ok: false, error: 'invalid-target' };
+  const clipped = intersectHalfspace(brush, side === 'front' ? reversePlane(plane) : plane, tex);
+  return { ok: true, value: clipped };
+}
+
+/**
+ * Builds the clipping plane defined by two points in a 2D view plus that
+ * view's depth axis. The positive side is determined by the line direction;
+ * Tab in the Clip tool can always select the other side.
+ */
+export function clipPlaneFromPoints(
+  first: Vec3,
+  second: Vec3,
+  view: 'xy' | 'xz' | 'yz',
+): Plane | null {
+  const depth = view === 'xy' ? 2 : view === 'yz' ? 0 : 1;
+  const along = sub(second, first);
+  const depthVector: Vec3 = [0, 0, 0];
+  depthVector[depth] = 1;
+  const n = normalize(cross(along, depthVector));
+  if (length(n) <= PLANE_EPS) return null;
+  return { n, d: dot(first, n) };
 }
 
 export type HollowDirection = 'inward' | 'outward';

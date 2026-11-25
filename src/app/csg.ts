@@ -1,7 +1,13 @@
 import { applyPatch, createId, mergePatches } from '@core/doc/index';
-import { analyzeBrush, hollowBrush, intersectBrushes, subtractBrush } from '@core/geom/index';
+import {
+  analyzeBrush,
+  clipBrush,
+  hollowBrush,
+  intersectBrushes,
+  subtractBrush,
+} from '@core/geom/index';
 import { PLANE_EPS } from '@core/geom/constants';
-import type { BrushNode, Id, MapDocument, MapNode, Patch } from '@core/types/index';
+import type { BrushNode, Id, MapDocument, MapNode, Patch, Plane } from '@core/types/index';
 
 export interface CsgSubtractResult {
   readonly patch: Patch;
@@ -166,4 +172,60 @@ export function hollowSelectionPatch(
     children: parent.children.flatMap((child) => (child === target.id ? ids : [child])),
   });
   return { patch: effective, ids, targets: 1 };
+}
+
+/** Clips every selected brush with a plane, replacing each brush by its kept fragment(s). */
+export function clipSelectionPatch(
+  doc: Readonly<MapDocument>,
+  selection: ReadonlySet<Id>,
+  plane: Plane,
+  side: 'front' | 'back' | 'both',
+): CsgSubtractResult | null {
+  const targets = [...selection]
+    .map((id) => doc.nodes.get(id))
+    .filter((node): node is BrushNode => node?.kind === 'brush');
+  if (targets.length === 0) return null;
+  let patch: Patch | null = null;
+  let working = doc;
+  const fragmentIds: Id[] = [];
+  let changedTargets = 0;
+
+  for (const target of targets) {
+    const tex = target.faces[0]!.tex;
+    const pieces: BrushNode[] = [];
+    for (const half of side === 'both' ? (['front', 'back'] as const) : [side]) {
+      const result = clipBrush(target, plane, tex, half);
+      if (!result.ok) throw new Error(`Clip failed: ${result.error}`);
+      if (result.value) pieces.push(result.value);
+    }
+    if (pieces.length === 1 && side !== 'both') {
+      const beforeVolume = analyzeBrush(target).volume;
+      const afterVolume = analyzeBrush(pieces[0]!).volume;
+      if (Math.abs(beforeVolume - afterVolume) <= PLANE_EPS) continue;
+    }
+    const parentId = working.parent.get(target.id);
+    const parent = parentId ? working.nodes.get(parentId) : undefined;
+    if (!parentId || !parent || parent.kind === 'brush')
+      throw new Error('clipped brush has no container parent');
+    const ids = pieces.map((_, index) => (index === 0 ? target.id : createId()));
+    const replacements = pieces.map((piece, index) => ({ ...piece, id: ids[index]! }));
+    const effective = emptyPatch();
+    record(effective, target.id, target, replacements[0] ?? null);
+    effective.parentBefore.set(target.id, parentId);
+    effective.parentAfter.set(target.id, replacements.length > 0 ? parentId : null);
+    for (let i = 1; i < replacements.length; i++) {
+      record(effective, replacements[i]!.id, null, replacements[i]!);
+      effective.parentBefore.set(replacements[i]!.id, null);
+      effective.parentAfter.set(replacements[i]!.id, parentId);
+    }
+    record(effective, parentId, parent, {
+      ...parent,
+      children: parent.children.flatMap((child) => (child === target.id ? ids : [child])),
+    });
+    patch = patch ? mergePatches(patch, effective) : effective;
+    working = applyPatch(working, effective);
+    fragmentIds.push(...ids);
+    changedTargets++;
+  }
+  return patch ? { patch, ids: fragmentIds, targets: changedTargets } : null;
 }

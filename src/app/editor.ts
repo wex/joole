@@ -14,7 +14,7 @@ import { CommandBus } from './commandBus';
 import { SelectionManager } from './selection';
 import { mapTextToPastePatch, removeSelectionPatch, selectionToMapText } from './clipboard';
 import { hollowSelectionPatch, intersectSelectionPatch, subtractSelectionPatch } from './csg';
-import { BrushTool, SelectTool, type ToolOutput, type ToolPointerEvent } from './tools';
+import { BrushTool, ClipTool, SelectTool, type ToolOutput, type ToolPointerEvent } from './tools';
 import type { PrimitiveKind } from '@core/geom/index';
 import { entriesFromFileList, entriesFromSinglePak, openGameVfs } from '@platform/index';
 
@@ -75,7 +75,7 @@ export type EditorEvent =
   | { readonly type: 'recovery' };
 
 export type EditorListener = (event: EditorEvent) => void;
-export type EditorToolMode = 'select' | 'brush';
+export type EditorToolMode = 'select' | 'brush' | 'clip';
 
 const MAX_LOG_ENTRIES = 500;
 
@@ -118,6 +118,7 @@ export class EditorApp {
   private readonly selectionManager: SelectionManager;
   private readonly selectTool: SelectTool;
   private readonly brushTool: BrushTool;
+  private readonly clipTool: ClipTool;
   private toolMode: EditorToolMode = 'select';
   private map: string | null = null;
   private vfs: Awaited<ReturnType<typeof openGameVfs>> | null = null;
@@ -145,6 +146,10 @@ export class EditorApp {
       () => this.document,
       () => this.gridSize,
     );
+    this.clipTool = new ClipTool(
+      () => this.document,
+      () => this.gridSize,
+    );
     this.bus.subscribe((event) => {
       if (event.type !== 'history') {
         this.dirty = true;
@@ -154,6 +159,7 @@ export class EditorApp {
     });
     this.selectionManager.subscribe(() => {
       this.selectTool.setSelection(this.selectionManager.selection);
+      this.clipTool.setSelection(this.selectionManager.selection);
       this.emit({ type: 'selection' });
     });
     this.log('info', 'Joole ready. Open a game folder and a map.');
@@ -474,6 +480,7 @@ export class EditorApp {
     }
     this.selectTool.cancel();
     this.brushTool.cancel();
+    this.clipTool.cancel();
     this.toolMode = mode;
     this.emit({ type: 'tool' });
   }
@@ -490,8 +497,30 @@ export class EditorApp {
 
   /** Feeding a neutral pointer event through the active tool and applying its effects. */
   selectPointer(event: ToolPointerEvent): ToolOutput {
-    const tool = this.toolMode === 'brush' ? this.brushTool : this.selectTool;
+    const tool =
+      this.toolMode === 'brush'
+        ? this.brushTool
+        : this.toolMode === 'clip'
+          ? this.clipTool
+          : this.selectTool;
     const output = tool.pointer(event);
+    for (const command of output.commands) {
+      try {
+        this.executeCommand(command);
+      } catch (error) {
+        this.log('warning', error instanceof Error ? error.message : String(error));
+        break;
+      }
+    }
+    if (output.selection) {
+      this.setSelection(output.selection);
+    }
+    return output;
+  }
+
+  /** Feeds Enter, Tab and Escape to the Clip tool without intercepting ordinary shortcuts. */
+  clipKey(key: string): ToolOutput {
+    const output = this.clipTool.key(key);
     for (const command of output.commands) {
       try {
         this.executeCommand(command);

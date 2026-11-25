@@ -3,7 +3,7 @@ import type { PrimitiveKind } from '@core/geom/index';
 import { Icon } from './Icon';
 import styles from './Toolbar.module.css';
 
-export type ToolbarTool = 'select' | 'brush';
+export type ToolbarTool = 'select' | 'brush' | 'clip';
 
 export interface ToolbarProps {
   readonly gridSize: number;
@@ -37,7 +37,7 @@ const tools = [
   tool('select', 'Select (S)', 'mousePointer', true),
   tool('brush', 'Brush (B)', 'box', true),
   tool('entity', 'Entity (E)', 'circleUser'),
-  tool('clip', 'Clip (C)', 'clip'),
+  tool('clip', 'Clip (C)', 'clip', true),
   tool('vertex', 'Vertex (V)', 'move'),
   tool('face', 'Face (F)', 'scan'),
   tool('texture', 'Texture (T)', 'brush'),
@@ -186,7 +186,8 @@ export function Toolbar(props: ToolbarProps) {
             aria-pressed={props.activeTool === item.id ? 'true' : 'false'}
             disabled={!item.enabled}
             onClick={() => {
-              if (item.id === 'select' || item.id === 'brush') props.onTool(item.id);
+              if (item.id === 'select' || item.id === 'brush' || item.id === 'clip')
+                props.onTool(item.id);
             }}
           >
             <Icon name={item.icon} />

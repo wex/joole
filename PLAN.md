@@ -545,7 +545,7 @@ Goal: Qoole-level geometry operations, and textures that look exactly the same i
 - **Depends on:** P3.1
 - **Done when:** both directions work, and the result passes the compiler test.
 
-### [ ] P3.4 Plane clip and Clip tool (C)
+### [x] P3.4 Plane clip and Clip tool (C)
 
 - **Goal:** cut brushes with a plane given in a 2D view.
 - **Scope:** the plane is defined by two points plus the view's depth axis, with modes front, back or both. In the tool, Enter applies the clip and Tab switches which side is kept.

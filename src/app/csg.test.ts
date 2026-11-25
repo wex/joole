@@ -100,3 +100,32 @@ describe('hollowSelectionPatch', () => {
     expect(undone.nodes.get('target')).toEqual(target);
   });
 });
+
+describe('clipSelectionPatch', () => {
+  it('clips a selected brush to the front side and undo restores it', async () => {
+    const { clipSelectionPatch } = await import('./csg');
+    const target = { ...makeBox([0, 0, 0], [64, 64, 64]), id: 'target' };
+    const doc = documentWith([target]);
+    const result = clipSelectionPatch(doc, new Set(['target']), { n: [1, 0, 0], d: 32 }, 'front')!;
+    const edited = applyPatch(doc, result.patch);
+    const clipped = edited.nodes.get('target') as BrushNode;
+    expect(analyzeBrush(clipped).aabb?.min[0]).toBeCloseTo(32, 5);
+    expect(result.ids).toEqual(['target']);
+    const undone = applyPatch(edited, invertPatch(result.patch));
+    expect(undone.nodes.get('target')).toEqual(target);
+  });
+
+  it('both sides produce two sibling fragments', async () => {
+    const { clipSelectionPatch } = await import('./csg');
+    const target = { ...makeBox([0, 0, 0], [64, 64, 64]), id: 'target' };
+    const doc = documentWith([target]);
+    const result = clipSelectionPatch(doc, new Set(['target']), { n: [1, 0, 0], d: 32 }, 'both')!;
+    expect(result.ids).toHaveLength(2);
+    const edited = applyPatch(doc, result.patch);
+    const volume = result.ids.reduce(
+      (sum, id) => sum + analyzeBrush(edited.nodes.get(id) as BrushNode).volume,
+      0,
+    );
+    expect(volume).toBeCloseTo(64 ** 3, 4);
+  });
+});

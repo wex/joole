@@ -221,4 +221,40 @@ describe('EditorApp', () => {
     expect(app.undo()).toBe(true);
     expect(app.document.nodes.get('target')).toEqual(target);
   });
+  it('clipKey applies the Clip tool command and is undoable', () => {
+    const { app } = makeApp();
+    const target = { ...makeBox([0, 0, 0], [64, 64, 64]), id: 'target' };
+    app.executeCommand({
+      label: 'Add brush',
+      run: (doc) => addNodePatch(doc, doc.worldspawn, target),
+    });
+    app.setSelection(['target']);
+    app.setToolMode('clip');
+    app.selectPointer({
+      type: 'down',
+      button: 0,
+      view: 'xy',
+      point: [32, 0, 0],
+      tolerance: 4,
+      shift: false,
+      ctrl: false,
+    });
+    app.selectPointer({
+      type: 'down',
+      button: 0,
+      view: 'xy',
+      point: [32, 64, 0],
+      tolerance: 4,
+      shift: false,
+      ctrl: false,
+    });
+    const output = app.clipKey('Enter');
+    expect(output.commands).toHaveLength(1);
+    expect(analyzeBrush(app.document.nodes.get('target') as BrushNode).aabb?.min[0]).toBeCloseTo(
+      32,
+      5,
+    );
+    expect(app.undo()).toBe(true);
+    expect(app.document.nodes.get('target')).toEqual(target);
+  });
 });
