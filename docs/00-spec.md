@@ -465,6 +465,11 @@ The implementation proceeds in five phases. Each phase ends with a usable versio
 4. **Entities and structure.** The definition file parser, the entity panel, brush entities, the tree view, groups and entering a group, prefabs, md2 preview and `target` lines. _Done when_ a working single-player level (player start, door, button, enemy) can be made from start to finish.
 5. **Compilation and polish.** WASM tools in the browser (qbsp3, qvis3 and qrad3 in workers, threads), the leak path, compile profiles, PWA, the performance targets and Firefox/Safari support. _Done when_ the targets in the performance table are met and a map compiles to a playable BSP file without leaving the browser.
 
+**Decisions 26.11.2026:**
+
+- **`style-src` allows `'unsafe-inline'`:** WebKit is the only engine that enforces `style-src` against runtime style-attribute writes, and it blocked the editor's dynamic geometry (virtual scrolling positions, splitter sizes, tree indentation). Replacing continuous per-element geometry with static classes is not feasible, and style-attribute injection carries no script-execution or network vector, so the relaxation is scoped to styles only; `script-src` stays strict. The violations were observed on WebKit 27.2 in CI.
+- **CI runs on `ubuntu-24.04`, not `ubuntu-latest`:** the `ubuntu-latest` image rolled to 26.04, which Playwright's browsers are not built for — Firefox (an ubuntu-24.04 build) could not create WebGL contexts there and every test failed at boot. The pinned image matches the documented development environment.
+
 **Decisions 24.11.2026:**
 
 - **Licence:** GNU General Public License v2.0 or later (`GPL-2.0-or-later`), the same as all source projects. Code from Qoole, q2pro, Q2 and the Q2 tools may be used.

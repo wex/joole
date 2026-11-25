@@ -79,6 +79,8 @@ test('a patch updates only its brushes, and its inverse restores the same pixels
 test('the canvas follows its element size and redraws once', async ({ page }) => {
   await open(page, 'mode=flat');
   await page.setViewportSize({ width: 800, height: 600 });
+  // The backing store is element size times the device pixel ratio, which
+  // differs across engines (WebKit headless reports 2, Chromium 1).
   await expect
     .poll(() =>
       page.evaluate(() => [
@@ -86,7 +88,10 @@ test('the canvas follows its element size and redraws once', async ({ page }) =>
         document.querySelector('canvas')!.height,
       ]),
     )
-    .toEqual([800, 600]);
+    .toEqual([
+      800 * (await page.evaluate(() => devicePixelRatio)),
+      600 * (await page.evaluate(() => devicePixelRatio)),
+    ]);
   await page.evaluate(() => window.jooleRender!.whenIdle());
   const frames = await page.evaluate(() => window.jooleRender!.stats().frames);
   await page.waitForTimeout(300);
