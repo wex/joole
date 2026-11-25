@@ -795,7 +795,7 @@ Status (26.11.2026): **the full E2E suite passes on all three engines**, locally
 - **Depends on:** P0.8, P5.4
 - **Done when:** production passes the smoke E2E test.
 
-### [ ] P5.8 Release 1.0
+### [x] P5.8 Release 1.0
 
 - **Goal:** ship v1.0.
 - **Scope:** a version bump, release notes, a complete `THIRD_PARTY_NOTICES.md`, final documentation, and a tag.
