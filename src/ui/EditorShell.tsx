@@ -656,6 +656,9 @@ export function EditorShell(props: EditorShellProps) {
         onCsgSubtract={() => app.csgSubtract()}
         onCsgIntersect={() => app.csgIntersect()}
         onHollow={(direction) => app.hollowSelection(direction)}
+        onFlip={(axis) => app.flipSelection(axis)}
+        onMirror={(axis) => app.mirrorSelection(axis)}
+        onRotate90={() => app.rotate90Selection()}
         onGridSize={(size) => app.setGridSize(size)}
         onToggleTheme={toggleTheme}
         activeTool={activeTool()}

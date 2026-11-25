@@ -18,6 +18,9 @@ export interface ToolbarProps {
   readonly onCsgSubtract: () => void;
   readonly onCsgIntersect: () => void;
   readonly onHollow: (direction: 'inward' | 'outward') => void;
+  readonly onFlip: (axis: 0 | 1 | 2) => void;
+  readonly onMirror: (axis: 0 | 1 | 2) => void;
+  readonly onRotate90: () => void;
   readonly onGridSize: (size: number) => void;
   readonly onToggleTheme: () => void;
   readonly onTool: (tool: ToolbarTool) => void;
@@ -160,6 +163,41 @@ export function Toolbar(props: ToolbarProps) {
                 onClick={() => choose(() => props.onHollow('outward'))}
               >
                 Hollow Outward
+              </button>
+            </li>
+            <li role="none">
+              <button type="button" role="menuitem" onClick={() => choose(() => props.onFlip(0))}>
+                Flip X
+              </button>
+            </li>
+            <li role="none">
+              <button type="button" role="menuitem" onClick={() => choose(() => props.onFlip(1))}>
+                Flip Y
+              </button>
+            </li>
+            <li role="none">
+              <button type="button" role="menuitem" onClick={() => choose(() => props.onFlip(2))}>
+                Flip Z
+              </button>
+            </li>
+            <li role="none">
+              <button type="button" role="menuitem" onClick={() => choose(() => props.onMirror(0))}>
+                Mirror X
+              </button>
+            </li>
+            <li role="none">
+              <button type="button" role="menuitem" onClick={() => choose(() => props.onMirror(1))}>
+                Mirror Y
+              </button>
+            </li>
+            <li role="none">
+              <button type="button" role="menuitem" onClick={() => choose(() => props.onMirror(2))}>
+                Mirror Z
+              </button>
+            </li>
+            <li role="none">
+              <button type="button" role="menuitem" onClick={() => choose(props.onRotate90)}>
+                Rotate 90°
               </button>
             </li>
           </ul>

@@ -553,7 +553,7 @@ Goal: Qoole-level geometry operations, and textures that look exactly the same i
 - **Depends on:** P2.5
 - **Done when:** the tool works in every 2D view.
 
-### [ ] P3.5 Mirror, flip and rotate 90° ⇄
+### [x] P3.5 Mirror, flip and rotate 90° ⇄
 
 - **Goal:** mirror on X, Y or Z with each face's point order reversed so normals still point outwards, and rotate by 90°.
 - **Tests:** properties (validity, and mirroring twice gives the identity).

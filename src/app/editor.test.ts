@@ -257,4 +257,36 @@ describe('EditorApp', () => {
     expect(app.undo()).toBe(true);
     expect(app.document.nodes.get('target')).toEqual(target);
   });
+  it('flip, mirror and rotate90 are undoable commands on the selection', () => {
+    const { app } = makeApp();
+    const target = { ...makeBox([0, 0, 0], [64, 32, 16]), id: 'target' };
+    app.executeCommand({
+      label: 'Add brush',
+      run: (doc) => addNodePatch(doc, doc.worldspawn, target),
+    });
+    app.setSelection(['target']);
+
+    expect(app.flipSelection(0)).toBe(true);
+    expect(app.undo()).toBe(true);
+    expect(app.document.nodes.get('target')).toEqual(target);
+
+    expect(app.rotate90Selection()).toBe(true);
+    const rotated = app.document.nodes.get('target') as BrushNode;
+    expect(rotated).not.toEqual(target);
+    for (const face of rotated.faces) {
+      for (const point of face.points) {
+        for (const c of point) expect(Number.isInteger(c)).toBe(true);
+      }
+    }
+    expect(app.undo()).toBe(true);
+    expect(app.document.nodes.get('target')).toEqual(target);
+
+    expect(app.mirrorSelection(1)).toBe(true);
+    expect(app.document.nodes.size).toBe(3);
+    expect(app.document.nodes.get('target')).toEqual(target);
+    expect(app.selection.has('target')).toBe(false);
+    expect(app.selection.size).toBe(1);
+    expect(app.undo()).toBe(true);
+    expect(app.document.nodes.size).toBe(2);
+  });
 });

@@ -14,6 +14,7 @@ import { CommandBus } from './commandBus';
 import { SelectionManager } from './selection';
 import { mapTextToPastePatch, removeSelectionPatch, selectionToMapText } from './clipboard';
 import { hollowSelectionPatch, intersectSelectionPatch, subtractSelectionPatch } from './csg';
+import { createFlipCommand, createRotate90Command, mirrorSelectionPatch } from './mirrorCommands';
 import { BrushTool, ClipTool, SelectTool, type ToolOutput, type ToolPointerEvent } from './tools';
 import type { PrimitiveKind } from '@core/geom/index';
 import { entriesFromFileList, entriesFromSinglePak, openGameVfs } from '@platform/index';
@@ -388,6 +389,56 @@ export class EditorApp {
       return true;
     } catch (error) {
       this.log('warning', `CSG Subtract failed: ${errorText(error)}`);
+      return false;
+    }
+  }
+
+  /** Flips the selected brushes in place across the axis plane through their center. */
+  flipSelection(axis: 0 | 1 | 2): boolean {
+    if (this.selection.size === 0) {
+      this.log('warning', 'Flip needs a selection.');
+      return false;
+    }
+    try {
+      this.executeCommand(createFlipCommand([...this.selection], axis));
+      this.log('ok', `Flipped the selection on ${'XYZ'[axis]}.`);
+      return true;
+    } catch (error) {
+      this.log('warning', `Flip failed: ${errorText(error)}`);
+      return false;
+    }
+  }
+
+  /** Duplicates the selection and flips the copies; the copies become selected. */
+  mirrorSelection(axis: 0 | 1 | 2): boolean {
+    const result = mirrorSelectionPatch(this.document, this.selection, axis);
+    if (!result) {
+      this.log('warning', 'Mirror needs a selected brush.');
+      return false;
+    }
+    try {
+      this.executeCommand({ label: `Mirror ${'XYZ'[axis]}`, run: () => result.patch });
+      this.setSelection(result.ids);
+      this.log('ok', `Mirrored ${plural(result.targets, 'brush')} on ${'XYZ'[axis]}.`);
+      return true;
+    } catch (error) {
+      this.log('warning', `Mirror failed: ${errorText(error)}`);
+      return false;
+    }
+  }
+
+  /** Rotates the selection exactly 90° counterclockwise about Z through its center. */
+  rotate90Selection(): boolean {
+    if (this.selection.size === 0) {
+      this.log('warning', 'Rotate 90° needs a selection.');
+      return false;
+    }
+    try {
+      this.executeCommand(createRotate90Command([...this.selection]));
+      this.log('ok', 'Rotated the selection 90°.');
+      return true;
+    } catch (error) {
+      this.log('warning', `Rotate 90° failed: ${errorText(error)}`);
       return false;
     }
   }
