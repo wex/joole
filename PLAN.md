@@ -786,7 +786,7 @@ Goal: the full compile cycle in the browser, plus the performance targets, brows
 - **Depends on:** P1.12 and all feature WPs
 - **Done when:** every target is met and recorded.
 
-### [ ] P5.7 Production hosting
+### [x] P5.7 Production hosting
 
 - **Goal:** a public deployment.
 - **Scope:** the production deployment of `main` on Cloudflare Workers with `_headers`, a check that `crossOriginIsolated` is true in production, and a custom domain if the owner wants one by then.

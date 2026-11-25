@@ -97,6 +97,7 @@ If a change requires a new dependency direction, the spec's rule table, the Merm
 | `pnpm test:coverage`                | Coverage, `core/` threshold ≥ 90 %                                               |
 | `pnpm bench`                        | Vitest benchmarks                                                                |
 | `pnpm e2e`                          | Playwright tests                                                                 |
+| `pnpm e2e:production`               | Added in P5.7: the production smoke test against the live deployment             |
 | `pnpm build:tools`                  | Added in P2.11: qbsp3, qvis3 and qrad3 to WebAssembly into `workers/`            |
 | `pnpm gen:entities`                 | Added in P4.2: generates `game/q2/q2.def` and the md2 table from the game code   |
 | `pnpm check`                        | All checks before a commit: format:check, lint, typecheck, test, build           |
