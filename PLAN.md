@@ -409,7 +409,7 @@ Goal: editing through commands with unlimited undo, project files and autosave, 
 - **Depends on:** P1.2
 - **Done when:** picks are correct, and the benchmark is recorded.
 
-### [ ] P2.4 Transforms and grid (`core/geom`, `app`)
+### [x] P2.4 Transforms and grid (`core/geom`, `app`)
 
 - **Goal:** move, rotate and scale brushes as the spec describes.
 - **Scope:**

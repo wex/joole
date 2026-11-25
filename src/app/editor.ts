@@ -146,6 +146,16 @@ export class EditorApp {
     return true;
   }
 
+  /** The `[` key behaviour: halve the grid, down to 1. */
+  decreaseGridSize(): boolean {
+    return this.setGridSize(Math.max(1, this.grid / 2));
+  }
+
+  /** The `]` key behaviour: double the grid, up to 256. */
+  increaseGridSize(): boolean {
+    return this.setGridSize(Math.min(256, this.grid * 2));
+  }
+
   /** The native directory-picker path. Returns false when the user cancels. */
   async openGameFolder(): Promise<boolean> {
     if (!this.pickGameEntries) {

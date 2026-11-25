@@ -121,6 +121,13 @@ describe('EditorApp', () => {
     expect(app.gridSize).toBe(8);
     expect(app.setGridSize(512)).toBe(false);
     expect(app.setGridSize(1)).toBe(true);
+    expect(app.increaseGridSize()).toBe(true);
+    expect(app.gridSize).toBe(2);
+    app.setGridSize(256);
+    expect(app.increaseGridSize()).toBe(true);
+    expect(app.gridSize).toBe(256);
+    expect(app.decreaseGridSize()).toBe(true);
+    expect(app.gridSize).toBe(128);
   });
 
   it('caps the log and keeps the newest entries', () => {
