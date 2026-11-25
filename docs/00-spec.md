@@ -287,6 +287,8 @@ Clipboard editing serialises the selected brushes in clipboard mode (full float 
 
 Project saving is implemented as versioned `joole-project` JSON with exact JSON float round trips and a migration chain entry point. Ctrl+S uses the File System Access save picker in Chromium and the download path elsewhere or when the picker is unavailable; grid settings and recent-file metadata are persisted in OPFS. Exporting `.map` remains a separate writer path with integer-point warnings.
 
+Autosave writes the current project to OPFS every 30 seconds once a command has made it dirty, and again on `pagehide`. The dirty flag is cleared only by an explicit project save/download. On start-up, a dirty autosave produces a recovery prompt; accepting loads it as `recovered.joole.json`, and discarding clears the recovery metadata.
+
 ## Rendering with WebGL2
 
 All four views are drawn into one WebGL2 context and one `<canvas>` element using `gl.scissor` and `gl.viewport`. Textures and buffers are then shared between the views, and four browser contexts are not used up. Qoole's `QDraw` abstraction (OpenGL, Glide, DirectX, MGL, software rendering) is replaced by a single renderer.

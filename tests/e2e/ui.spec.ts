@@ -12,6 +12,7 @@ interface JooleWindow {
       textures: readonly { name: string; width: number; height: number }[];
     };
     selection(): string[];
+    autosave(): Promise<boolean>;
   };
 }
 
@@ -312,5 +313,33 @@ test('Ctrl+S downloads a project and the project reloads without loss', async ({
   expect(await page.evaluate(() => (window as unknown as JooleWindow).joole!.stats().nodes)).toBe(
     nodesBefore,
   );
+  expect(errors).toEqual([]);
+});
+
+test('an edit autosaves and reload offers recovery', async ({ page }) => {
+  const errors = consoleErrors(page);
+  await contextlessOpen(page);
+
+  async function contextlessOpen(page: Page) {
+    await openFixtureMap(page);
+  }
+  const nodesBefore = await page.evaluate(
+    () => (window as unknown as JooleWindow).joole!.stats().nodes,
+  );
+  const top = await viewPoint(page, 'top');
+  await page.mouse.click(top.x, top.y, { button: 'left' });
+  await page.keyboard.press('Control+d');
+  await expect
+    .poll(() => page.evaluate(() => (window as unknown as JooleWindow).joole!.stats().nodes))
+    .toBe(nodesBefore + 1);
+  await page.evaluate(() => (window as unknown as JooleWindow).joole!.autosave());
+
+  await page.reload();
+  await expect(page.locator('[data-testid=recovery-prompt]')).toBeVisible();
+  await page.getByRole('button', { name: 'Recover' }).click();
+  await page.evaluate(() => (window as unknown as JooleWindow).joole!.whenIdle());
+  await expect
+    .poll(() => page.evaluate(() => (window as unknown as JooleWindow).joole!.stats().nodes))
+    .toBe(nodesBefore + 1);
   expect(errors).toEqual([]);
 });

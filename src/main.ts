@@ -94,6 +94,7 @@ const app = new EditorApp({
   clipboard: navigator.clipboard,
   saveProjectText: saveTextFile,
   saveMapText: saveTextFile,
+  autosaveStore: projectStore ?? undefined,
 });
 
 const canvas = document.createElement('canvas');
@@ -101,6 +102,10 @@ const renderer = new Renderer(canvas, {
   colorSource: document.documentElement,
   loadTexture: (name) => app.loadTexture(name),
 });
+const storedAutosave = await projectStore?.loadAutosave();
+if (storedAutosave?.dirty && storedAutosave.project) app.offerRecovery(storedAutosave.project);
+setInterval(() => void app.autosave(), 30000);
+window.addEventListener('pagehide', () => void app.autosave());
 renderer.setDocument(app.document);
 if (typeof settings?.gridSize === 'number') app.setGridSize(settings.gridSize);
 renderer.setGridSize(app.gridSize);
@@ -114,13 +119,14 @@ app.subscribe((event) => {
     } else {
       renderer.setDocument(app.document);
     }
+    if (app.mapName) void projectStore?.saveRecentFiles([app.mapName]);
   } else if (event.type === 'selection') {
     renderer.setSelection(app.selection);
   } else if (event.type === 'game') {
     renderer.reloadTextures();
   } else if (event.type === 'grid') {
-    if (typeof settings?.gridSize === 'number') app.setGridSize(settings.gridSize);
     renderer.setGridSize(app.gridSize);
+    void projectStore?.saveSettings({ gridSize: app.gridSize });
   }
 });
 
@@ -130,6 +136,7 @@ declare global {
       whenIdle: () => Promise<void>;
       stats: () => ReturnType<Renderer['stats']>;
       selection: () => string[];
+      autosave: () => Promise<boolean>;
     };
   }
 }
@@ -137,6 +144,7 @@ window.joole = {
   whenIdle: () => renderer.whenIdle(),
   stats: () => renderer.stats(),
   selection: () => [...app.selection],
+  autosave: () => app.autosave(),
 };
 
 mountEditorShell({ app, renderer, canvas }, root);

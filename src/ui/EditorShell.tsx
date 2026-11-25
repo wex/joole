@@ -105,6 +105,7 @@ export function EditorShell(props: EditorShellProps) {
   const [activeTool, setActiveTool] = createSignal(app.activeTool);
   const [brushPrimitive, setBrushPrimitive] = createSignal(app.brushPrimitive);
   const [brushSides, setBrushSides] = createSignal(app.brushSides);
+  const [recoveryAvailable, setRecoveryAvailable] = createSignal(app.recoveryProject !== null);
 
   let viewportElement: HTMLDivElement | undefined;
   let mainElement: HTMLDivElement | undefined;
@@ -587,6 +588,8 @@ export function EditorShell(props: EditorShellProps) {
         setActiveTool(app.activeTool);
         setBrushPrimitive(app.brushPrimitive);
         setBrushSides(app.brushSides);
+      } else if (event.type === 'recovery') {
+        setRecoveryAvailable(app.recoveryProject !== null);
       }
     });
     const initialFrame = requestAnimationFrame(() => {
@@ -749,6 +752,23 @@ export function EditorShell(props: EditorShellProps) {
         />
         <PropertiesPanel mapName={mapName()} gameOpen={gameOpen()} />
       </div>
+      <Show when={recoveryAvailable()}>
+        <div
+          class={styles.recoveryPrompt}
+          role="alertdialog"
+          aria-label="Recover autosave"
+          data-testid="recovery-prompt"
+        >
+          <strong>Recover unsaved work?</strong>
+          <span>An autosaved project is available.</span>
+          <button type="button" onClick={() => void app.acceptRecovery()}>
+            Recover
+          </button>
+          <button type="button" onClick={() => void app.discardRecovery()}>
+            Discard
+          </button>
+        </div>
+      </Show>
       <input
         ref={(el) => (gameInput = el)}
         class={styles.fileInput}

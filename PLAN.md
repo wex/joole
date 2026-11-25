@@ -481,7 +481,7 @@ Goal: editing through commands with unlimited undo, project files and autosave, 
 - **Depends on:** P1.5, P1.6, P2.1
 - **Done when:** projects save and reload without loss in Chromium and through the download path.
 
-### [ ] P2.10 Autosave and recovery (`app`, `platform`)
+### [x] P2.10 Autosave and recovery (`app`, `platform`)
 
 - **Goal:** never lose work.
 - **Scope:** autosave to OPFS every 30 s and on `pagehide`, an unsaved-changes flag that is cleared by a save or a download, and a recovery prompt on start when the flag is set.

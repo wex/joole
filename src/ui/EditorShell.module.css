@@ -215,3 +215,18 @@
 .contextMenuItem:disabled {
   color: var(--ink-disabled);
 }
+
+.recoveryPrompt {
+  position: absolute;
+  z-index: 20;
+  right: var(--space-md);
+  bottom: var(--space-md);
+  display: flex;
+  gap: var(--space-sm);
+  align-items: center;
+  padding: var(--space-md);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  color: var(--ink);
+}

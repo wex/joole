@@ -37,6 +37,11 @@ export interface TextureCacheLike {
   put(key: string, texture: ConvertedTexture): Promise<void>;
 }
 
+export interface AutosaveStoreLike {
+  saveAutosave(project: string, dirty: boolean): Promise<void>;
+  clearAutosave(): Promise<void>;
+}
+
 export interface EditorAppOptions {
   readonly inflate: Inflate;
   readonly textureClient: TextureWorkerLike;
@@ -49,6 +54,7 @@ export interface EditorAppOptions {
   /** Saves project text; main.ts uses a file handle or a download. */
   readonly saveProjectText?: (name: string, text: string) => Promise<boolean>;
   readonly saveMapText?: (name: string, text: string) => Promise<boolean>;
+  readonly autosaveStore?: AutosaveStoreLike;
 }
 
 export type EditorEvent =
@@ -57,7 +63,8 @@ export type EditorEvent =
   | { readonly type: 'log' }
   | { readonly type: 'grid' }
   | { readonly type: 'selection' }
-  | { readonly type: 'tool' };
+  | { readonly type: 'tool' }
+  | { readonly type: 'recovery' };
 
 export type EditorListener = (event: EditorEvent) => void;
 export type EditorToolMode = 'select' | 'brush';
@@ -94,6 +101,9 @@ export class EditorApp {
   private readonly clipboard?: ClipboardLike;
   private readonly saveProjectText?: (name: string, text: string) => Promise<boolean>;
   private readonly saveMapText?: (name: string, text: string) => Promise<boolean>;
+  private readonly autosaveStore?: AutosaveStoreLike;
+  private dirty = false;
+  private recovery: string | null = null;
   private entries: LogEntry[] = [];
   private nextLogId = 1;
   private readonly bus: CommandBus;
@@ -116,6 +126,7 @@ export class EditorApp {
     this.clipboard = options.clipboard;
     this.saveProjectText = options.saveProjectText;
     this.saveMapText = options.saveMapText;
+    this.autosaveStore = options.autosaveStore;
     this.bus = new CommandBus(createEmptyDocument());
     this.selectionManager = new SelectionManager(this.bus);
     this.selectTool = new SelectTool(
@@ -128,6 +139,7 @@ export class EditorApp {
     );
     this.bus.subscribe((event) => {
       if (event.type !== 'history') {
+        this.dirty = true;
         this.selectTool.applyPatch(event.document, event.patch);
         this.emit({ type: 'document', patch: event.patch });
       }
@@ -396,6 +408,44 @@ export class EditorApp {
     return output;
   }
 
+  get hasUnsavedChanges(): boolean {
+    return this.dirty;
+  }
+
+  get recoveryProject(): string | null {
+    return this.recovery;
+  }
+
+  offerRecovery(project: string): void {
+    this.recovery = project;
+    this.emit({ type: 'recovery' });
+  }
+
+  async acceptRecovery(): Promise<boolean> {
+    if (!this.recovery) return false;
+    const text = this.recovery;
+    this.recovery = null;
+    this.emit({ type: 'recovery' });
+    const opened = await this.openProjectText('recovered.joole.json', text);
+    if (opened) {
+      this.dirty = true;
+      await this.autosaveStore?.clearAutosave();
+    }
+    return opened;
+  }
+
+  async discardRecovery(): Promise<void> {
+    this.recovery = null;
+    this.emit({ type: 'recovery' });
+    await this.autosaveStore?.clearAutosave();
+  }
+
+  async autosave(): Promise<boolean> {
+    if (!this.dirty || !this.autosaveStore) return false;
+    await this.autosaveStore.saveAutosave(this.projectText(), true);
+    return true;
+  }
+
   projectText(): string {
     return writeProject(this.document, { gridSize: this.gridSize });
   }
@@ -408,7 +458,11 @@ export class EditorApp {
     if (!this.saveProjectText) return false;
     const name = (this.map?.replace(/\.(map|joole\.json)$/i, '') ?? 'untitled') + '.joole.json';
     const saved = await this.saveProjectText(name, this.projectText());
-    if (saved) this.log('ok', `Project saved as ${name}.`);
+    if (saved) {
+      this.dirty = false;
+      void this.autosaveStore?.clearAutosave();
+      this.log('ok', `Project saved as ${name}.`);
+    }
     return saved;
   }
 
