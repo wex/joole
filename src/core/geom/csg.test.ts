@@ -44,8 +44,15 @@ describe('subtractBrush', () => {
           const result = subtractBrush(target, cutter);
           expect(result.ok).toBe(true);
           if (!result.ok) return;
+          const cutterPlanes = cutter.faces.map((face) => planeFromPoints(...face.points)!);
           for (const brush of result.value) {
-            expect(validateBrush(analyzeBrush(brush)).valid).toBe(true);
+            const analysis = analyzeBrush(brush);
+            expect(validateBrush(analysis).valid).toBe(true);
+            for (const polygon of analysis.polygons) {
+              for (const point of polygon ?? []) {
+                expect(insideConvexPlanes(point, cutterPlanes)).toBe(false);
+              }
+            }
           }
           const overlap = [0, 1, 2].reduce(
             (product, axis) =>

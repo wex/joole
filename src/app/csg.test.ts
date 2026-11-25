@@ -1,0 +1,67 @@
+import { describe, expect, it } from 'vitest';
+import { addNodePatch, applyPatch, createEmptyDocument, invertPatch } from '@core/doc/index';
+import { analyzeBrush } from '@core/geom/index';
+import { makeBox } from '@core/geom/__tests__/helpers';
+import type { BrushNode, MapDocument } from '@core/types/index';
+import { subtractSelectionPatch } from './csg';
+
+function documentWith(brushes: BrushNode[]): MapDocument {
+  let doc = createEmptyDocument();
+  for (const brush of brushes) doc = applyPatch(doc, addNodePatch(doc, doc.worldspawn, brush));
+  return doc;
+}
+
+describe('subtractSelectionPatch', () => {
+  it('treats selected brushes as cutters and cuts overlapping unselected brushes', () => {
+    const target = { ...makeBox([0, 0, 0], [64, 64, 64]), id: 'target' };
+    const untouched = { ...makeBox([256, 0, 0], [320, 64, 64]), id: 'untouched' };
+    const cutter = { ...makeBox([32, 32, 32], [96, 96, 96]), id: 'cutter' };
+    const doc = documentWith([target, untouched, cutter]);
+    const result = subtractSelectionPatch(doc, new Set(['cutter']));
+    expect(result).not.toBeNull();
+    const edited = applyPatch(doc, result!.patch);
+    expect(edited.nodes.has('cutter')).toBe(true);
+    expect(edited.nodes.get('untouched')).toBe(untouched);
+    expect(result!.targets).toBe(1);
+    expect(result!.ids.length).toBeGreaterThan(1);
+    const volume = result!.ids.reduce(
+      (sum, id) => sum + analyzeBrush(edited.nodes.get(id) as BrushNode).volume,
+      0,
+    );
+    expect(volume).toBeCloseTo(64 ** 3 - 32 ** 3, 3);
+  });
+
+  it('removes a fully contained target and preserves parent child order', () => {
+    const before = { ...makeBox([96, 0, 0], [104, 8, 8]), id: 'before' };
+    const target = { ...makeBox([16, 16, 16], [32, 32, 32]), id: 'target' };
+    const after = { ...makeBox([128, 0, 0], [136, 8, 8]), id: 'after' };
+    const cutter = { ...makeBox([0, 0, 0], [64, 64, 64]), id: 'cutter' };
+    const doc = documentWith([before, target, after, cutter]);
+    const result = subtractSelectionPatch(doc, new Set(['cutter']))!;
+    const edited = applyPatch(doc, result.patch);
+    expect(edited.nodes.has('target')).toBe(false);
+    const world = edited.nodes.get(edited.worldspawn);
+    expect(world?.kind).toBe('entity');
+    if (world?.kind === 'entity') expect(world.children).toEqual(['before', 'after', 'cutter']);
+  });
+
+  it('undo restores the original document', () => {
+    const target = { ...makeBox([0, 0, 0], [64, 64, 64]), id: 'target' };
+    const cutter = { ...makeBox([32, 32, 32], [96, 96, 96]), id: 'cutter' };
+    const doc = documentWith([target, cutter]);
+    const result = subtractSelectionPatch(doc, new Set(['cutter']))!;
+    const edited = applyPatch(doc, result.patch);
+    const undone = applyPatch(edited, invertPatch(result.patch));
+    expect(undone.nodes.get('target')).toEqual(target);
+    const world = undone.nodes.get(undone.worldspawn);
+    if (world?.kind === 'entity') expect(world.children).toEqual(['target', 'cutter']);
+  });
+
+  it('returns null without cutters or overlapping targets', () => {
+    const target = { ...makeBox([0, 0, 0], [64, 64, 64]), id: 'target' };
+    const cutter = { ...makeBox([128, 0, 0], [192, 64, 64]), id: 'cutter' };
+    const doc = documentWith([target, cutter]);
+    expect(subtractSelectionPatch(doc, new Set())).toBeNull();
+    expect(subtractSelectionPatch(doc, new Set(['cutter']))).toBeNull();
+  });
+});

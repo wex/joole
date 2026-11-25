@@ -637,6 +637,7 @@ export function EditorShell(props: EditorShellProps) {
         onOpenSinglePak={() => pakInput?.click()}
         onOpenMap={chooseMap}
         onExportMap={() => void app.exportMap()}
+        onCsgSubtract={() => app.csgSubtract()}
         onGridSize={(size) => app.setGridSize(size)}
         onToggleTheme={toggleTheme}
         activeTool={activeTool()}

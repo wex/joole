@@ -2,6 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { convertWalToRgba } from '@core/formats/index';
 import type { ByteSource, ConvertedTexture } from '@core/types/index';
+import { addNodePatch } from '@core/doc/index';
+import { analyzeBrush } from '@core/geom/index';
+import { makeBox } from '@core/geom/__tests__/helpers';
+import type { BrushNode } from '@core/types/index';
 import { EditorApp } from './editor';
 
 function source(bytes: Uint8Array): ByteSource {
@@ -156,5 +160,31 @@ describe('EditorApp', () => {
     }
     expect(app.undo()).toBe(true);
     expect(app.document.nodes.has(id!)).toBe(false);
+  });
+  it('CSG Subtract uses the selection as cutters and is undoable', () => {
+    const { app } = makeApp();
+    const target = { ...makeBox([0, 0, 0], [64, 64, 64]), id: 'target' };
+    const cutter = { ...makeBox([32, 32, 32], [96, 96, 96]), id: 'cutter' };
+    for (const brush of [target, cutter]) {
+      app.executeCommand({
+        label: 'Add brush',
+        run: (doc) => addNodePatch(doc, doc.worldspawn, brush),
+      });
+    }
+    app.setSelection(['cutter']);
+
+    expect(app.csgSubtract()).toBe(true);
+    expect(app.document.nodes.has('cutter')).toBe(true);
+    const fragments = [...app.selection];
+    expect(fragments.length).toBeGreaterThan(1);
+    const volume = fragments.reduce(
+      (sum, id) => sum + analyzeBrush(app.document.nodes.get(id) as BrushNode).volume,
+      0,
+    );
+    expect(volume).toBeCloseTo(64 ** 3 - 32 ** 3, 3);
+
+    expect(app.undo()).toBe(true);
+    expect(app.document.nodes.get('target')).toEqual(target);
+    expect([...app.selection]).toEqual(['cutter']);
   });
 });

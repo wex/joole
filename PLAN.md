@@ -520,7 +520,7 @@ Goal: editing through commands with unlimited undo, project files and autosave, 
 
 Goal: Qoole-level geometry operations, and textures that look exactly the same in the editor and in the game.
 
-### [ ] P3.1 CSG subtract (`core/geom`, `app`)
+### [x] P3.1 CSG subtract (`core/geom`, `app`)
 
 - **Goal:** implement the spec's subtract algorithm.
 - **Scope:** each target is split by every plane of the cutter: the part outside the plane becomes a new brush, and the part inside continues to the next plane, until what is left inside is discarded. New faces get the cutter's texture. The result is valid brushes or an error. Exposed as a command and a menu item.

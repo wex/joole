@@ -13,6 +13,7 @@ import type { GameFileEntry } from '@platform/index';
 import { CommandBus } from './commandBus';
 import { SelectionManager } from './selection';
 import { mapTextToPastePatch, removeSelectionPatch, selectionToMapText } from './clipboard';
+import { subtractSelectionPatch } from './csg';
 import { BrushTool, SelectTool, type ToolOutput, type ToolPointerEvent } from './tools';
 import type { PrimitiveKind } from '@core/geom/index';
 import { entriesFromFileList, entriesFromSinglePak, openGameVfs } from '@platform/index';
@@ -361,6 +362,27 @@ export class EditorApp {
     } catch (error) {
       this.log('warning', errorText(error));
       return null;
+    }
+  }
+
+  /** Qoole semantics: selected brushes are cutters; overlapping unselected brushes are targets. */
+  csgSubtract(): boolean {
+    const result = subtractSelectionPatch(this.document, this.selection);
+    if (!result) {
+      this.log('warning', 'CSG Subtract needs a selected cutter overlapping another brush.');
+      return false;
+    }
+    try {
+      this.executeCommand({ label: 'CSG Subtract', run: () => result.patch });
+      this.setSelection(result.ids);
+      this.log(
+        'ok',
+        `CSG Subtract cut ${plural(result.targets, 'target')} into ${plural(result.ids.length, 'fragment')}.`,
+      );
+      return true;
+    } catch (error) {
+      this.log('warning', `CSG Subtract failed: ${errorText(error)}`);
+      return false;
     }
   }
 

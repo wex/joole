@@ -15,6 +15,7 @@ export interface ToolbarProps {
   readonly onOpenSinglePak: () => void;
   readonly onOpenMap: () => void;
   readonly onExportMap: () => void;
+  readonly onCsgSubtract: () => void;
   readonly onGridSize: (size: number) => void;
   readonly onToggleTheme: () => void;
   readonly onTool: (tool: ToolbarTool) => void;
@@ -44,17 +45,20 @@ const primitives: PrimitiveKind[] = ['box', 'wedge', 'cylinder', 'cone', 'sphere
 
 export function Toolbar(props: ToolbarProps) {
   const [fileOpen, setFileOpen] = createSignal(false);
+  const [editOpen, setEditOpen] = createSignal(false);
   let root: HTMLDivElement | undefined;
 
   onSettled(() => {
     const close = (event: PointerEvent) => {
       if (root && event.target instanceof Node && !root.contains(event.target)) {
         setFileOpen(false);
+        setEditOpen(false);
       }
     };
     const escape = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         setFileOpen(false);
+        setEditOpen(false);
       }
     };
     document.addEventListener('pointerdown', close);
@@ -67,6 +71,7 @@ export function Toolbar(props: ToolbarProps) {
 
   const choose = (action: () => void) => {
     setFileOpen(false);
+    setEditOpen(false);
     action();
   };
   const gridPower = () => Math.round(Math.log2(props.gridSize));
@@ -80,7 +85,10 @@ export function Toolbar(props: ToolbarProps) {
           class={styles.menuButton}
           aria-haspopup="menu"
           aria-expanded={fileOpen() ? 'true' : 'false'}
-          onClick={() => setFileOpen(!fileOpen())}
+          onClick={() => {
+            setEditOpen(false);
+            setFileOpen(!fileOpen());
+          }}
         >
           File <Icon name="chevronDown" />
         </button>
@@ -104,6 +112,29 @@ export function Toolbar(props: ToolbarProps) {
             <li role="none">
               <button type="button" role="menuitem" onClick={() => choose(props.onExportMap)}>
                 Export .map…
+              </button>
+            </li>
+          </ul>
+        </Show>
+      </div>
+      <div class={styles.menuHolder}>
+        <button
+          type="button"
+          class={styles.menuButton}
+          aria-haspopup="menu"
+          aria-expanded={editOpen() ? 'true' : 'false'}
+          onClick={() => {
+            setFileOpen(false);
+            setEditOpen(!editOpen());
+          }}
+        >
+          Edit <Icon name="chevronDown" />
+        </button>
+        <Show when={editOpen()}>
+          <ul class={styles.menu} role="menu">
+            <li role="none">
+              <button type="button" role="menuitem" onClick={() => choose(props.onCsgSubtract)}>
+                CSG Subtract
               </button>
             </li>
           </ul>
@@ -165,7 +196,13 @@ export function Toolbar(props: ToolbarProps) {
         </label>
       </Show>
       <span class={styles.separator} />
-      <button type="button" class={styles.iconButton} title="CSG Subtract" disabled>
+      <button
+        type="button"
+        class={styles.iconButton}
+        title="CSG Subtract"
+        aria-label="CSG Subtract"
+        onClick={() => props.onCsgSubtract()}
+      >
         <Icon name="csgSubtract" />
       </button>
       <button type="button" class={styles.iconButton} title="Hollow" disabled>
