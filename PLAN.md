@@ -715,7 +715,7 @@ Goal: everything needed to build a complete playable single-player level.
 - **Depends on:** P4.2, P1.8
 - **Done when:** vanilla monsters and items show their models.
 
-**[ ] Gate 4:** a single-player sample level made entirely in Joole is committed as a self-made fixture (`tests/fixtures/maps/sp-sample.map`). It has a player start, a door, a button that opens the door, and a monster. It compiles without warnings, and it is played through in q2pro by hand, with the result recorded.
+**[x] Gate 4:** a single-player sample level made entirely in Joole is committed as a self-made fixture (`tests/fixtures/maps/sp-sample.map`). It has a player start, a door, a button that opens the door, and a monster. It compiles without warnings, and it is played through in q2pro by hand, with the result recorded. **Passed 25.11.2026:** the lit full-chain artifact plays through in q2pro with every actor working.
 
 ---
 
