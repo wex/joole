@@ -40,6 +40,10 @@ export interface RendererOptions {
   readonly lineWidth?: number;
   /** The gap between the four views in CSS pixels: the splitter size. */
   readonly gap?: number;
+  /** Class colour lookup for point entities (0..1 rgb). */
+  readonly entityColorOf?: (
+    node: import('@core/types/index').MapNode,
+  ) => readonly [number, number, number] | null;
 }
 
 export interface RendererStats {
@@ -174,7 +178,7 @@ export class Renderer {
     this.grid = { program: grid, uniforms: uniformLocations(gl, grid, GRID_UNIFORMS) };
     this.emptyVao = gl.createVertexArray();
 
-    this.cache = new GeometryCache(gl);
+    this.cache = new GeometryCache(gl, options.entityColorOf);
     this.textures = new TextureManager(
       gl,
       options.loadTexture ?? null,

@@ -1,4 +1,10 @@
-import { addNodePatch, createId, mergePatches, reparentNodePatch, applyPatch } from '@core/doc/index';
+import {
+  addNodePatch,
+  createId,
+  mergePatches,
+  reparentNodePatch,
+  applyPatch,
+} from '@core/doc/index';
 import type { EntityNode, Id, MapDocument, Patch, Vec3 } from '@core/types/index';
 
 /** Reads one property of an entity. */

@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { applyPatch, buildDocument, createId } from '@core/doc/index';
 import type { BrushNode, EntityNode } from '@core/types/index';
-import { convertBrushesToEntityPatch, createPointEntityPatch, entityProp, withEntityProp } from './entities';
+import {
+  convertBrushesToEntityPatch,
+  createPointEntityPatch,
+  entityProp,
+  withEntityProp,
+} from './entities';
 import { makeBox } from '@core/geom/__tests__/helpers';
 
 function boxBrush(id: string): BrushNode {

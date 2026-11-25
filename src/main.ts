@@ -99,6 +99,13 @@ const app = new EditorApp({
 
 const canvas = document.createElement('canvas');
 const renderer = new Renderer(canvas, {
+  entityColorOf: (node) => {
+    if (node.kind !== 'entity') return null;
+    const cls = node.props.find(([k]) => k === 'classname')?.[1];
+    const def = cls ? app.entityDefs().find((d) => d.className === cls) : undefined;
+    return def ? def.color : null;
+  },
+
   colorSource: document.documentElement,
   loadTexture: (name) => app.loadTexture(name),
 });

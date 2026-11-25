@@ -78,7 +78,9 @@ describe('parseQuakedBlocks', () => {
   });
 
   it('handles colour keys as color type', () => {
-    const withColor = parseQuakedBlocks('/*QUAKED x_light (1 1 0) (-8 -8 -8) (8 8 8)\n"_color" the light colour\n*/');
+    const withColor = parseQuakedBlocks(
+      '/*QUAKED x_light (1 1 0) (-8 -8 -8) (8 8 8)\n"_color" the light colour\n*/',
+    );
     const light = withColor.find((def) => def.className === 'x_light')!;
     expect(light.keys.find((key) => key.name === '_color')!.type).toBe('color');
   });

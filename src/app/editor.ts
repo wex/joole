@@ -378,8 +378,7 @@ export class EditorApp {
     return def ? def.bbox === 'brush' : /^(func|trigger|path|multi)_/.test(classname);
   }
 
-    private entityDefsValue: readonly EntityClassDef[] =
-    parseQuakedBlocks(q2defText);
+  private entityDefsValue: readonly EntityClassDef[] = parseQuakedBlocks(q2defText);
   private modEntityDefTexts: string[] = [];
 
   setTextureLock(enabled: boolean): void {

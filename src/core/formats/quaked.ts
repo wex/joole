@@ -79,9 +79,12 @@ function keyType(name: string, description: string): EntityKeyType {
 const HEADER =
   /^\/\*QUAKED\s+(\S+)\s+\(\s*([-\d.]+)\s+([-\d.]+)\s+([-\d.]+)\s*\)\s+(\([^)]*\)\s*\([^)]*\)|\?)\s*([^\n]*)/;
 
-function parseHeader(
-  line: string,
-): { className: string; color: [number, number, number]; bbox: EntityClassDef['bbox']; spawnflags: string[] } | null {
+function parseHeader(line: string): {
+  className: string;
+  color: [number, number, number];
+  bbox: EntityClassDef['bbox'];
+  spawnflags: string[];
+} | null {
   const m = HEADER.exec(line);
   if (!m) return null;
   const color: [number, number, number] = [parseFloat(m[2]!), parseFloat(m[3]!), parseFloat(m[4]!)];
@@ -122,8 +125,8 @@ export function parseQuakedBlocks(text: string, options?: QuakedParseOptions): E
       const m = KEY_LINE.exec(line);
       if (!m || seen.has(m[1]!)) continue;
       seen.add(m[1]!);
-      const type = options?.overrides?.[m[1]!] ?? keyType(m[1]!, m[2] ?? "");
-      keys.push({ name: m[1]!, type, description: (m[2] ?? "").trim() });
+      const type = options?.overrides?.[m[1]!] ?? keyType(m[1]!, m[2] ?? '');
+      keys.push({ name: m[1]!, type, description: (m[2] ?? '').trim() });
     }
     for (const header of pending) {
       out.push({ ...header, description, keys });

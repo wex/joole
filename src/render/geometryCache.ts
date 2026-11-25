@@ -157,7 +157,8 @@ export class GeometryCache {
   readonly lines: GpuStore;
   private readonly cornerBuffer: WebGLBuffer;
   private readonly stateTexture: WebGLTexture;
-  private state = new Uint8Array(STATE_WIDTH);
+  /** RGBA per node index: R flags, GBA the class colour for entities. */
+  private state = new Uint8Array(STATE_WIDTH * 4);
   private stateDirty = true;
   private stateRowsOnGpu = 0;
   private readonly freeIndices: number[] = [];
@@ -167,9 +168,15 @@ export class GeometryCache {
   private invalidSegments: readonly LineSegment[] = [];
   private readonly invalidIndex: number;
 
-  constructor(private readonly gl: WebGL2RenderingContext) {
+  constructor(
+    private readonly gl: WebGL2RenderingContext,
+    /** Class colour lookup for point entities, injected from the app layer. */
+    private readonly entityColorOf: (
+      node: MapNode,
+    ) => readonly [number, number, number] | null = () => null,
+  ) {
     this.invalidIndex = this.takeIndex();
-    this.state[this.invalidIndex] = STATE_SELECTED | STATE_INVALID;
+    this.state[this.invalidIndex * 4] = STATE_SELECTED | STATE_INVALID;
     this.cornerBuffer = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, this.cornerBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([0, -1, 0, 1, 1, -1, 1, 1]), gl.STATIC_DRAW);
@@ -293,17 +300,17 @@ export class GeometryCache {
     if (!this.stateDirty) {
       return;
     }
-    const rows = this.state.length / STATE_WIDTH;
+    const rows = this.state.length / 4 / STATE_WIDTH;
     gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
     if (rows !== this.stateRowsOnGpu) {
       gl.texImage2D(
         gl.TEXTURE_2D,
         0,
-        gl.R8UI,
+        gl.RGBA8UI,
         STATE_WIDTH,
         rows,
         0,
-        gl.RED_INTEGER,
+        gl.RGBA_INTEGER,
         gl.UNSIGNED_BYTE,
         this.state,
       );
@@ -318,7 +325,7 @@ export class GeometryCache {
         0,
         STATE_WIDTH,
         rows,
-        gl.RED_INTEGER,
+        gl.RGBA_INTEGER,
         gl.UNSIGNED_BYTE,
         this.state,
       );
@@ -372,6 +379,7 @@ export class GeometryCache {
     this.lines.write(node.id, writeLines(edges, index), edges.length);
     this.records.set(node.id, { kind: 'entity', index, aabb: box, batchKeys: [] });
     this.setState(index, 'entity', this.selected.has(node.id));
+    this.setEntityColor(index, this.entityColorOf(node));
   }
 
   private removeNode(id: Id): void {
@@ -405,12 +413,29 @@ export class GeometryCache {
       const grown = new Uint8Array(this.state.length * 2);
       grown.set(this.state);
       this.state = grown;
+      // (stride is RGBA per node index)
     }
     return index;
   }
 
   private setState(index: number, kind: NodeRecord['kind'], selected: boolean): void {
-    this.state[index] = (kind === 'entity' ? STATE_ENTITY : 0) | (selected ? STATE_SELECTED : 0);
+    this.state[index * 4] =
+      (kind === 'entity' ? STATE_ENTITY : 0) | (selected ? STATE_SELECTED : 0);
+    this.stateDirty = true;
+  }
+
+  /** Writes the definition colour of an entity into the state's GBA bytes. */
+  private setEntityColor(index: number, rgb: readonly [number, number, number] | null): void {
+    const at = index * 4;
+    if (rgb) {
+      this.state[at + 1] = Math.round(Math.max(0, Math.min(1, rgb[0])) * 255);
+      this.state[at + 2] = Math.round(Math.max(0, Math.min(1, rgb[1])) * 255);
+      this.state[at + 3] = Math.round(Math.max(0, Math.min(1, rgb[2])) * 255);
+    } else {
+      this.state[at + 1] = 0;
+      this.state[at + 2] = 0;
+      this.state[at + 3] = 0;
+    }
     this.stateDirty = true;
   }
 
