@@ -109,6 +109,29 @@ input:focus-visible {
   font: var(--text-mono-small);
 }
 
+.primitiveControl {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2xs);
+  color: var(--ink-muted);
+  font: var(--text-ui-small);
+}
+
+.primitiveControl select,
+.primitiveControl input {
+  height: var(--size-control);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--ink);
+  font: var(--text-ui-small);
+}
+
+.primitiveControl input {
+  width: 56px;
+  padding: 0 var(--space-xs);
+}
+
 .menu {
   position: absolute;
   z-index: 10;

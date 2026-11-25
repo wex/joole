@@ -102,6 +102,9 @@ export function EditorShell(props: EditorShellProps) {
   const [rightWidth, setRightWidth] = createSignal(initialRightWidth);
   const [bottomHeight, setBottomHeight] = createSignal(initialBottomHeight);
   const [viewMenu, setViewMenu] = createSignal<{ x: number; y: number } | null>(null);
+  const [activeTool, setActiveTool] = createSignal(app.activeTool);
+  const [brushPrimitive, setBrushPrimitive] = createSignal(app.brushPrimitive);
+  const [brushSides, setBrushSides] = createSignal(app.brushSides);
 
   let viewportElement: HTMLDivElement | undefined;
   let mainElement: HTMLDivElement | undefined;
@@ -505,6 +508,11 @@ export function EditorShell(props: EditorShellProps) {
         stepGrid(action === 'grid-down' ? -1 : 1);
         return;
       }
+      if ((action === 'tool-select' || action === 'tool-brush') && !(pointerLocked || rightFly)) {
+        event.preventDefault();
+        app.setToolMode(action === 'tool-select' ? 'select' : 'brush');
+        return;
+      }
       if (action && action.startsWith('tool-') && !(pointerLocked || rightFly)) {
         event.preventDefault();
         return;
@@ -561,6 +569,10 @@ export function EditorShell(props: EditorShellProps) {
         setEntries(app.logEntries());
       } else if (event.type === 'grid') {
         setGridSize(app.gridSize);
+      } else if (event.type === 'tool') {
+        setActiveTool(app.activeTool);
+        setBrushPrimitive(app.brushPrimitive);
+        setBrushSides(app.brushSides);
       }
     });
     const initialFrame = requestAnimationFrame(() => {
@@ -594,6 +606,11 @@ export function EditorShell(props: EditorShellProps) {
         onOpenMap={chooseMap}
         onGridSize={(size) => app.setGridSize(size)}
         onToggleTheme={toggleTheme}
+        activeTool={activeTool()}
+        brushPrimitive={brushPrimitive()}
+        brushSides={brushSides()}
+        onTool={(tool) => app.setToolMode(tool)}
+        onBrushPrimitive={(kind, sides) => app.setBrushPrimitive(kind, sides)}
       />
       <div class={styles.main} ref={(el) => (mainElement = el)}>
         <div class={styles.center} ref={(el) => (centerElement = el)}>
@@ -664,8 +681,10 @@ export function EditorShell(props: EditorShellProps) {
                     type="button"
                     role="menuitem"
                     class={styles.contextMenuItem}
-                    disabled
-                    title="Available with the Brush tool in P2.6"
+                    onClick={() => {
+                      setViewMenu(null);
+                      app.setToolMode('brush');
+                    }}
                   >
                     Add Brush
                   </button>

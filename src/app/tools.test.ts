@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { createEmptyDocument, addNodePatch, applyPatch } from '@core/doc/index';
-import { analyzeBrush } from '@core/geom/index';
+import { analyzeBrush, validateBrush } from '@core/geom/index';
 import type { BrushNode, Command, MapDocument } from '@core/types/index';
 import { makeBox } from '../core/geom/__tests__/helpers';
-import { SelectTool, type ToolPointerEvent } from './tools';
+import { BrushTool, SelectTool, type ToolPointerEvent } from './tools';
 
 function brush(
   id: string,
@@ -21,7 +21,10 @@ function documentWithBrushes(): MapDocument {
   return doc;
 }
 
-function runScript(tool: SelectTool, events: ToolPointerEvent[]): Command[] {
+function runScript(
+  tool: { pointer(event: ToolPointerEvent): { commands: Command[] } },
+  events: ToolPointerEvent[],
+): Command[] {
   const commands: Command[] = [];
   for (const event of events) {
     const out = tool.pointer(event);
@@ -106,6 +109,79 @@ describe('SelectTool event scripts', () => {
     expect(scaledBrush?.kind).toBe('brush');
     if (scaledBrush?.kind === 'brush') {
       expect(analyzeBrush(scaledBrush).aabb!.max.map((x) => x + 0)).toEqual([128, 128, 64]);
+    }
+  });
+});
+
+describe('BrushTool', () => {
+  function makeBrushDoc(): MapDocument {
+    return createEmptyDocument();
+  }
+
+  it('drags a grid-snapped box in a 2D view with a 64-unit default depth', () => {
+    const doc = makeBrushDoc();
+    const tool = new BrushTool(
+      () => doc,
+      () => 8,
+    );
+    const commands = runScript(tool, [down(0, 0), move(65, 65), up(65, 65)]);
+    expect(commands).toHaveLength(1);
+    expect(commands[0]!.label).toBe('Add box');
+    const patched = applyPatch(doc, commands[0]!.run(doc));
+    const brushes = [...patched.nodes.values()].filter((node) => node.kind === 'brush');
+    expect(brushes).toHaveLength(1);
+    const brush = brushes[0]!;
+    expect(brush.kind).toBe('brush');
+    if (brush.kind === 'brush') {
+      const box = analyzeBrush(brush).aabb;
+      expect(box?.min.map((x) => x + 0)).toEqual([0, 0, -32]);
+      expect(box?.max.map((x) => x + 0)).toEqual([64, 64, 32]);
+      expect(validateBrush(analyzeBrush(brush)).valid).toBe(true);
+    }
+  });
+
+  it('creates every primitive kind and rejects a zero-size drag', () => {
+    for (const kind of ['box', 'wedge', 'cylinder', 'cone', 'sphere'] as const) {
+      const doc = makeBrushDoc();
+      const tool = new BrushTool(
+        () => doc,
+        () => 8,
+      );
+      tool.primitive = kind;
+      const commands = runScript(tool, [down(0, 0), move(64, 64), up(64, 64)]);
+      expect(commands).toHaveLength(1);
+      const patched = applyPatch(doc, commands[0]!.run(doc));
+      const brush = [...patched.nodes.values()].find((node) => node.kind === 'brush');
+      expect(brush?.kind).toBe('brush');
+      if (brush?.kind === 'brush') {
+        expect(validateBrush(analyzeBrush(brush))).toEqual({ valid: true, reasons: [] });
+      }
+    }
+
+    const doc = makeBrushDoc();
+    const tool = new BrushTool(
+      () => doc,
+      () => 8,
+    );
+    expect(runScript(tool, [down(0, 0), up(0, 0)])).toEqual([]);
+  });
+
+  it('uses the depth axis of front and side views', () => {
+    const doc = makeBrushDoc();
+    const frontTool = new BrushTool(
+      () => doc,
+      () => 8,
+    );
+    const front = runScript(frontTool, [
+      down(0, 0, { view: 'xz' }),
+      { ...move(64, 64), view: 'xz', point: [64, 0, 64] },
+      { ...up(64, 64), view: 'xz', point: [64, 0, 64] },
+    ]);
+    const frontPatch = applyPatch(doc, front[0]!.run(doc));
+    const frontBrush = [...frontPatch.nodes.values()].find((node) => node.kind === 'brush');
+    if (frontBrush?.kind === 'brush') {
+      expect(analyzeBrush(frontBrush).aabb?.min.map((x) => x + 0)).toEqual([0, -32, 0]);
+      expect(analyzeBrush(frontBrush).aabb?.max.map((x) => x + 0)).toEqual([64, 32, 64]);
     }
   });
 });

@@ -8,3 +8,4 @@ export * from './integerPoints';
 export * from './texAxes';
 export * from './picking';
 export * from './transform';
+export * from './primitives';

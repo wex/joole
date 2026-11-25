@@ -5,7 +5,8 @@ import { PALETTE_PATH } from '@game/q2/index';
 import type { GameFileEntry } from '@platform/index';
 import { CommandBus } from './commandBus';
 import { SelectionManager } from './selection';
-import { SelectTool, type ToolOutput, type ToolPointerEvent } from './tools';
+import { BrushTool, SelectTool, type ToolOutput, type ToolPointerEvent } from './tools';
+import type { PrimitiveKind } from '@core/geom/index';
 import { entriesFromFileList, entriesFromSinglePak, openGameVfs } from '@platform/index';
 
 export type LogLevel = 'info' | 'ok' | 'warning' | 'error';
@@ -45,9 +46,11 @@ export type EditorEvent =
   | { readonly type: 'game' }
   | { readonly type: 'log' }
   | { readonly type: 'grid' }
-  | { readonly type: 'selection' };
+  | { readonly type: 'selection' }
+  | { readonly type: 'tool' };
 
 export type EditorListener = (event: EditorEvent) => void;
+export type EditorToolMode = 'select' | 'brush';
 
 const MAX_LOG_ENTRIES = 500;
 
@@ -83,6 +86,8 @@ export class EditorApp {
   private readonly bus: CommandBus;
   private readonly selectionManager: SelectionManager;
   private readonly selectTool: SelectTool;
+  private readonly brushTool: BrushTool;
+  private toolMode: EditorToolMode = 'select';
   private map: string | null = null;
   private vfs: Awaited<ReturnType<typeof openGameVfs>> | null = null;
   private palette: Uint8Array | null = null;
@@ -98,6 +103,10 @@ export class EditorApp {
     this.bus = new CommandBus(createEmptyDocument());
     this.selectionManager = new SelectionManager(this.bus);
     this.selectTool = new SelectTool(
+      () => this.document,
+      () => this.gridSize,
+    );
+    this.brushTool = new BrushTool(
       () => this.document,
       () => this.gridSize,
     );
@@ -120,6 +129,18 @@ export class EditorApp {
 
   get selection(): ReadonlySet<string> {
     return this.selectionManager.selection;
+  }
+
+  get activeTool(): EditorToolMode {
+    return this.toolMode;
+  }
+
+  get brushPrimitive(): PrimitiveKind {
+    return this.brushTool.primitive;
+  }
+
+  get brushSides(): number {
+    return this.brushTool.sides;
   }
 
   get mapName(): string | null {
@@ -275,9 +296,30 @@ export class EditorApp {
     this.selectionManager.setSelection(ids);
   }
 
-  /** Feeding a neutral pointer event through the Select tool and applying its effects. */
+  setToolMode(mode: EditorToolMode): void {
+    if (mode === this.toolMode) {
+      return;
+    }
+    this.selectTool.cancel();
+    this.brushTool.cancel();
+    this.toolMode = mode;
+    this.emit({ type: 'tool' });
+  }
+
+  setBrushPrimitive(kind: PrimitiveKind, sides = this.brushTool.sides): boolean {
+    if (!Number.isInteger(sides) || sides < 3 || sides > 64) {
+      return false;
+    }
+    this.brushTool.primitive = kind;
+    this.brushTool.sides = sides;
+    this.emit({ type: 'tool' });
+    return true;
+  }
+
+  /** Feeding a neutral pointer event through the active tool and applying its effects. */
   selectPointer(event: ToolPointerEvent): ToolOutput {
-    const output = this.selectTool.pointer(event);
+    const tool = this.toolMode === 'brush' ? this.brushTool : this.selectTool;
+    const output = tool.pointer(event);
     for (const command of output.commands) {
       try {
         this.executeCommand(command);

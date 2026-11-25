@@ -1,30 +1,45 @@
 import { createSignal, For, onSettled, Show } from 'solid-js';
+import type { PrimitiveKind } from '@core/geom/index';
 import { Icon } from './Icon';
 import styles from './Toolbar.module.css';
+
+export type ToolbarTool = 'select' | 'brush';
 
 export interface ToolbarProps {
   readonly gridSize: number;
   readonly theme: 'dark' | 'light';
+  readonly activeTool: ToolbarTool;
+  readonly brushPrimitive: PrimitiveKind;
+  readonly brushSides: number;
   readonly onOpenGameFolder: () => void;
   readonly onOpenSinglePak: () => void;
   readonly onOpenMap: () => void;
   readonly onGridSize: (size: number) => void;
   readonly onToggleTheme: () => void;
+  readonly onTool: (tool: ToolbarTool) => void;
+  readonly onBrushPrimitive: (kind: PrimitiveKind, sides: number) => void;
 }
 
-function tool(label: string, icon: Parameters<typeof Icon>[0]['name'], pressed = false) {
-  return { label, icon, pressed };
+function tool(
+  id: string,
+  label: string,
+  icon: Parameters<typeof Icon>[0]['name'],
+  enabled = false,
+) {
+  return { id, label, icon, enabled };
 }
 
 const tools = [
-  tool('Select (S)', 'mousePointer', true),
-  tool('Brush (B)', 'box'),
-  tool('Entity (E)', 'circleUser'),
-  tool('Clip (C)', 'clip'),
-  tool('Vertex (V)', 'move'),
-  tool('Face (F)', 'scan'),
-  tool('Texture (T)', 'brush'),
+  tool('select', 'Select (S)', 'mousePointer', true),
+  tool('brush', 'Brush (B)', 'box', true),
+  tool('entity', 'Entity (E)', 'circleUser'),
+  tool('clip', 'Clip (C)', 'clip'),
+  tool('vertex', 'Vertex (V)', 'move'),
+  tool('face', 'Face (F)', 'scan'),
+  tool('texture', 'Texture (T)', 'brush'),
 ];
+
+const primitives: PrimitiveKind[] = ['box', 'wedge', 'cylinder', 'cone', 'sphere'];
 
 export function Toolbar(props: ToolbarProps) {
   const [fileOpen, setFileOpen] = createSignal(false);
@@ -106,13 +121,43 @@ export function Toolbar(props: ToolbarProps) {
             class={styles.iconButton}
             title={item.label}
             aria-label={item.label}
-            aria-pressed={item.pressed ? 'true' : 'false'}
-            disabled={!item.pressed}
+            aria-pressed={props.activeTool === item.id ? 'true' : 'false'}
+            disabled={!item.enabled}
+            onClick={() => {
+              if (item.id === 'select' || item.id === 'brush') props.onTool(item.id);
+            }}
           >
             <Icon name={item.icon} />
           </button>
         )}
       </For>
+      <Show when={props.activeTool === 'brush'}>
+        <label class={styles.primitiveControl}>
+          <span>Primitive</span>
+          <select
+            aria-label="Brush primitive"
+            value={props.brushPrimitive}
+            onChange={(event) =>
+              props.onBrushPrimitive(event.currentTarget.value as PrimitiveKind, props.brushSides)
+            }
+          >
+            <For each={primitives}>{(kind) => <option value={kind}>{kind}</option>}</For>
+          </select>
+        </label>
+        <label class={styles.primitiveControl}>
+          <span>Sides</span>
+          <input
+            type="number"
+            min="3"
+            max="64"
+            value={props.brushSides}
+            aria-label="Primitive sides"
+            onChange={(event) =>
+              props.onBrushPrimitive(props.brushPrimitive, Number(event.currentTarget.value))
+            }
+          />
+        </label>
+      </Show>
       <span class={styles.separator} />
       <button type="button" class={styles.iconButton} title="CSG Subtract" disabled>
         <Icon name="csgSubtract" />

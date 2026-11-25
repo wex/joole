@@ -279,6 +279,8 @@ The tolerances are constants in one place: `PLANE_EPS = 1e-4` (classifying a poi
 
 In the 2D views, a point's position snaps to the grid (1, 2, 4 … 256 units, 8 by default). Grid-aligned brushes are written as integer points, which avoids qbsp3's precision problems. After a rotation, the plane points are rounded to the grid only if the user chooses the _Snap to grid_ command, because automatic rounding can make a brush non-convex.
 
+The approximate sphere primitive is an octahedron in the first editing implementation: always convex, integer-pointed on an integer grid and cheap to validate. A higher-detail segmented sphere is a possible later refinement, not a correctness requirement. Until the multi-view height workflow arrives, a brush drawn in a 2D view receives a 64-unit depth centred on that view plane.
+
 ## Rendering with WebGL2
 
 All four views are drawn into one WebGL2 context and one `<canvas>` element using `gl.scissor` and `gl.viewport`. Textures and buffers are then shared between the views, and four browser contexts are not used up. Qoole's `QDraw` abstraction (OpenGL, Glide, DirectX, MGL, software rendering) is replaced by a single renderer.

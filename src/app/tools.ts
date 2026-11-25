@@ -1,4 +1,4 @@
-import type { Command, Id, MapDocument, Patch, Vec3 } from '@core/types/index';
+import type { Command, FaceTexture, Id, MapDocument, Patch, Vec3 } from '@core/types/index';
 import {
   analyzeBrush,
   BrushBvh,
@@ -12,7 +12,12 @@ import {
   type Aabb,
   type Mat4,
   type PickAxis,
+  createPrimitiveBrush,
+  type PrimitiveKind,
 } from '@core/geom/index';
+import { createId } from '@core/doc/index';
+import { addNodePatch } from '@core/doc/commands';
+import { DEFAULT_TEXTURE } from '@game/q2/index';
 import { createTransformCommand } from './transformCommands';
 
 export type ToolView = PickAxis | '3d';
@@ -52,11 +57,11 @@ type Mode =
   | { kind: 'rotate'; last: Vec3; center: Vec3; view: ToolView; key: string }
   | { kind: 'scale'; anchor: Vec3; start: Vec3; view: ToolView; key: string };
 
-function planeAxes(view: ToolView): [number, number] {
+function planeAxes(view: ToolView): [0 | 1 | 2, 0 | 1 | 2] {
   return view === 'xy' ? [0, 1] : view === 'xz' ? [0, 2] : view === 'yz' ? [1, 2] : [0, 1];
 }
 
-function depthAxis(view: ToolView): number {
+function depthAxis(view: ToolView): 0 | 1 | 2 {
   return view === 'xy' ? 2 : view === 'xz' ? 1 : view === 'yz' ? 0 : 2;
 }
 
@@ -115,6 +120,98 @@ function rotationFor(view: ToolView, degrees: number): Mat4 {
     : view === 'yz'
       ? mat4RotationX(degrees)
       : mat4RotationZ(degrees);
+}
+
+const DEFAULT_FACE_TEXTURE: FaceTexture = {
+  name: DEFAULT_TEXTURE,
+  offset: [0, 0],
+  rotation: 0,
+  scale: [1, 1],
+  contents: 0,
+  flags: 0,
+  value: 0,
+  attribsInFile: false,
+};
+
+type BrushMode = { kind: 'idle' } | { kind: 'draw'; start: Vec3; view: PickAxis };
+
+/**
+ * The Brush tool state machine. Dragging a rectangle in a 2D view creates the
+ * selected primitive; the dimension perpendicular to that view defaults to 64
+ * units centred on the view plane until the multi-view height workflow arrives.
+ */
+export class BrushTool {
+  primitive: PrimitiveKind = 'box';
+  sides = 8;
+  private mode: BrushMode = { kind: 'idle' };
+
+  constructor(
+    private readonly getDocument: () => Readonly<MapDocument>,
+    private readonly getGridSize: () => number,
+    private readonly texture: FaceTexture = DEFAULT_FACE_TEXTURE,
+  ) {}
+
+  pointer(event: ToolPointerEvent): ToolOutput {
+    if (event.button !== 0 || event.view === '3d') {
+      return { commands: [] };
+    }
+    const grid = this.getGridSize();
+    const [axis0, axis1] = planeAxes(event.view);
+    const depth = depthAxis(event.view);
+    const point = [...event.point] as Vec3;
+    point[axis0] = snap(point[axis0], grid);
+    point[axis1] = snap(point[axis1], grid);
+
+    if (event.type === 'down') {
+      this.mode = { kind: 'draw', start: point, view: event.view };
+      return { commands: [] };
+    }
+    if (event.type === 'move') {
+      return { commands: [] };
+    }
+    if (event.type !== 'up' || this.mode.kind !== 'draw') {
+      return { commands: [] };
+    }
+
+    const start = this.mode.start;
+    this.mode = { kind: 'idle' };
+    const min: Vec3 = [...point] as Vec3;
+    const max: Vec3 = [...point] as Vec3;
+    for (const axis of [axis0, axis1]) {
+      min[axis] = Math.min(start[axis], point[axis]);
+      max[axis] = Math.max(start[axis], point[axis]);
+      if (min[axis] === max[axis]) {
+        return { commands: [] };
+      }
+    }
+    min[depth] = snap(start[depth], grid) - 32;
+    max[depth] = snap(start[depth], grid) + 32;
+
+    const result = createPrimitiveBrush(this.primitive, {
+      id: createId(),
+      min,
+      max,
+      texture: this.texture,
+      sides: this.sides,
+    });
+    if (!result.ok) {
+      return { commands: [] };
+    }
+    const brush = result.value;
+    return {
+      commands: [
+        {
+          label: `Add ${this.primitive}`,
+          run: (doc) => addNodePatch(doc, doc.worldspawn, brush),
+        },
+      ],
+      selection: new Set([brush.id]),
+    };
+  }
+
+  cancel(): void {
+    this.mode = { kind: 'idle' };
+  }
 }
 
 /**

@@ -82,7 +82,7 @@ test('the shell has the workspace, file menu, panels, splitters, theme and view 
   const top = await viewPoint(page, 'top');
   await page.mouse.click(top.x, top.y, { button: 'right' });
   await expect(page.locator('[data-testid=view-context-menu]')).toBeVisible();
-  await expect(page.getByRole('menuitem', { name: 'Add Brush' })).toBeDisabled();
+  await expect(page.getByRole('menuitem', { name: 'Add Brush' })).toBeEnabled();
   await page.keyboard.press('Escape');
   await expect(page.locator('[data-testid=view-context-menu]')).toHaveCount(0);
 
@@ -213,5 +213,41 @@ test('selecting and dragging a brush moves it, and Ctrl+Z undoes the move', asyn
   await page.evaluate(() => (window as unknown as JooleWindow).joole!.whenIdle());
   const undone = await canvasScreenshot(page);
   expect(undone.equals(selected)).toBe(true);
+  expect(errors).toEqual([]);
+});
+
+test('the brush tool creates a primitive in a 2D view and undo removes it', async ({ page }) => {
+  const errors = consoleErrors(page);
+  await openFixtureMap(page);
+  const initial = await canvasScreenshot(page);
+  const nodesBefore = await page.evaluate(
+    () => (window as unknown as JooleWindow).joole!.stats().nodes,
+  );
+
+  await page.getByRole('button', { name: 'Brush (B)' }).click();
+  await expect(page.getByLabel('Brush primitive')).toBeVisible();
+  await page.getByLabel('Brush primitive').selectOption('wedge');
+
+  const top = await viewPoint(page, 'top');
+  await page.mouse.move(top.x, top.y);
+  await page.mouse.down({ button: 'left' });
+  await page.mouse.move(top.x + 80, top.y + 80, { steps: 6 });
+  await page.mouse.up({ button: 'left' });
+  await page.evaluate(() => (window as unknown as JooleWindow).joole!.whenIdle());
+
+  await expect
+    .poll(() => page.evaluate(() => (window as unknown as JooleWindow).joole!.selection().length))
+    .toBe(1);
+  await expect
+    .poll(() => page.evaluate(() => (window as unknown as JooleWindow).joole!.stats().nodes))
+    .toBe(nodesBefore + 1);
+  const created = await canvasScreenshot(page);
+  expect(created.equals(initial)).toBe(false);
+
+  await page.keyboard.press('Control+z');
+  await page.evaluate(() => (window as unknown as JooleWindow).joole!.whenIdle());
+  await expect
+    .poll(() => page.evaluate(() => (window as unknown as JooleWindow).joole!.stats().nodes))
+    .toBe(nodesBefore);
   expect(errors).toEqual([]);
 });
