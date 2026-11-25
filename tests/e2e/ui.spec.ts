@@ -251,3 +251,35 @@ test('the brush tool creates a primitive in a 2D view and undo removes it', asyn
     .toBe(nodesBefore);
   expect(errors).toEqual([]);
 });
+
+test('copy, paste, cut and duplicate operate on the selection', async ({ page, context }) => {
+  const errors = consoleErrors(page);
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  await openFixtureMap(page);
+  const nodesBefore = await page.evaluate(
+    () => (window as unknown as JooleWindow).joole!.stats().nodes,
+  );
+  const top = await viewPoint(page, 'top');
+  await page.mouse.click(top.x, top.y, { button: 'left' });
+  await expect
+    .poll(() => page.evaluate(() => (window as unknown as JooleWindow).joole!.selection().length))
+    .toBe(1);
+
+  await page.keyboard.press('Control+c');
+  await page.keyboard.press('Control+v');
+  await expect
+    .poll(() => page.evaluate(() => (window as unknown as JooleWindow).joole!.stats().nodes))
+    .toBe(nodesBefore + 1);
+
+  await page.keyboard.press('Control+x');
+  await expect
+    .poll(() => page.evaluate(() => (window as unknown as JooleWindow).joole!.stats().nodes))
+    .toBe(nodesBefore);
+
+  await page.mouse.click(top.x, top.y, { button: 'left' });
+  await page.keyboard.press('Control+d');
+  await expect
+    .poll(() => page.evaluate(() => (window as unknown as JooleWindow).joole!.stats().nodes))
+    .toBe(nodesBefore + 1);
+  expect(errors).toEqual([]);
+});

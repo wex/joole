@@ -458,7 +458,7 @@ Goal: editing through commands with unlimited undo, project files and autosave, 
 - **Depends on:** P2.5
 - **Done when:** dragging updates only the affected brush.
 
-### [ ] P2.8 Clipboard (`app`, `platform`) ⇄
+### [x] P2.8 Clipboard (`app`, `platform`) ⇄
 
 - **Goal:** cut, copy, paste and duplicate as `.map` text.
 - **Scope:** the clipboard writer mode (full precision), the system clipboard API, new ids on paste, and an offset for duplicates.

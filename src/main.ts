@@ -58,6 +58,7 @@ const app = new EditorApp({
       }
     : undefined,
   pickMapFile: 'showOpenFilePicker' in window ? pickMapFile : undefined,
+  clipboard: navigator.clipboard,
 });
 
 const canvas = document.createElement('canvas');

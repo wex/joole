@@ -283,6 +283,8 @@ The approximate sphere primitive is an octahedron in the first editing implement
 
 Editing feedback uses the same incremental GPU cache as document edits: selected brush corners carry small cross handles, brush-tool drags show a red wireframe ghost, and only patch-affected brush ranges are rebuilt. The drag-bandwidth benchmark remains a hardware reference measurement for P5.6; SwiftShader numbers are not meaningful for the 8 ms target.
 
+Clipboard editing serialises the selected brushes in clipboard mode (full float precision). Pasted brushes always receive fresh nanoids; duplicate offsets the copy by one grid step in X and Y. The interoperability check is at the format level in this phase: the emitted text is canonical Q2 `.map`, and the automated round trip parses it back without loss.
+
 ## Rendering with WebGL2
 
 All four views are drawn into one WebGL2 context and one `<canvas>` element using `gl.scissor` and `gl.viewport`. Textures and buffers are then shared between the views, and four browser contexts are not used up. Qoole's `QDraw` abstraction (OpenGL, Glide, DirectX, MGL, software rendering) is replaced by a single renderer.

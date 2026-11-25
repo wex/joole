@@ -5,6 +5,7 @@ import { PALETTE_PATH } from '@game/q2/index';
 import type { GameFileEntry } from '@platform/index';
 import { CommandBus } from './commandBus';
 import { SelectionManager } from './selection';
+import { mapTextToPastePatch, removeSelectionPatch, selectionToMapText } from './clipboard';
 import { BrushTool, SelectTool, type ToolOutput, type ToolPointerEvent } from './tools';
 import type { PrimitiveKind } from '@core/geom/index';
 import { entriesFromFileList, entriesFromSinglePak, openGameVfs } from '@platform/index';
@@ -26,6 +27,11 @@ export interface TextureWorkerLike {
   convert(wal: ArrayBuffer, palette: ArrayBuffer): Promise<ConvertedTexture>;
 }
 
+export interface ClipboardLike {
+  writeText(text: string): Promise<void>;
+  readText(): Promise<string>;
+}
+
 export interface TextureCacheLike {
   get(key: string): Promise<ConvertedTexture | null>;
   put(key: string, texture: ConvertedTexture): Promise<void>;
@@ -39,6 +45,7 @@ export interface EditorAppOptions {
   readonly pickGameEntries?: () => Promise<GameSelection | null>;
   /** The Chromium file-picker path, wired in main.ts. */
   readonly pickMapFile?: () => Promise<File | null>;
+  readonly clipboard?: ClipboardLike;
 }
 
 export type EditorEvent =
@@ -81,6 +88,7 @@ export class EditorApp {
   private readonly textureCache: TextureCacheLike | null;
   private readonly pickGameEntries?: () => Promise<GameSelection | null>;
   private readonly pickMapFile?: () => Promise<File | null>;
+  private readonly clipboard?: ClipboardLike;
   private entries: LogEntry[] = [];
   private nextLogId = 1;
   private readonly bus: CommandBus;
@@ -100,6 +108,7 @@ export class EditorApp {
     this.textureCache = options.textureCache ?? null;
     this.pickGameEntries = options.pickGameEntries;
     this.pickMapFile = options.pickMapFile;
+    this.clipboard = options.clipboard;
     this.bus = new CommandBus(createEmptyDocument());
     this.selectionManager = new SelectionManager(this.bus);
     this.selectTool = new SelectTool(
@@ -294,6 +303,50 @@ export class EditorApp {
 
   setSelection(ids: Iterable<string>): void {
     this.selectionManager.setSelection(ids);
+  }
+
+  copySelectionText(): string | null {
+    return selectionToMapText(this.document, this.selection);
+  }
+
+  async copySelection(): Promise<boolean> {
+    const text = this.copySelectionText();
+    if (!text || !this.clipboard) return false;
+    await this.clipboard.writeText(text);
+    this.log('ok', 'Selection copied as .map text.');
+    return true;
+  }
+
+  async cutSelection(): Promise<boolean> {
+    if (!(await this.copySelection())) return false;
+    const patch = removeSelectionPatch(this.document, this.selection);
+    if (!patch) return false;
+    this.executeCommand({ label: 'Cut selection', run: () => patch });
+    this.setSelection([]);
+    return true;
+  }
+
+  pasteMapText(text: string, offset: [number, number, number] = [0, 0, 0]): boolean {
+    try {
+      const pasted = mapTextToPastePatch(this.document, text, offset);
+      if (!pasted.patch) return false;
+      this.executeCommand({ label: 'Paste selection', run: () => pasted.patch! });
+      this.setSelection(pasted.ids);
+      return true;
+    } catch (error) {
+      this.log('warning', `Paste failed: ${errorText(error)}`);
+      return false;
+    }
+  }
+
+  async pasteClipboard(): Promise<boolean> {
+    if (!this.clipboard) return false;
+    return this.pasteMapText(await this.clipboard.readText());
+  }
+
+  duplicateSelection(): boolean {
+    const text = this.copySelectionText();
+    return text ? this.pasteMapText(text, [this.gridSize, this.gridSize, 0]) : false;
   }
 
   setToolMode(mode: EditorToolMode): void {

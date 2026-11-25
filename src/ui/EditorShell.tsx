@@ -504,6 +504,14 @@ export function EditorShell(props: EditorShellProps) {
         }
         return;
       }
+      if (action === 'copy' || action === 'cut' || action === 'paste' || action === 'duplicate') {
+        event.preventDefault();
+        if (action === 'copy') void app.copySelection();
+        if (action === 'cut') void app.cutSelection();
+        if (action === 'paste') void app.pasteClipboard();
+        if (action === 'duplicate') app.duplicateSelection();
+        return;
+      }
       if (action === 'grid-down' || action === 'grid-up') {
         event.preventDefault();
         stepGrid(action === 'grid-down' ? -1 : 1);
