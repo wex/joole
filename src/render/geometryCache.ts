@@ -24,6 +24,7 @@ export const STATE_SELECTED = 1;
 export const STATE_ENTITY = 2;
 export const STATE_INVALID = 4;
 export const STATE_DIMMED = 8;
+export const STATE_LEAK = 16;
 
 /** The state texture is this many texels wide, one byte per node index. */
 const STATE_WIDTH = 1024;
@@ -169,6 +170,8 @@ export class GeometryCache {
   private linkSegments: readonly LineSegment[] = [];
   private invalidSegments: readonly LineSegment[] = [];
   private readonly invalidIndex: number;
+  private readonly leakIndex: number;
+  private leakSegments: readonly LineSegment[] = [];
 
   constructor(
     private readonly gl: WebGL2RenderingContext,
@@ -185,6 +188,8 @@ export class GeometryCache {
   ) {
     this.invalidIndex = this.takeIndex();
     this.state[this.invalidIndex * 4] = STATE_SELECTED | STATE_INVALID;
+    this.leakIndex = this.takeIndex();
+    this.state[this.leakIndex * 4] = STATE_SELECTED | STATE_LEAK;
     this.cornerBuffer = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, this.cornerBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([0, -1, 0, 1, 1, -1, 1, 1]), gl.STATIC_DRAW);
@@ -309,6 +314,12 @@ export class GeometryCache {
     this.rebuildOverlay();
   }
 
+  /** The leak polyline from a qbsp3 pointfile, drawn in the leak colour. */
+  setLeakPath(segments: readonly LineSegment[]): void {
+    this.leakSegments = segments;
+    this.rebuildOverlay();
+  }
+
   private rebuildOverlay(): void {
     const segments: LineSegment[] = [...this.toolSegments, ...this.linkSegments];
     // Handles are small world-space crosses at every selected brush's corners.
@@ -348,6 +359,15 @@ export class GeometryCache {
         '__overlayInvalid',
         writeLines(this.invalidSegments, this.invalidIndex),
         this.invalidSegments.length,
+      );
+    }
+    if (this.leakSegments.length === 0) {
+      this.lines.remove('__overlayLeak');
+    } else {
+      this.lines.write(
+        '__overlayLeak',
+        writeLines(this.leakSegments, this.leakIndex),
+        this.leakSegments.length,
       );
     }
     this.state[0] = STATE_SELECTED;
@@ -537,7 +557,9 @@ export class GeometryCache {
     }
     this.lines.remove(id);
     this.records.delete(id);
-    this.state[record.index] = 0;
+    // The R byte of the index's texel: GBA keep the stale class colour, which
+    // is harmless because the state texture is only read through live indices.
+    this.state[record.index * 4] = 0;
     this.stateDirty = true;
     this.freeIndices.push(record.index);
   }

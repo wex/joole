@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
+import { parsePts } from '@core/formats/index';
 import { runCompilePipeline, type CompileRunner } from './compile';
 
 interface CompileModule {
@@ -87,17 +88,20 @@ describe('runCompilePipeline with the real wasm tools', () => {
     expect(result.bsp.byteLength).toBeGreaterThan(10000);
   });
 
-  it('a leaking map stops after qbsp3 with the .pts path', async () => {
-    // An unsealed box with an entity inside: qbsp3 reports the leak and
-    // writes the pointfile.
-    const leaky = readFileSync('tests/fixtures/simple.map', 'utf8');
-    const result = await runCompilePipeline(nodeRunner, 'normal', 'simple', leaky, wals, null);
-    if (!result.leaked) {
-      // simple.map may be sealed; the pipeline shape is what matters here.
-      expect(result.steps.length).toBeGreaterThan(1);
-      return;
-    }
+  it('a leaking map stops after qbsp3 with the pointfile path', async () => {
+    // leaking.map connects its interior to the void through a tunnel:
+    // qbsp3 must report the leak and write the .lin pointfile.
+    const leaky = readFileSync('tests/fixtures/maps/leaking.map', 'utf8');
+    const result = await runCompilePipeline(nodeRunner, 'normal', 'leaking', leaky, wals, null);
+    expect(result.leaked).toBe(true);
     expect(result.steps).toEqual(['qbsp3']);
     expect(result.pts).not.toBeNull();
+    // The path is a parseable polyline ending at the player start.
+    const points = parsePts(new TextDecoder().decode(result.pts!));
+    expect(points.length).toBeGreaterThan(1);
+    const end = points[points.length - 1]!;
+    expect(Math.abs(end[0] - 64)).toBeLessThan(2);
+    expect(Math.abs(end[1] - 128)).toBeLessThan(2);
+    expect(Math.abs(end[2] - 24)).toBeLessThan(2);
   });
 });

@@ -23,7 +23,7 @@ export interface PipelineResult {
   readonly bsp: Uint8Array;
   readonly prt: Uint8Array | null;
   readonly pts: Uint8Array | null;
-  /** True when qbsp3 reported a leak: the .pts then holds the leak path. */
+  /** True when qbsp3 reported a leak: the .lin pointfile then holds the leak path. */
   readonly leaked: boolean;
   readonly steps: readonly CompileTool[];
 }
@@ -66,7 +66,7 @@ export async function runCompilePipeline(
   const mapPath = `${Q2PREFIX}/maps/${base}.map`;
   const bspPath = `${Q2PREFIX}/maps/${base}.bsp`;
   const prtPath = `${Q2PREFIX}/maps/${base}.prt`;
-  const ptsPath = `${Q2PREFIX}/maps/${base}.pts`;
+  const ptsPath = `${Q2PREFIX}/maps/${base}.lin`;
   const walFiles = textureWals.map((wal) => ({
     path: `${Q2PREFIX}/textures/${wal.name}.wal`,
     data: wal.data,

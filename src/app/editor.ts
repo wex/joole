@@ -45,7 +45,7 @@ import type { GameFileEntry } from '@platform/index';
 import { CommandBus } from './commandBus';
 import { SelectionManager } from './selection';
 import type { PrefabStore } from '@platform/index';
-import { parseMd2, type Md2Wireframe } from '@core/formats/index';
+import { parseMd2, parsePts, type Md2Wireframe } from '@core/formats/index';
 import { CLASS_MODELS } from '@game/q2/models';
 import { mapTextToPastePatch, removeSelectionPatch, selectionToMapText } from './clipboard';
 import { hollowSelectionPatch, intersectSelectionPatch, subtractSelectionPatch } from './csg';
@@ -1063,6 +1063,18 @@ export class EditorApp {
 
   private compiling = false;
 
+  /** The parsed leak path of the last compile, or null when there is none. */
+  leakPath: readonly [number, number, number][] | null = null;
+  private leakIndex = 0;
+
+  /** The next leak point for the camera stepping command (N), advancing each time. */
+  nextLeakPoint(): [number, number, number] | null {
+    if (!this.leakPath || this.leakPath.length === 0) return null;
+    const point = this.leakPath[this.leakIndex % this.leakPath.length]!;
+    this.leakIndex++;
+    return [point[0], point[1], point[2]];
+  }
+
   /** True while a compile runs; the UI shows the cancel action. */
   get isCompiling(): boolean {
     return this.compiling;
@@ -1122,9 +1134,15 @@ export class EditorApp {
         colormap ?? null,
       );
       if (result.leaked) {
-        this.log('error', 'The map leaks. The pointfile is ready for the leak display.');
+        this.leakPath = result.pts ? parsePts(new TextDecoder().decode(result.pts)) : null;
+        this.log(
+          'error',
+          `The map leaks; the path is drawn in the views. N steps the camera along it.`,
+        );
         return false;
       }
+      this.leakPath = null;
+      this.leakIndex = 0;
       const bspName = mapName.replace(/\.map$/i, '.bsp');
       const saved = this.saveBinaryFile ? await this.saveBinaryFile(bspName, result.bsp) : false;
       this.log('ok', `Compiled ${bspName} (${result.bsp.byteLength} bytes).`);

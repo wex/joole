@@ -1,4 +1,5 @@
 import '@ui/fonts.css';
+import type { Vec3 } from '@core/types/index';
 import '../docs/design-system/tokens.css';
 import '@ui/global.css';
 import { EditorApp } from '@app/index';
@@ -205,6 +206,19 @@ app.subscribe((event) => {
     }
     if (app.mapName) void projectStore?.saveRecentFiles([app.mapName]);
     renderer.setScope(app.scope);
+    // The leak path appears automatically once a compile finds a leak.
+    if (app.leakPath && app.leakPath.length > 1) {
+      const segments: [Vec3, Vec3][] = [];
+      for (let i = 0; i + 1 < app.leakPath.length; i++) {
+        segments.push([
+          app.leakPath[i]! as [number, number, number],
+          app.leakPath[i + 1]! as [number, number, number],
+        ]);
+      }
+      renderer.setLeakPath(segments);
+    } else {
+      renderer.setLeakPath([]);
+    }
   } else if (event.type === 'selection') {
     renderer.setSelection(app.selection);
   } else if (event.type === 'game') {
@@ -225,6 +239,7 @@ declare global {
       camera: (view: '3d' | 'top' | 'front' | 'side') => ReturnType<Renderer['getCamera']>;
       viewRects: () => Record<string, { x: number; y: number; width: number; height: number }>;
       project: () => string;
+      leakPath: () => readonly (readonly number[])[] | null;
       texture: (name?: string) => string;
       faces: () => number;
     };
@@ -238,6 +253,7 @@ window.joole = {
   camera: (view) => renderer.getCamera(view),
   viewRects: () => Object.fromEntries(renderer.viewRects()),
   project: () => app.projectText(),
+  leakPath: () => app.leakPath,
   texture: (name?: string) => {
     if (name) app.setCurrentTexture(name);
     return app.currentTextureName;

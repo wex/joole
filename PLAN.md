@@ -750,7 +750,7 @@ Goal: the full compile cycle in the browser, plus the performance targets, brows
 - **Depends on:** P5.1, P1.8
 - **Done when:** the Gate 4 sample map compiles with every profile in the browser.
 
-### [ ] P5.3 Leak display
+### [x] P5.3 Leak display
 
 - **Goal:** make leaks easy to find and fix.
 - **Scope:** a `.pts` parser, the leak path drawn in all views in `vp-leak`, and a _Next leak point_ command (N) that moves the camera along the path.

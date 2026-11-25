@@ -93,6 +93,7 @@ const LINE_UNIFORMS = [
   'uEntityColor',
   'uSelectColor',
   'uInvalidColor',
+  'uLeakColor',
 ] as const;
 const GRID_UNIFORMS = [
   'uViewportOrigin',
@@ -223,6 +224,11 @@ export class Renderer {
       this.cache.setSelection(this.doc, ids);
       this.invalidate();
     }
+  }
+
+  /** Draws the qbsp3 leak polyline in the leak colour (empty clears it). */
+  setLeakPath(segments: readonly (readonly [Vec3, Vec3])[]): void {
+    this.cache.setLeakPath(segments);
   }
 
   /** Rebuilds one node's geometry, e.g. when its model finished loading. */
@@ -447,6 +453,7 @@ export class Renderer {
     gl.uniform4fv(u.uEntityColor, this.colors['vp-entity']);
     gl.uniform4fv(u.uSelectColor, this.colors['vp-select']);
     gl.uniform4fv(u.uInvalidColor, this.colors['vp-invalid']);
+    gl.uniform4fv(u.uLeakColor, this.colors['vp-leak']);
     gl.bindVertexArray(this.cache.lines.vao);
     for (const pass of [0, 1]) {
       gl.uniform1i(u.uPass, pass);

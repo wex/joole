@@ -559,6 +559,20 @@ export function EditorShell(props: EditorShellProps) {
         shift: event.shiftKey,
         alt: event.altKey,
       });
+      // N steps the cameras along the leak path after a leaking compile.
+      if ((event.key === 'n' || event.key === 'N') && !event.ctrlKey && !event.metaKey) {
+        const point = app.nextLeakPoint();
+        if (point) {
+          event.preventDefault();
+          for (const view of ['top', 'front', 'side'] as const) {
+            const camera = controller.get(view);
+            if (camera.kind === 'ortho') {
+              controller.setCamera(view, { ...camera, center: [...point] });
+            }
+          }
+          return;
+        }
+      }
       if (action === 'undo' || action === 'redo') {
         event.preventDefault();
         if (action === 'undo') {
