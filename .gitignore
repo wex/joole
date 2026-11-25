@@ -6,3 +6,6 @@ playwright-report/
 test-results/
 *.tsbuildinfo
 .tsbuild/
+
+# Generated stress-test maps
+tests/fixtures/generated/

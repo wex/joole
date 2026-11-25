@@ -401,7 +401,19 @@ The targets are sized so that a large Q2 map works on an integrated GPU. They ar
 | CSG subtract, 1 cutter and 50 targets           | < 50 ms          | A Vitest benchmark               | CI (loose threshold) and the reference hardware |
 | Memory use without textures, 20,000 brushes     | < 300 MB         | Chrome's memory profiler         | Manual, at each phase gate                      |
 
-**Reference hardware:** a laptop with an Intel Iris Xe (11th–13th gen) or AMD Radeon 680M-class integrated GPU, 16 GB RAM, the current Chrome, on the balanced power profile. Every recorded result names the exact model, the Chrome version and the date. CI runs only the CPU-bound metrics (map opening and the CSG benchmark), with thresholds of twice the target, to catch regressions; the CI runners render with SwiftShader, so GPU-bound numbers there are meaningless. The GPU-bound metrics (frame rate, drag latency, memory) are measured by hand on the reference hardware at each phase gate.
+**Reference hardware:** a laptop with an Intel Iris Xe (11th–13th gen) or AMD Radeon 680M-class integrated GPU, 16 GB RAM, the current Chrome, on the balanced power profile. Every recorded result names the exact model, the Chrome version and the date. CI runs only the CPU-bound metrics (map opening and, once CSG exists in P3.1, the CSG benchmark), with thresholds of twice the target, to catch regressions; the CI runners render with SwiftShader, so GPU-bound numbers there are meaningless. The GPU-bound metrics (frame rate, drag latency, memory) are measured by hand on the reference hardware at each phase gate.
+
+**P1.12 preliminary baseline (25.11.2026):** the development-machine measurements below are not reference-hardware results. The environment was an AMD Ryzen 7 7800X3D (16 logical CPUs, 15 GiB available to WSL2), WSL2 kernel 5.15.167.4, Playwright Chromium 159.0.8154.6, headless SwiftShader rendering, production preview build. The generated maps were non-overlapping 96³ boxes on a 128-unit cubic lattice.
+
+| Measurement                                                          |                                                                          P1.12 preliminary result | Interpretation                                                                                                  |
+| -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------: | --------------------------------------------------------------------------------------------------------------- |
+| Opening the generated 5,000-brush map, views idle                    |                                                               median 261 ms; five runs 229–342 ms | Passes the 2 s target in this environment; CI regression threshold is 4 s                                       |
+| Memory after opening the generated 20,000-brush map without textures | 52,180,952 bytes of live JS heap after forced GC, a 50,142,148-byte increase over the empty shell | Within the 300 MB target by this measurement method; the reference-memory measurement remains manual            |
+| 3D frame rate, generated 20,000 textured brushes                     |                                                                   7.0 fps in headless SwiftShader | Not a hardware measurement and not evidence for or against the 60 fps target, per the CI/SwiftShader rule above |
+| Drag latency                                                         |                                                                         not measurable in phase 1 | Editing does not exist before phase 2; the final target remains measured in P5.6                                |
+| CSG subtract                                                         |                                                                         not measurable in phase 1 | CSG does not exist before P3.1, whose benchmark is the phase-3 measurement                                      |
+
+The texture conversion proxy measured on the same machine was 72 ms for 512 synthetic 256×256 textures, single-threaded in Node. No valid measurement shows a target clearly at risk. The GPU frame rate still needs reference-hardware measurement, and P5.6 already contains the profiling/culling work package, so P1.12 adds no new mitigation WP.
 
 **Testing:**
 
@@ -451,6 +463,10 @@ The implementation proceeds in five phases. Each phase ends with a usable versio
 
 - **2D view axes (P1.10):** the Radiant convention described under Rendering with WebGL2. id's own `qe4` has only the XY view, and Qoole's orientations are buried in its object transforms, so the widely known Radiant layout was chosen.
 
+**Decisions 25.11.2026:**
+
+- **Performance baseline ordering:** P1.12 measures the map-open path and records preliminary memory/rendering numbers. The CSG benchmark is not moved earlier than P3.1, because implementing CSG only to measure it would violate the phase order. Drag latency likewise remains a later measurement because brush editing does not exist in phase 1. Reference-hardware GPU measurements remain phase-gate checks, with the final target pass in P5.6.
+
 **To be refined later:**
 
-- [ ] **Performance-panel measurement of the texture pipeline (P1.9):** the 512-texture batch conversion was verified as a single-threaded Node measurement in the unit tests (24.11.2026), well within budget. The browser Performance-panel measurement needs a larger real game-data corpus and is made in the P1.12 performance pass. The E2E test of a texture arriving in the renderer through the worker was added with P1.10 (25.11.2026). The E2E test of the game-data fallback path (P1.8) was added with P1.11 (25.11.2026).
+- [ ] **Performance-panel measurement of the texture pipeline (P1.9):** the 512-texture batch conversion was verified as a single-threaded Node measurement in the unit tests (24.11.2026), well within budget. The browser Performance-panel measurement needs a larger real game-data corpus and is made at Gate 1 when `JOOLE_Q2_DIR` is configured. The E2E test of a texture arriving in the renderer through the worker was added with P1.10 (25.11.2026). The E2E test of the game-data fallback path (P1.8) was added with P1.11 (25.11.2026).
