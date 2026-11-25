@@ -9,6 +9,7 @@ import {
   pickGameDirectory,
   TextureCache,
   TextureClient,
+  ProjectStore,
 } from '@platform/index';
 import { Renderer } from '@render/index';
 import { mountEditorShell } from '@ui/index';
@@ -21,6 +22,8 @@ if (!root) {
 }
 
 const textureCache = await TextureCache.openOpfs().catch(() => null);
+const projectStore = await ProjectStore.openOpfs().catch(() => null);
+const settings = (await projectStore?.loadSettings()) ?? null;
 const textureClient = new TextureClient();
 
 async function pickMapFile(): Promise<File | null> {
@@ -43,6 +46,36 @@ async function pickMapFile(): Promise<File | null> {
   }
 }
 
+function downloadText(name: string, text: string): boolean {
+  const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = name;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  return true;
+}
+
+async function saveTextFile(name: string, text: string): Promise<boolean> {
+  const picker = (
+    window as unknown as {
+      showSaveFilePicker?: (options: { suggestedName: string }) => Promise<FileSystemFileHandle>;
+    }
+  ).showSaveFilePicker;
+  if (picker) {
+    try {
+      const handle = await picker({ suggestedName: name });
+      const writable = await handle.createWritable();
+      await writable.write(text);
+      await writable.close();
+      return true;
+    } catch {
+      return false;
+    }
+  }
+  return downloadText(name, text);
+}
+
 const app = new EditorApp({
   inflate: browserInflate,
   textureClient,
@@ -59,6 +92,8 @@ const app = new EditorApp({
     : undefined,
   pickMapFile: 'showOpenFilePicker' in window ? pickMapFile : undefined,
   clipboard: navigator.clipboard,
+  saveProjectText: saveTextFile,
+  saveMapText: saveTextFile,
 });
 
 const canvas = document.createElement('canvas');
@@ -67,6 +102,7 @@ const renderer = new Renderer(canvas, {
   loadTexture: (name) => app.loadTexture(name),
 });
 renderer.setDocument(app.document);
+if (typeof settings?.gridSize === 'number') app.setGridSize(settings.gridSize);
 renderer.setGridSize(app.gridSize);
 
 // The renderer is subscribed before the UI, so the UI's document event can
@@ -83,6 +119,7 @@ app.subscribe((event) => {
   } else if (event.type === 'game') {
     renderer.reloadTextures();
   } else if (event.type === 'grid') {
+    if (typeof settings?.gridSize === 'number') app.setGridSize(settings.gridSize);
     renderer.setGridSize(app.gridSize);
   }
 });

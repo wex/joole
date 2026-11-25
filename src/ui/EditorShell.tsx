@@ -504,6 +504,11 @@ export function EditorShell(props: EditorShellProps) {
         }
         return;
       }
+      if (action === 'save') {
+        event.preventDefault();
+        void app.saveProject();
+        return;
+      }
       if (action === 'copy' || action === 'cut' || action === 'paste' || action === 'duplicate') {
         event.preventDefault();
         if (action === 'copy') void app.copySelection();
@@ -779,7 +784,7 @@ export function EditorShell(props: EditorShellProps) {
         ref={(el) => (mapInput = el)}
         class={styles.fileInput}
         type="file"
-        accept=".map"
+        accept=".map,.joole.json"
         aria-label="Choose map"
         data-testid="map-input"
         onChange={(event) => {

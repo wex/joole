@@ -1,5 +1,5 @@
 import { createEmptyDocument } from '@core/doc/index';
-import { parseMap, readPcxPalette } from '@core/formats/index';
+import { parseMap, readPcxPalette, readProject, writeMap, writeProject } from '@core/formats/index';
 import type { Command, ConvertedTexture, Inflate, MapDocument, Patch } from '@core/types/index';
 import { PALETTE_PATH } from '@game/q2/index';
 import type { GameFileEntry } from '@platform/index';
@@ -46,6 +46,9 @@ export interface EditorAppOptions {
   /** The Chromium file-picker path, wired in main.ts. */
   readonly pickMapFile?: () => Promise<File | null>;
   readonly clipboard?: ClipboardLike;
+  /** Saves project text; main.ts uses a file handle or a download. */
+  readonly saveProjectText?: (name: string, text: string) => Promise<boolean>;
+  readonly saveMapText?: (name: string, text: string) => Promise<boolean>;
 }
 
 export type EditorEvent =
@@ -89,6 +92,8 @@ export class EditorApp {
   private readonly pickGameEntries?: () => Promise<GameSelection | null>;
   private readonly pickMapFile?: () => Promise<File | null>;
   private readonly clipboard?: ClipboardLike;
+  private readonly saveProjectText?: (name: string, text: string) => Promise<boolean>;
+  private readonly saveMapText?: (name: string, text: string) => Promise<boolean>;
   private entries: LogEntry[] = [];
   private nextLogId = 1;
   private readonly bus: CommandBus;
@@ -109,6 +114,8 @@ export class EditorApp {
     this.pickGameEntries = options.pickGameEntries;
     this.pickMapFile = options.pickMapFile;
     this.clipboard = options.clipboard;
+    this.saveProjectText = options.saveProjectText;
+    this.saveMapText = options.saveMapText;
     this.bus = new CommandBus(createEmptyDocument());
     this.selectionManager = new SelectionManager(this.bus);
     this.selectTool = new SelectTool(
@@ -265,7 +272,9 @@ export class EditorApp {
 
   async openMapFile(file: File): Promise<boolean> {
     try {
-      return await this.openMapText(file.name, await file.text());
+      const text = await file.text();
+      if (/\.joole\.json$/i.test(file.name)) return await this.openProjectText(file.name, text);
+      return await this.openMapText(file.name, text);
     } catch (error) {
       this.log('error', `Map failed to open: ${errorText(error)}`);
       return false;
@@ -385,6 +394,46 @@ export class EditorApp {
       this.setSelection(output.selection);
     }
     return output;
+  }
+
+  projectText(): string {
+    return writeProject(this.document, { gridSize: this.gridSize });
+  }
+
+  exportMapText(): { text: string; warnings: string[] } {
+    return writeMap(this.document, { mode: 'export' });
+  }
+
+  async saveProject(): Promise<boolean> {
+    if (!this.saveProjectText) return false;
+    const name = (this.map?.replace(/\.(map|joole\.json)$/i, '') ?? 'untitled') + '.joole.json';
+    const saved = await this.saveProjectText(name, this.projectText());
+    if (saved) this.log('ok', `Project saved as ${name}.`);
+    return saved;
+  }
+
+  async exportMap(): Promise<boolean> {
+    if (!this.saveMapText) return false;
+    const result = this.exportMapText();
+    for (const warning of result.warnings) this.log('warning', warning);
+    const name = (this.map?.replace(/\.(map|joole\.json)$/i, '') ?? 'untitled') + '.map';
+    return this.saveMapText(name, result.text);
+  }
+
+  async openProjectText(name: string, text: string): Promise<boolean> {
+    try {
+      const doc = readProject(text);
+      this.bus.reset(doc);
+      this.selectionManager.clear();
+      this.selectTool.syncDocument(doc);
+      this.map = name;
+      this.emit({ type: 'document' });
+      this.log('ok', `Opened project ${name} (${plural(doc.nodes.size, 'node')}).`);
+      return true;
+    } catch (error) {
+      this.log('error', `Project failed to open: ${errorText(error)}`);
+      return false;
+    }
   }
 
   /** The renderer's lazy texture loader, over the open VFS, worker and cache. */

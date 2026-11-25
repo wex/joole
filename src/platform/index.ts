@@ -5,3 +5,4 @@ export * from './gameFiles';
 export * from './gameAccess';
 export * from './textureClient';
 export * from './textureCache';
+export * from './projectStore';

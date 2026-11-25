@@ -1,5 +1,6 @@
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
+import { readFile } from 'node:fs/promises';
 import { expect, test, type Page } from '@playwright/test';
 
 interface JooleWindow {
@@ -281,5 +282,35 @@ test('copy, paste, cut and duplicate operate on the selection', async ({ page, c
   await expect
     .poll(() => page.evaluate(() => (window as unknown as JooleWindow).joole!.stats().nodes))
     .toBe(nodesBefore + 1);
+  expect(errors).toEqual([]);
+});
+
+test('Ctrl+S downloads a project and the project reloads without loss', async ({ page }) => {
+  const errors = consoleErrors(page);
+  await page.addInitScript(() => {
+    Object.defineProperty(window, 'showSaveFilePicker', { value: undefined, configurable: true });
+  });
+  await openFixtureMap(page);
+  const nodesBefore = await page.evaluate(
+    () => (window as unknown as JooleWindow).joole!.stats().nodes,
+  );
+
+  const downloadPromise = page.waitForEvent('download');
+  await page.keyboard.press('Control+s');
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toBe('room.joole.json');
+  const path = await download.path();
+  expect(path).not.toBeNull();
+
+  await page.locator('[data-testid=map-input]').setInputFiles({
+    name: download.suggestedFilename(),
+    mimeType: 'application/json',
+    buffer: await readFile(path!),
+  });
+  await expect(page.locator('[data-testid=properties-panel]')).toContainText('room.joole.json');
+  await page.evaluate(() => (window as unknown as JooleWindow).joole!.whenIdle());
+  expect(await page.evaluate(() => (window as unknown as JooleWindow).joole!.stats().nodes)).toBe(
+    nodesBefore,
+  );
   expect(errors).toEqual([]);
 });

@@ -40,4 +40,8 @@ interface Window {
     types?: FilePickerAcceptType[];
     excludeAcceptAllOption?: boolean;
   }): Promise<FileSystemFileHandle[]>;
+  showSaveFilePicker(options?: {
+    suggestedName?: string;
+    types?: FilePickerAcceptType[];
+  }): Promise<FileSystemFileHandle>;
 }

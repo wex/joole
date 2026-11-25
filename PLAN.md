@@ -466,7 +466,7 @@ Goal: editing through commands with unlimited undo, project files and autosave, 
 - **Depends on:** P1.5, P2.1
 - **Done when:** a selection pasted into another editor's `.map` format parses there. This is checked manually once and recorded.
 
-### [ ] P2.9 Project format and saving (`core/formats`, `platform`, `app`)
+### [x] P2.9 Project format and saving (`core/formats`, `platform`, `app`)
 
 - **Goal:** `.joole.json` as the primary save format.
 - **Scope:**
