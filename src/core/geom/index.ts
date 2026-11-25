@@ -10,3 +10,4 @@ export * from './picking';
 export * from './transform';
 export * from './primitives';
 export * from './csg';
+export * from './vertexEdit';
