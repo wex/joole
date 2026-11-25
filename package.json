@@ -22,7 +22,8 @@
     "test:coverage": "vitest run --coverage",
     "bench": "vitest bench --run",
     "e2e": "playwright test",
-    "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build"
+    "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build",
+    "build:tools": "sh tools/build.sh"
   },
   "dependencies": {
     "@solidjs/web": "^2.0.0",

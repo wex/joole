@@ -489,7 +489,7 @@ Goal: editing through commands with unlimited undo, project files and autosave, 
 - **Depends on:** P2.9
 - **Done when:** recovery works in Chromium and in the download path.
 
-### [ ] P2.11 qbsp3 for Node (`tools`, `workers`) ⇄ (may start right after P1.5)
+### [x] P2.11 qbsp3 for Node (`tools`, `workers`) ⇄ (may start right after P1.5)
 
 - **Goal:** use qbsp3 as an automated test oracle from phase 2 onwards.
 - **Scope:**

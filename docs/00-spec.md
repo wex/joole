@@ -289,6 +289,8 @@ Project saving is implemented as versioned `joole-project` JSON with exact JSON 
 
 Autosave writes the current project to OPFS every 30 seconds once a command has made it dirty, and again on `pagehide`. The dirty flag is cleared only by an explicit project save/download. On start-up, a dirty autosave produces a recovery prompt; accepting loads it as `recovered.joole.json`, and discarding clears the recovery metadata.
 
+The qbsp3 oracle is built with Emscripten without `DOUBLEVEC_T`: the upstream makefile defines it for native double-precision experiments, but the wasm build crashed while parsing with that ABI-altering typedef. The browser/editor geometry core remains float64 independently of the oracle. The committed wasm output was rebuilt twice on 25.11.2026 and was bit-for-bit deterministic.
+
 ## Rendering with WebGL2
 
 All four views are drawn into one WebGL2 context and one `<canvas>` element using `gl.scissor` and `gl.viewport`. Textures and buffers are then shared between the views, and four browser contexts are not used up. Qoole's `QDraw` abstraction (OpenGL, Glide, DirectX, MGL, software rendering) is replaced by a single renderer.

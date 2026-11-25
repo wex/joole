@@ -45,3 +45,8 @@ interface Window {
     types?: FilePickerAcceptType[];
   }): Promise<FileSystemFileHandle>;
 }
+
+declare module '*qbsp3.mjs' {
+  const createQbsp3: unknown;
+  export default createQbsp3;
+}

@@ -48,6 +48,16 @@ jobs:
             test-results/
           if-no-files-found: ignore
 
+  wasm-reproducibility:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Rebuild qbsp3
+        run: pnpm build:tools
+      - name: Verify committed WASM is reproducible
+        run: git diff --exit-code -- workers/wasm
+
   conventional-pr-title:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
