@@ -251,7 +251,23 @@ window.joole = {
   selection: () => [...app.selection],
   autosave: () => app.autosave(),
   camera: (view) => renderer.getCamera(view),
-  viewRects: () => Object.fromEntries(renderer.viewRects()),
+  // The renderer's rectangles are backing-store pixels, but every consumer
+  // here feeds them to mouse input, which is in CSS pixels — at a backing
+  // ratio other than 1 the raw rectangles misplace every click.
+  viewRects: () => {
+    const ratio = renderer.backingRatio();
+    return Object.fromEntries(
+      [...renderer.viewRects()].map(([view, rect]) => [
+        view,
+        {
+          x: rect.x / ratio,
+          y: rect.y / ratio,
+          width: rect.width / ratio,
+          height: rect.height / ratio,
+        },
+      ]),
+    );
+  },
   project: () => app.projectText(),
   leakPath: () => app.leakPath,
   texture: (name?: string) => {

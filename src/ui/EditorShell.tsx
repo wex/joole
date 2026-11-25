@@ -170,7 +170,7 @@ export function EditorShell(props: EditorShellProps) {
 
   const hitView = (clientX: number, clientY: number): HitView | null => {
     const bounds = canvasElement.getBoundingClientRect();
-    const ratio = window.devicePixelRatio || 1;
+    const ratio = props.renderer.backingRatio();
     const x = (clientX - bounds.left) * ratio;
     const y = (clientY - bounds.top) * ratio;
     for (const [view, rect] of props.renderer.viewRects()) {
@@ -454,7 +454,7 @@ export function EditorShell(props: EditorShellProps) {
               camera,
               event.clientX - pan.lastX,
               event.clientY - pan.lastY,
-              window.devicePixelRatio || 1,
+              props.renderer.backingRatio(),
             ),
           );
         }

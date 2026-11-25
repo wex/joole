@@ -39,14 +39,14 @@ async function worldScreen(page: Page, view: string, point: Vec3) {
       return {
         x:
           canvas.left +
-          rect.x / ratio +
+          rect.x +
           (point[hAxis!]! - camera.center[hAxis!]!) * (camera.zoom / ratio) +
-          rect.width / ratio / 2,
+          rect.width / 2,
         y:
           canvas.top +
-          rect.y / ratio -
+          rect.y -
           (point[vAxis!]! - camera.center[vAxis!]!) * (camera.zoom / ratio) +
-          rect.height / ratio / 2,
+          rect.height / 2,
       };
     },
     { view, point },
