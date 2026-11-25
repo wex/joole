@@ -371,7 +371,7 @@ Goal: read Q2 game data and `.map` files without loss, and show the map in four 
 
 Goal: editing through commands with unlimited undo, project files and autosave, and qbsp3 available as a test oracle.
 
-### [ ] P2.1 Commands and history (`core/doc`, `app`)
+### [x] P2.1 Commands and history (`core/doc`, `app`)
 
 - **Goal:** route every document change through one bus.
 - **Scope:**
