@@ -229,6 +229,11 @@ export class Renderer {
     this.invalidate();
   }
 
+  /** Persistent target–targetname link lines in the 2D views. */
+  setTargetLinks(segments: readonly (readonly [Vec3, Vec3])[]): void {
+    this.cache.setTargetLinks(segments);
+  }
+
   setCamera(view: ViewId, camera: Camera): void {
     this.cameras.set(view, camera);
     this.invalidate();

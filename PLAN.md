@@ -671,7 +671,7 @@ Goal: everything needed to build a complete playable single-player level.
 - **Depends on:** P4.2, P2.5
 - **Done when:** entities can be placed and converted.
 
-### [ ] P4.5 Entity panel
+### [x] P4.5 Entity panel
 
 - **Goal:** a form generated from the definitions.
 - **Scope:** implements the design system's `EntityProperties`. A class picker (category, then class), spawnflag checkboxes, a `_color` picker, an `angle` compass, `target` and `targetname` drop-downs filled from the names in the map, and a raw key–value table for unknown keys. `target` links are drawn as lines in the 2D views.

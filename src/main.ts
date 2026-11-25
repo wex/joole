@@ -114,8 +114,33 @@ if (storedAutosave?.dirty && storedAutosave.project) app.offerRecovery(storedAut
 setInterval(() => void app.autosave(), 30000);
 window.addEventListener('pagehide', () => void app.autosave());
 renderer.setDocument(app.document);
+updateTargetLinks();
 if (typeof settings?.gridSize === 'number') app.setGridSize(settings.gridSize);
 renderer.setGridSize(app.gridSize);
+
+/** Recomputes the target–targetname link lines after document changes. */
+function updateTargetLinks(): void {
+  const segments: (readonly [[number, number, number], [number, number, number]])[] = [];
+  for (const [from, to] of app.targetLinks()) {
+    const a = app.document.nodes.get(from);
+    const b = app.document.nodes.get(to);
+    if (a?.kind !== 'entity' || b?.kind !== 'entity') continue;
+    const pa = a.props
+      .find(([k]) => k === 'origin')?.[1]
+      ?.split(/\s+/)
+      .map(Number);
+    const pb = b.props
+      .find(([k]) => k === 'origin')?.[1]
+      ?.split(/\s+/)
+      .map(Number);
+    if (!pa || !pb || pa.length !== 3 || pb.length !== 3) continue;
+    segments.push([
+      [pa[0]!, pa[1]!, pa[2]!],
+      [pb[0]!, pb[1]!, pb[2]!],
+    ]);
+  }
+  renderer.setTargetLinks(segments);
+}
 
 // The renderer is subscribed before the UI, so the UI's document event can
 // frame cameras after the geometry cache has been updated.
@@ -123,6 +148,7 @@ app.subscribe((event) => {
   if (event.type === 'document') {
     if (event.patch) {
       renderer.applyPatch(app.document, event.patch);
+      updateTargetLinks();
     } else {
       renderer.setDocument(app.document);
     }

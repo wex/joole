@@ -2,6 +2,7 @@ import { createEffect, createSignal, For, Show, untrack } from 'solid-js';
 import type { EditorApp } from '@app/index';
 import type { SurfaceState } from '@app/surfaceProps';
 import styles from './PropertiesPanel.module.css';
+import { EntityPanel } from './EntityPanel';
 
 export interface PropertiesPanelProps {
   readonly app: EditorApp;
@@ -123,6 +124,7 @@ export function PropertiesPanel(props: PropertiesPanelProps) {
     <aside class={styles.panel} aria-label="Properties" data-testid="properties-panel">
       <header class={styles.titlebar}>Properties</header>
       <div class={styles.body}>
+        <EntityPanel app={app} version={props.version} />
         <span class={styles.groupLabel}>Selection</span>
         <Show
           when={textureNames().length > 0}

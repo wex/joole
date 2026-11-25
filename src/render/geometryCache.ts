@@ -165,6 +165,7 @@ export class GeometryCache {
   private nextIndex = 1;
   private selected = new Set<Id>();
   private toolSegments: readonly LineSegment[] = [];
+  private linkSegments: readonly LineSegment[] = [];
   private invalidSegments: readonly LineSegment[] = [];
   private readonly invalidIndex: number;
 
@@ -242,8 +243,14 @@ export class GeometryCache {
     this.rebuildOverlay();
   }
 
+  /** Persistent target–targetname link lines, recomputed by the app on document changes. */
+  setTargetLinks(segments: readonly LineSegment[]): void {
+    this.linkSegments = segments;
+    this.rebuildOverlay();
+  }
+
   private rebuildOverlay(): void {
-    const segments: LineSegment[] = [...this.toolSegments];
+    const segments: LineSegment[] = [...this.toolSegments, ...this.linkSegments];
     // Handles are small world-space crosses at every selected brush's corners.
     for (const id of this.selected) {
       const box = this.records.get(id)?.aabb;

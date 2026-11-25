@@ -11,6 +11,14 @@ import {
 } from '@core/formats/index';
 import q2defText from '../game/q2/q2.def?raw';
 import { convertBrushesToEntityPatch } from './entities';
+import {
+  entityPanelState,
+  renameEntityPropPatch,
+  setEntityClassPatch,
+  setEntityPropPatch,
+  targetLinks,
+  toggleSpawnflagPatch,
+} from './entityPanel';
 import type { EntityClassDef } from '@core/formats/index';
 import type {
   Command,
@@ -368,6 +376,53 @@ export class EditorApp {
       return true;
     } catch (error) {
       this.log('warning', `Convert to entity failed: ${errorText(error)}`);
+      return false;
+    }
+  }
+
+  /** The entity panel state of the current selection. */
+  entityPanel() {
+    return entityPanelState(this.document, this.selection, this.entityDefsValue);
+  }
+
+  /** Undoable entity key edit; empty value removes the key. */
+  setEntityProp(id: string, key: string, value: string): boolean {
+    return this.runEntityPatch(`Edit ${key}`, () =>
+      setEntityPropPatch(this.document, id, key, value),
+    );
+  }
+
+  renameEntityProp(id: string, oldKey: string, newKey: string): boolean {
+    return this.runEntityPatch(`Rename ${oldKey}`, () =>
+      renameEntityPropPatch(this.document, id, oldKey, newKey),
+    );
+  }
+
+  toggleSpawnflag(id: string, bit: number): boolean {
+    return this.runEntityPatch('Toggle spawnflag', () =>
+      toggleSpawnflagPatch(this.document, id, bit),
+    );
+  }
+
+  /** Changes the class of a point entity. For brush classes on a brush selection use convertSelectionToEntity. */
+  setEntityClass(id: string, classname: string): boolean {
+    return this.runEntityPatch(`Class ${classname}`, () =>
+      setEntityClassPatch(this.document, id, classname),
+    );
+  }
+
+  /** Target–targetname link pairs for the 2D link lines. */
+  targetLinks() {
+    return targetLinks(this.document);
+  }
+
+  private runEntityPatch(label: string, build: () => Patch): boolean {
+    try {
+      const patch = build();
+      this.executeCommand({ label, run: () => patch });
+      return true;
+    } catch (error) {
+      this.log('warning', errorText(error));
       return false;
     }
   }
