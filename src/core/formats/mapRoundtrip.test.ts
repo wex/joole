@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { parseMap } from './mapParse';
 import { writeMap, formatNumber } from './mapWrite';
 import type { MapDocument, MapNode } from '@core/types/index';
+import { analyzeBrush, validateBrush } from '@core/geom/index';
 
 function normalize(doc: MapDocument): unknown {
   // ids of entities and brushes are generated per parse, so structural
@@ -63,6 +64,30 @@ describe('round-trip on the canonical fixture', () => {
   it('clipboard mode round-trips the same way', () => {
     const doc = parseMap(text);
     expect(writeMap(doc, { mode: 'clipboard' }).text).toBe(text);
+  });
+});
+
+describe('the renderer fixture room.map', () => {
+  const text = readFileSync('tests/fixtures/room.map', 'utf8');
+
+  it('is canonical: export writes it back byte for byte, without warnings', () => {
+    const result = writeMap(parseMap(text), { mode: 'export' });
+    expect(result.warnings).toEqual([]);
+    expect(result.text).toBe(text);
+  });
+
+  it('read-write-read produces identical data', () => {
+    const first = parseMap(text);
+    expect(normalize(parseMap(writeMap(first, { mode: 'export' }).text))).toEqual(normalize(first));
+  });
+
+  it('every brush is valid, so every one of them renders', () => {
+    const doc = parseMap(text);
+    const brushes = [...doc.nodes.values()].filter((node) => node.kind === 'brush');
+    expect(brushes).toHaveLength(11);
+    for (const brush of brushes) {
+      expect(validateBrush(analyzeBrush(brush)).reasons).toEqual([]);
+    }
   });
 });
 

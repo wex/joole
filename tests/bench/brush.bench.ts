@@ -1,6 +1,7 @@
 import { it } from 'vitest';
 import { analyzeBrush } from '../../src/core/geom/brush';
 import { makeBox } from '../../src/core/geom/__tests__/helpers';
+import { buildBrushMesh } from '../../src/render/brushMesh';
 import type { BrushNode, Vec3 } from '../../src/core/types/index';
 
 // deterministic pseudo-random boxes, generated once outside the timing
@@ -27,5 +28,11 @@ it('builds polygons for 5000 brushes', async ({ bench }) => {
     for (const brush of brushes) {
       analyzeBrush(brush);
     }
+  }).run();
+});
+
+it('builds the GPU meshes for 5000 brushes', async ({ bench }) => {
+  await bench('5000 brush mesh builds (polygons, triangles, UVs, edges)', () => {
+    brushes.forEach((brush, i) => buildBrushMesh(brush, i));
   }).run();
 });
