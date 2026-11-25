@@ -292,7 +292,7 @@ Goal: read Q2 game data and `.map` files without loss, and show the map in four 
 - **Depends on:** P1.3, P1.4
 - **Done when:** the textures from both `baseq2` and a mod resolve in the correct order.
 
-### [ ] P1.9 Texture worker and cache (`workers`, `platform`)
+### [x] P1.9 Texture worker and cache (`workers`, `platform`)
 
 - **Goal:** convert textures off the main thread and cache them.
 - **Scope:**

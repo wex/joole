@@ -5,3 +5,4 @@ export * from './pcx';
 export * from './mapTokenize';
 export * from './mapParse';
 export * from './mapWrite';
+export * from './walRgba';

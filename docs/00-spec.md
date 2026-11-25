@@ -451,4 +451,4 @@ The implementation proceeds in five phases. Each phase ends with a usable versio
 
 **To be refined later:**
 
-None at the moment.
+- [ ] **Browser verification of the texture pipeline (P1.9):** the 512-texture batch conversion was verified as a single-threaded Node measurement inside the unit test suite (24.11.2026), well within budget; the plan's Performance-panel measurement and the E2E test of a texture arriving in the renderer require the application shell and are run with P1.10/P1.11. The same applies to the E2E test of the game-data fallback path deferred in P1.8.
