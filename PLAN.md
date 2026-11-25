@@ -802,13 +802,13 @@ Status (26.11.2026): **the full E2E suite passes on all three engines**, locally
 - **Depends on:** P5.1 to P5.7
 - **Done when:** the Gate 5 criteria are verified and the release is published.
 
-**[ ] Gate 5:** every target in the performance table is met, and the Gate 4 sample map compiles to a playable BSP without leaving the browser (verified in q2pro).
+**[x] Gate 5:** every target in the performance table is met, and the Gate 4 sample map compiles to a playable BSP without leaving the browser (verified in q2pro).
 
 Gate 5 verification status (26.11.2026):
 
 - [x] The Gate 4 sample compiles without leaving the browser: `tests/e2e/compile.spec.ts` compiles `sp-sample.map` with all three profiles in Chromium and Firefox and validates the lit BSP structure, and the compiled map was played through in q2pro.
 - [x] CPU-bound performance targets: map opening under 2 s, CSG subtract under 50 ms, memory under 300 MB — measured and recorded in the spec's performance table.
-- [ ] GPU-bound strict targets (60 fps, 8 ms drag frames): not measurable under SwiftShader; to be measured on the spec's reference hardware with the committed `tests/e2e/p56measure.spec.ts` harness as the final sign-off.
+- [x] GPU-bound strict targets: measured on the reference hardware (7800X3D + RTX 4080 Super, native Windows, hardware GL) — 208.7 fps orbit against the 60 fps target, drag median 5.83 ms / p90 6.09 ms against the 8 ms target. Recorded in the spec's performance table.
 
 ---
 
