@@ -723,7 +723,7 @@ Goal: everything needed to build a complete playable single-player level.
 
 Goal: the full compile cycle in the browser, plus the performance targets, browser support, offline use and release.
 
-### [ ] P5.1 Compilers in the browser
+### [x] P5.1 Compilers in the browser
 
 - **Goal:** run qbsp3, qvis3 and qrad3 in Web Workers.
 - **Scope:**
@@ -737,7 +737,7 @@ Goal: the full compile cycle in the browser, plus the performance targets, brows
 - **Depends on:** P2.11
 - **Done when:** all three tools run in Chromium with threads.
 
-### [ ] P5.2 Compile pipeline and profiles
+### [x] P5.2 Compile pipeline and profiles
 
 - **Goal:** compile with one command.
 - **Scope:**

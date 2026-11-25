@@ -57,5 +57,23 @@ test('compiles the map in the browser through all three tools', async ({ page })
   });
   await expect(page.locator('[data-testid=log-panel]')).toContainText('---- vis ----');
   await expect(page.locator('[data-testid=log-panel]')).toContainText('Radiosity');
+  // Threading is engaged in Chromium: the tools print their thread count.
+  await expect(page.locator('[data-testid=log-panel]')).toContainText('threads:');
+  expect(errors).toEqual([]);
+
+  // The other two profiles compile the sample as well (Gate 5's rehearsal).
+  for (const profile of ['fast', 'final'] as const) {
+    await page.locator('[data-testid=compile-button]').click();
+    const nextDownload = page.waitForEvent('download', { timeout: 60000 });
+    await page.locator(`[data-testid=compile-${profile}]`).click();
+    const nextFile = await nextDownload;
+    expect(nextFile.suggestedFilename()).toMatch(/\.bsp$/);
+    const nextPath = await nextFile.path();
+    expect(statSync(nextPath!).size).toBeGreaterThan(5000);
+  }
+  // The fast profile skips radiosity, so it appears exactly twice: once for
+  // the normal compile and once for the final one.
+  const logText = await page.locator('[data-testid=log-panel]').textContent();
+  expect(logText?.split('Radiosity').length).toBe(3);
   expect(errors).toEqual([]);
 });
