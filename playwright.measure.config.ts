@@ -24,6 +24,7 @@ export default defineConfig({
       name: 'chromium',
       use: {
         ...devices['Desktop Chrome'],
+        deviceScaleFactor: Number(process.env.JOOLE_MEASURE_DSF ?? '1'),
         // The harness exists for the reference-hardware GPU measurement, so
         // the real GPU is the default. JOOLE_MEASURE_SOFTWARE_GL=1 forces
         // SwiftShader for comparable development-machine runs, where no GPU
