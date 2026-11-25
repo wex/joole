@@ -26,7 +26,7 @@ This file is a guide for both human developers and coding agents: where informat
 
 ## Project status
 
-Phase 0 (_Foundations_) is complete. The scaffold is merged on `main` (PR #1) with branch protection enforced (PRs required, `check` and `conventional-pr-title` as required checks, linear history, no force-pushes). CI is verified both ways: green on a normal PR and red and unmergeable on a deliberate layer violation (PR #2). The production deployment is live at [joole.niko-hujanen.workers.dev](https://joole.niko-hujanen.workers.dev/) with verified security headers (`crossOriginIsolated === true`, verified 24.11.2026). One known operational issue: Cloudflare Workers Builds fail on non-`main` branch pushes, so PR preview deployments do not work yet; production deployment is unaffected. Phase 1 (_Reader and viewer_) is next.
+All six phases (0–5) are implemented on the release branch: the editor reads and writes `.map` and `.joole.json` files, edits brushes with CSG, clipping, vertex/edge/face editing and texture tools, handles entities with generated definitions, groups, prefabs and md2 previews, and compiles maps to playable BSP files entirely in the browser with the threaded qbsp3/qvis3/qrad3 wasm tools. The application is an offline-capable PWA. The production deployment is live at [joole.niko-hujanen.workers.dev](https://joole.niko-hujanen.workers.dev/) with verified security headers. One known operational issue: Cloudflare Workers Builds fail on non-`main` branch pushes, so PR preview deployments do not work yet; production deployment is unaffected.
 
 ## Directory structure and layer rules
 

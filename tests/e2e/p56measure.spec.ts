@@ -1,6 +1,6 @@
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 import { writeGeneratedBrushMap } from '../fixtures/generatedMap';
 
 const projectRoot = fileURLToPath(new URL('../../', import.meta.url));
@@ -16,7 +16,7 @@ interface JooleWindow {
   };
 }
 
-const joole = (page: import('@playwright/test').Page) =>
+const joole = (page: Page) =>
   page.evaluate(() => {
     const j = (window as unknown as JooleWindow).joole!;
     const rects = j.viewRects();
