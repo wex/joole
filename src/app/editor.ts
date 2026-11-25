@@ -1,5 +1,12 @@
 import { addNodePatch, createEmptyDocument, createId } from '@core/doc/index';
-import { parseMap, readPcxPalette, readProject, writeMap, writeProject } from '@core/formats/index';
+import {
+  parseMap,
+  readPcxPalette,
+  readProject,
+  readWalHeader,
+  writeMap,
+  writeProject,
+} from '@core/formats/index';
 import type {
   Command,
   ConvertedTexture,
@@ -8,12 +15,23 @@ import type {
   Patch,
   Vec3,
 } from '@core/types/index';
-import { DEFAULT_TEXTURE, PALETTE_PATH } from '@game/q2/index';
+import {
+  CONTENT_FLAG_BITS,
+  DEFAULT_TEXTURE,
+  PALETTE_PATH,
+  SURFACE_FLAG_BITS,
+} from '@game/q2/index';
 import type { GameFileEntry } from '@platform/index';
 import { CommandBus } from './commandBus';
 import { SelectionManager } from './selection';
 import { mapTextToPastePatch, removeSelectionPatch, selectionToMapText } from './clipboard';
 import { hollowSelectionPatch, intersectSelectionPatch, subtractSelectionPatch } from './csg';
+import {
+  readSurfaceState,
+  toggleBitPatch,
+  editSurfacePatch,
+  type SurfaceState,
+} from './surfaceProps';
 import {
   allFacesOf,
   applyTexturePatch,
@@ -150,6 +168,8 @@ export class EditorApp {
   private textureLock = false;
   private currentTexture = DEFAULT_TEXTURE;
   private textureDims = new Map<string, readonly [number, number]>();
+  private walAttribs = new Map<string, { flags: number; contents: number; value: number }>();
+  private walAttribsPending = new Set<string>();
 
   constructor(options: EditorAppOptions) {
     this.inflate = options.inflate;
@@ -728,6 +748,95 @@ export class EditorApp {
       this.log('ok', `Project saved as ${name}.`);
     }
     return saved;
+  }
+
+  /** The surface-attribute bit tables for the properties panel. */
+  readonly surfaceFlagBits = SURFACE_FLAG_BITS;
+  readonly contentFlagBits = CONTENT_FLAG_BITS;
+
+  /** The combined surface state of the texture tool's target faces, or null. */
+  surfaceState(): SurfaceState | null {
+    const faces = this.textureTargets();
+    if (faces.length === 0) return null;
+    return readSurfaceState(
+      this.document,
+      faces,
+      SURFACE_FLAG_BITS.map(([bit]) => bit),
+      CONTENT_FLAG_BITS.map(([bit]) => bit),
+    );
+  }
+
+  /** The distinct texture names of the target faces, for the ObjectPreview. */
+  selectionTextureNames(): readonly string[] {
+    const names = new Set<string>();
+    for (const ref of this.textureTargets()) {
+      const node = this.document.nodes.get(ref.brush);
+      if (node?.kind === 'brush') {
+        const face = node.faces[ref.face];
+        if (face) names.add(face.tex.name);
+      }
+    }
+    return [...names].sort();
+  }
+
+  /**
+   * The wal default attributes of a texture, or null when unknown. The first
+   * call starts loading; a 'game' event is emitted when they arrive.
+   */
+  walDefaultAttribs(name: string): { flags: number; contents: number; value: number } | null {
+    const cached = this.walAttribs.get(name);
+    if (cached) return cached;
+    if (!this.vfs || this.walAttribsPending.has(name)) return null;
+    this.walAttribsPending.add(name);
+    const hit = this.vfs.find(`textures/${name}.wal`);
+    if (!hit) return null;
+    void hit.read().then((bytes) => {
+      try {
+        const header = readWalHeader(new Uint8Array(bytes));
+        this.walAttribs.set(name, {
+          flags: header.flags,
+          contents: header.contents,
+          value: header.value,
+        });
+        this.emit({ type: 'game' });
+      } catch {
+        // An unreadable wal has no usable defaults; the panel hides the marker.
+      }
+    });
+    return null;
+  }
+
+  /** Toggles one surface or contents bit on the target faces, undoably. */
+  toggleSurfaceBit(field: 'flags' | 'contents', bit: number): boolean {
+    const faces = this.textureTargets();
+    if (faces.length === 0) {
+      this.log('info', 'No faces or brushes selected.');
+      return false;
+    }
+    const patch = toggleBitPatch(this.document, faces, field, bit);
+    if (!patch) return false;
+    this.executeCommand({
+      label: field === 'flags' ? 'Surface Flag' : 'Contents Flag',
+      run: () => patch,
+    });
+    return true;
+  }
+
+  /** Sets the light value of the target faces, undoably. */
+  setSurfaceValue(value: number): boolean {
+    if (!Number.isFinite(value)) return false;
+    const faces = this.textureTargets();
+    if (faces.length === 0) {
+      this.log('info', 'No faces or brushes selected.');
+      return false;
+    }
+    const patch = editSurfacePatch(this.document, faces, (tex) => ({
+      ...tex,
+      value: Math.round(value),
+    }));
+    if (!patch) return false;
+    this.executeCommand({ label: 'Surface Value', run: () => patch });
+    return true;
   }
 
   /** The face targets of the texture tools: picked faces, or whole selected brushes. */

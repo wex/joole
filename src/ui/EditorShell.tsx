@@ -113,6 +113,7 @@ export function EditorShell(props: EditorShellProps) {
   const [brushSides, setBrushSides] = createSignal(app.brushSides);
   const [textureLock, setTextureLock] = createSignal(app.textureLockEnabled);
   const [recoveryAvailable, setRecoveryAvailable] = createSignal(app.recoveryProject !== null);
+  const [panelVersion, setPanelVersion] = createSignal(0);
 
   let viewportElement: HTMLDivElement | undefined;
   let mainElement: HTMLDivElement | undefined;
@@ -651,7 +652,16 @@ export function EditorShell(props: EditorShellProps) {
         setBrushSides(app.brushSides);
         setTextureLock(app.textureLockEnabled);
         setCurrentTexture(app.currentTextureName);
-      } else if (event.type === 'recovery') {
+      }
+      if (
+        event.type === 'document' ||
+        event.type === 'selection' ||
+        event.type === 'tool' ||
+        event.type === 'game'
+      ) {
+        setPanelVersion((v) => v + 1);
+      }
+      if (event.type === 'recovery') {
         setRecoveryAvailable(app.recoveryProject !== null);
       }
     });
@@ -852,7 +862,12 @@ export function EditorShell(props: EditorShellProps) {
           onPointerDown={(event) => beginSplitterDrag(event, 'vertical')}
           onKeyDown={(event) => splitterKey(event, 'vertical')}
         />
-        <PropertiesPanel mapName={mapName()} gameOpen={gameOpen()} />
+        <PropertiesPanel
+          app={app}
+          mapName={mapName()}
+          gameOpen={gameOpen()}
+          version={panelVersion}
+        />
       </div>
       <Show when={recoveryAvailable()}>
         <div

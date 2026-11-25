@@ -607,7 +607,7 @@ Goal: Qoole-level geometry operations, and textures that look exactly the same i
 - **Depends on:** P1.8, P1.9
 - **Done when:** the full vanilla texture set browses smoothly.
 
-### [ ] P3.10 Surface and content flags panel (`ui`, `app`)
+### [x] P3.10 Surface and content flags panel (`ui`, `app`)
 
 - **Goal:** edit each face's flags, contents and value.
 - **Scope:** checkboxes from the `game/q2` constants, an indicator when a value differs from the `.wal` default, and edits that set `attribsInFile` where needed. The properties panel also shows the selection's texture with the design system's `ObjectPreview` (one texture, or "Multiple textures").

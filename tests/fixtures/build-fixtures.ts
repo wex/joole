@@ -500,6 +500,9 @@ for (const name of [
   'e1u1/basic1_2',
   'e1u1/metal1_1',
 ]) {
-  copyFileSync('tests/fixtures/harness.wal', `tests/fixtures/game-browser/baseq2/textures/${name}.wal`);
+  copyFileSync(
+    'tests/fixtures/harness.wal',
+    `tests/fixtures/game-browser/baseq2/textures/${name}.wal`,
+  );
 }
 console.log('fixtures built');

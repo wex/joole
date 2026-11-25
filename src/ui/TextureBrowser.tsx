@@ -188,8 +188,8 @@ export function TextureBrowser(props: TextureBrowserProps) {
         >
           <For each={visible()}>
             {({ entry, index }) => {
-              const row = Math.floor(index / columns());
-              const col = index % columns();
+              const staticRow = Math.floor(index / columns());
+              const staticCol = index % columns();
               return (
                 <button
                   type="button"
@@ -199,8 +199,8 @@ export function TextureBrowser(props: TextureBrowserProps) {
                   ]}
 
                   ref={(el) => {
-                    el.style.left = `${col * cellWidth}px`;
-                    el.style.top = `${row * cellHeight}px`;
+                    el.style.left = `${staticCol * cellWidth}px`;
+                    el.style.top = `${staticRow * cellHeight}px`;
                     el.style.width = `${cellWidth}px`;
                     el.style.height = `${cellHeight}px`;
                   }}
