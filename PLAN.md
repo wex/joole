@@ -651,7 +651,7 @@ Goal: everything needed to build a complete playable single-player level.
 - **Depends on:** P4.1
 - **Done when:** both files are generated and reviewed, and the script is documented in AGENTS.md.
 
-### [ ] P4.3 Mod entity definitions (`platform`, `app`)
+### [x] P4.3 Mod entity definitions (`platform`, `app`)
 
 - **Goal:** support entities from mods.
 - **Scope:** load a `.def` file or a set of mod `.c` files, parse them with P4.1, and let the mod's classes override vanilla classes with the same name. The choice is stored in the project file.

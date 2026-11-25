@@ -1,5 +1,7 @@
 import { addNodePatch, createEmptyDocument, createId } from '@core/doc/index';
 import {
+  mergeEntityDefs,
+  parseQuakedBlocks,
   parseMap,
   readPcxPalette,
   readProject,
@@ -7,6 +9,8 @@ import {
   writeMap,
   writeProject,
 } from '@core/formats/index';
+import q2defText from '../game/q2/q2.def?raw';
+import type { EntityClassDef } from '@core/formats/index';
 import type {
   Command,
   ConvertedTexture,
@@ -309,6 +313,23 @@ export class EditorApp {
   }
 
   /** Texture lock toggle: textures stick to surfaces on move and rotate when on. */
+  /** The merged entity definitions: vanilla plus any mod overrides. */
+  entityDefs(): readonly EntityClassDef[] {
+    return this.entityDefsValue;
+  }
+
+  /** Replaces the mod definition layer; an empty list returns to vanilla. */
+  setModEntityDefs(texts: readonly string[]): void {
+    const vanilla = parseQuakedBlocks(q2defText);
+    const mod = texts.flatMap((text) => parseQuakedBlocks(text));
+    this.entityDefsValue = mod.length > 0 ? mergeEntityDefs(vanilla, mod) : vanilla;
+    this.modEntityDefTexts = [...texts];
+  }
+
+  private entityDefsValue: readonly EntityClassDef[] =
+    parseQuakedBlocks(q2defText);
+  private modEntityDefTexts: string[] = [];
+
   setTextureLock(enabled: boolean): void {
     if (enabled !== this.textureLock) {
       this.textureLock = enabled;
@@ -731,7 +752,10 @@ export class EditorApp {
   }
 
   projectText(): string {
-    return writeProject(this.document, { gridSize: this.gridSize });
+    return writeProject(this.document, {
+      gridSize: this.gridSize,
+      ...(this.modEntityDefTexts.length > 0 ? { modEntityDefs: this.modEntityDefTexts } : {}),
+    });
   }
 
   exportMapText(): { text: string; warnings: string[] } {
@@ -957,6 +981,10 @@ export class EditorApp {
   async openProjectText(name: string, text: string): Promise<boolean> {
     try {
       const doc = readProject(text);
+      const editorField = (JSON.parse(text) as { editor?: { modEntityDefs?: unknown } }).editor;
+      if (Array.isArray(editorField?.modEntityDefs)) {
+        this.setModEntityDefs(editorField.modEntityDefs.filter((t) => typeof t === 'string'));
+      }
       this.bus.reset(doc);
       this.selectionManager.clear();
       this.selectTool.syncDocument(doc);

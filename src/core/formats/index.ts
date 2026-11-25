@@ -8,3 +8,4 @@ export * from './mapWrite';
 export * from './walRgba';
 export * from './project';
 export * from './quaked';
+export * from './entityMerge';

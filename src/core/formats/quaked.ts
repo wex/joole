@@ -108,7 +108,8 @@ const KEY_LINE = /^\s*"([^"]+)"\s*(\S.*)?$/;
 export function parseQuakedBlocks(text: string, options?: QuakedParseOptions): EntityClassDef[] {
   const lines = text.split('\n');
   const out: EntityClassDef[] = [];
-  let pending: ReturnType<typeof parseHeader>[] = [];
+  type Header = NonNullable<ReturnType<typeof parseHeader>>;
+  let pending: Header[] = [];
   let body: string[] = [];
   let inBlock = false;
 
