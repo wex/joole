@@ -486,4 +486,20 @@ mkdirSync('tests/fixtures/game/baseq2/pics', { recursive: true });
 mkdirSync('tests/fixtures/game/baseq2/textures/e2u1', { recursive: true });
 copyFileSync('tests/fixtures/colormap.pcx', 'tests/fixtures/game/baseq2/pics/colormap.pcx');
 copyFileSync('tests/fixtures/harness.wal', 'tests/fixtures/game/baseq2/textures/e2u1/mine10_1.wal');
+// Extra textures for the texture browser E2E in a separate game directory, so
+// the other UI tests keep their single-texture renderer statistics.
+mkdirSync('tests/fixtures/game-browser/baseq2/pics', { recursive: true });
+mkdirSync('tests/fixtures/game-browser/baseq2/textures/e1u1', { recursive: true });
+mkdirSync('tests/fixtures/game-browser/baseq2/textures/e2u1', { recursive: true });
+copyFileSync('tests/fixtures/colormap.pcx', 'tests/fixtures/game-browser/baseq2/pics/colormap.pcx');
+for (const name of [
+  'e2u1/mine10_1',
+  'e2u1/mine10_2',
+  'e2u1/mine10_3',
+  'e1u1/basic1_1',
+  'e1u1/basic1_2',
+  'e1u1/metal1_1',
+]) {
+  copyFileSync('tests/fixtures/harness.wal', `tests/fixtures/game-browser/baseq2/textures/${name}.wal`);
+}
 console.log('fixtures built');

@@ -1,0 +1,121 @@
+.browser {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  font-size: 12px;
+  color: var(--ink);
+  background: var(--surface-1);
+}
+
+.controls {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 4px 8px;
+}
+
+.controls select,
+.controls input[type='search'] {
+  background: var(--surface-2);
+  color: var(--ink);
+  border: 1px solid var(--line-strong);
+  padding: 2px 4px;
+}
+
+.search {
+  flex: 1;
+  min-width: 80px;
+}
+
+.inuse {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  color: var(--ink-muted);
+  white-space: nowrap;
+}
+
+.grid {
+  flex: 1;
+  overflow-y: auto;
+  position: relative;
+  min-height: 0;
+}
+
+.spacer {
+  position: relative;
+}
+
+.cell {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  background: none;
+  border: 1px solid transparent;
+  padding: 4px 2px;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+}
+
+.cell:hover {
+  background: var(--surface-2);
+}
+
+.selected {
+  border-color: var(--select);
+  outline: 1px solid var(--select);
+}
+
+.selected .name {
+  background: var(--select);
+  color: var(--on-select);
+}
+
+.thumb {
+  width: 64px;
+  height: 64px;
+  image-rendering: pixelated;
+  /* Checker for an unloaded texture, from the surface tokens. */
+  background-image:
+    linear-gradient(
+      45deg,
+      var(--surface-3) 25%,
+      transparent 25%,
+      transparent 75%,
+      var(--surface-3) 75%
+    ),
+    linear-gradient(
+      45deg,
+      var(--surface-3) 25%,
+      transparent 25%,
+      transparent 75%,
+      var(--surface-3) 75%
+    );
+  background-color: var(--surface-2);
+  background-size: 16px 16px;
+  background-position:
+    0 0,
+    8px 8px;
+}
+
+.name {
+  font-size: 10px;
+  max-width: 84px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 0 2px;
+}
+
+.footer {
+  padding: 4px 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--ink-muted);
+  border-top: 1px solid var(--surface-2);
+}

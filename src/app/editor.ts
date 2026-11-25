@@ -862,6 +862,31 @@ export class EditorApp {
     }
   }
 
+  /** The indexed textures with their source label, for the texture browser. */
+  textureList(): readonly { name: string; source: string }[] {
+    if (!this.vfs) return [];
+    const out: { name: string; source: string }[] = [];
+    for (const [name, source] of this.vfs.textureIndex()) {
+      out.push({
+        name,
+        source:
+          source.kind === 'pack' ? `${source.gameDir}/${source.packFile}` : `${source.gameDir}`,
+      });
+    }
+    out.sort((a, b) => a.name.localeCompare(b.name));
+    return out;
+  }
+
+  /** Texture names used by the document's brushes, for the in-use filter. */
+  texturesInUse(): ReadonlySet<string> {
+    const used = new Set<string>();
+    for (const node of this.document.nodes.values()) {
+      if (node.kind !== 'brush') continue;
+      for (const face of node.faces) used.add(face.tex.name);
+    }
+    return used;
+  }
+
   /** The renderer's lazy texture loader, over the open VFS, worker and cache. */
   async loadTexture(name: string): Promise<ConvertedTexture | null> {
     if (!this.vfs || !this.palette) {

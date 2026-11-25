@@ -599,7 +599,7 @@ Goal: Qoole-level geometry operations, and textures that look exactly the same i
 - **Depends on:** P3.7, P2.5
 - **Done when:** all the spec's texture tools exist.
 
-### [ ] P3.9 Texture browser (`ui`)
+### [x] P3.9 Texture browser (`ui`)
 
 - **Goal:** find and choose textures quickly.
 - **Scope:** implements the design system's `TextureBrowser`. A folder tree (`textures/e1u1` …), search by name, an in-use filter, previews with sizes, the mod's textures as their own root with source markers, lazy loading, and a virtualised grid.

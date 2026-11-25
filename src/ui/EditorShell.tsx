@@ -18,6 +18,7 @@ import { Icon } from './Icon';
 import { LogPanel } from './LogPanel';
 import { PanelTabs, type BottomTab } from './PanelTabs';
 import { PropertiesPanel } from './PropertiesPanel';
+import { TextureBrowser } from './TextureBrowser';
 import { Toolbar } from './Toolbar';
 import styles from './EditorShell.module.css';
 
@@ -91,7 +92,8 @@ export function EditorShell(props: EditorShellProps) {
   const canvasElement = untrack(() => props.canvas);
   const [mapName, setMapName] = createSignal(app.mapName);
   const [gameOpen, setGameOpen] = createSignal(app.gameOpen);
-  const [textureCount, setTextureCount] = createSignal(app.textureCount);
+  const [textureList, setTextureList] = createSignal(app.textureList());
+  const [currentTexture, setCurrentTexture] = createSignal(app.currentTextureName);
   const [gridSize, setGridSize] = createSignal(app.gridSize);
   const [entries, setEntries] = createSignal<readonly LogEntry[]>(app.logEntries());
   const [activeView, setActiveView] = createSignal<ViewId>('3d');
@@ -637,7 +639,7 @@ export function EditorShell(props: EditorShellProps) {
         }
       } else if (event.type === 'game') {
         setGameOpen(app.gameOpen);
-        setTextureCount(app.textureCount);
+        setTextureList(app.textureList());
       } else if (event.type === 'log') {
         setEntries(app.logEntries());
       } else if (event.type === 'grid') {
@@ -648,6 +650,7 @@ export function EditorShell(props: EditorShellProps) {
         setBrushPrimitive(app.brushPrimitive);
         setBrushSides(app.brushSides);
         setTextureLock(app.textureLockEnabled);
+        setCurrentTexture(app.currentTextureName);
       } else if (event.type === 'recovery') {
         setRecoveryAvailable(app.recoveryProject !== null);
       }
@@ -817,11 +820,22 @@ export function EditorShell(props: EditorShellProps) {
             <Show
               when={bottomTab() === 'log'}
               fallback={
-                <div class={styles.texturePlaceholder} data-testid="texture-placeholder">
-                  {gameOpen()
-                    ? `Texture browser: ${textureCount()} textures indexed.`
-                    : 'Open a game folder to index textures.'}
-                </div>
+                <Show
+                  when={gameOpen()}
+                  fallback={
+                    <div class={styles.texturePlaceholder} data-testid="texture-placeholder">
+                      Open a game folder to index textures.
+                    </div>
+                  }
+                >
+                  <TextureBrowser
+                    entries={textureList()}
+                    inUse={() => app.texturesInUse()}
+                    selected={() => currentTexture()}
+                    onSelect={(name) => app.setCurrentTexture(name)}
+                    load={(name) => app.loadTexture(name)}
+                  />
+                </Show>
               }
             >
               <LogPanel entries={entries()} />
