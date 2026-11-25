@@ -17,6 +17,7 @@ import {
 import { Icon } from './Icon';
 import { LogPanel } from './LogPanel';
 import { PanelTabs, type BottomTab } from './PanelTabs';
+import { TreeView } from './TreeView';
 import { PropertiesPanel } from './PropertiesPanel';
 import { TextureBrowser } from './TextureBrowser';
 import { Toolbar } from './Toolbar';
@@ -941,28 +942,29 @@ export function EditorShell(props: EditorShellProps) {
               onSelect={setBottomTab}
               onView={toggleMaximized}
             />
-            <Show
-              when={bottomTab() === 'log'}
-              fallback={
-                <Show
-                  when={gameOpen()}
-                  fallback={
-                    <div class={styles.texturePlaceholder} data-testid="texture-placeholder">
-                      Open a game folder to index textures.
-                    </div>
-                  }
-                >
-                  <TextureBrowser
-                    entries={textureList()}
-                    inUse={() => app.texturesInUse()}
-                    selected={() => currentTexture()}
-                    onSelect={(name) => app.setCurrentTexture(name)}
-                    load={(name) => app.loadTexture(name)}
-                  />
-                </Show>
-              }
-            >
+            <Show when={bottomTab() === 'tree'}>
+              <TreeView app={app} version={panelVersion} />
+            </Show>
+            <Show when={bottomTab() === 'log'}>
               <LogPanel entries={entries()} />
+            </Show>
+            <Show when={bottomTab() === 'textures'}>
+              <Show
+                when={gameOpen()}
+                fallback={
+                  <div class={styles.texturePlaceholder} data-testid="texture-placeholder">
+                    Open a game folder to index textures.
+                  </div>
+                }
+              >
+                <TextureBrowser
+                  entries={textureList()}
+                  inUse={() => app.texturesInUse()}
+                  selected={() => currentTexture()}
+                  onSelect={(name) => app.setCurrentTexture(name)}
+                  load={(name) => app.loadTexture(name)}
+                />
+              </Show>
             </Show>
           </section>
         </div>

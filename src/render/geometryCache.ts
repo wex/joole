@@ -197,7 +197,19 @@ export class GeometryCache {
 
   /** Rebuilds only the nodes that a patch created, changed or removed. */
   applyPatch(doc: Readonly<MapDocument>, patch: Patch): void {
-    for (const id of patch.after.keys()) {
+    // A changed container re-evaluates its whole subtree, because hidden and
+    // locked group flags propagate to the children.
+    const affected = new Set<Id>();
+    const walk = (id: Id) => {
+      if (affected.has(id)) return;
+      affected.add(id);
+      const node = doc.nodes.get(id);
+      if (node && (node.kind === 'entity' || node.kind === 'group')) {
+        for (const child of node.children) walk(child);
+      }
+    };
+    for (const id of patch.after.keys()) walk(id);
+    for (const id of affected) {
       this.removeNode(id);
       const node = doc.nodes.get(id);
       if (node) {
@@ -390,7 +402,22 @@ export class GeometryCache {
     return [stem, barb(1), barb(-1)];
   }
 
+  /** A node inside a hidden group chain is not drawn (Qoole's group hide). */
+  private isHidden(doc: Readonly<MapDocument>, id: Id): boolean {
+    let at: Id | undefined = doc.parent.get(id);
+    while (at !== undefined) {
+      const node = doc.nodes.get(at);
+      if (node?.kind === 'group' && node.hidden) return true;
+      at = doc.parent.get(at);
+    }
+    return false;
+  }
+
   private addNode(doc: Readonly<MapDocument>, node: MapNode): void {
+    if (this.isHidden(doc, node.id)) {
+      this.removeNode(node.id);
+      return;
+    }
     if (node.kind === 'brush') {
       const index = this.takeIndex();
       const mesh = buildBrushMesh(node, index);

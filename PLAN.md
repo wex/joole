@@ -679,7 +679,7 @@ Goal: everything needed to build a complete playable single-player level.
 - **Depends on:** P4.4
 - **Done when:** the spec's panel features exist.
 
-### [ ] P4.6 Tree view, groups, hide and lock
+### [x] P4.6 Tree view, groups, hide and lock
 
 - **Goal:** show and edit the structure of the map.
 - **Scope:**

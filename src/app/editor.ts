@@ -1,4 +1,4 @@
-import { addNodePatch, createEmptyDocument, createId } from '@core/doc/index';
+import { reparentNodePatch, addNodePatch, createEmptyDocument, createId } from '@core/doc/index';
 import {
   mergeEntityDefs,
   parseQuakedBlocks,
@@ -19,6 +19,12 @@ import {
   targetLinks,
   toggleSpawnflagPatch,
 } from './entityPanel';
+import {
+  effectiveGroupState,
+  groupNodesPatch,
+  setGroupFlagPatch,
+  ungroupNodesPatch,
+} from './groups';
 import type { EntityClassDef } from '@core/formats/index';
 import type {
   Command,
@@ -380,6 +386,70 @@ export class EditorApp {
     }
   }
 
+  /** Groups the selected nodes under a new group (one undo step). */
+  groupSelection(): boolean {
+    const ids = [...this.selection].filter((id) => id !== this.document.worldspawn);
+    try {
+      const { patch, id } = groupNodesPatch(this.document, ids, createId);
+      this.executeCommand({ label: 'Group', run: () => patch });
+      this.setSelection([id]);
+      this.log('ok', `Grouped ${plural(ids.length, 'node')}.`);
+      return true;
+    } catch (error) {
+      this.log('warning', `Group failed: ${errorText(error)}`);
+      return false;
+    }
+  }
+
+  /** Dissolves the selected group, moving its children to its parent. */
+  ungroupSelection(): boolean {
+    const groupId = [...this.selection].find((id) => this.document.nodes.get(id)?.kind === 'group');
+    if (!groupId) {
+      this.log('warning', 'Ungroup needs a selected group.');
+      return false;
+    }
+    try {
+      const patch = ungroupNodesPatch(this.document, groupId);
+      const children = (this.document.nodes.get(groupId) as { children: string[] }).children;
+      this.executeCommand({ label: 'Ungroup', run: () => patch });
+      this.setSelection(children);
+      this.log('ok', 'Ungrouped.');
+      return true;
+    } catch (error) {
+      this.log('warning', `Ungroup failed: ${errorText(error)}`);
+      return false;
+    }
+  }
+
+  /** Sets or clears the hidden or locked flag of a group. */
+  setGroupFlag(groupId: string, flag: 'hidden' | 'locked', value: boolean): boolean {
+    try {
+      const patch = setGroupFlagPatch(this.document, groupId, flag, value);
+      this.executeCommand({ label: value ? `${flag} group` : `un${flag} group`, run: () => patch });
+      return true;
+    } catch (error) {
+      this.log('warning', errorText(error));
+      return false;
+    }
+  }
+
+  /** Reparents a node in the tree, as one undoable command. */
+  reparentNode(id: string, newParentId: string): boolean {
+    try {
+      const patch = reparentNodePatch(this.document, id, newParentId);
+      this.executeCommand({ label: 'Reparent', run: () => patch });
+      return true;
+    } catch (error) {
+      this.log('warning', `Reparent failed: ${errorText(error)}`);
+      return false;
+    }
+  }
+
+  /** Hidden/locked inherited state of a node. */
+  nodeGroupState(id: string): { hidden: boolean; locked: boolean } {
+    return effectiveGroupState(this.document, id);
+  }
+
   /** The entity panel state of the current selection. */
   entityPanel() {
     return entityPanelState(this.document, this.selection, this.entityDefsValue);
@@ -547,7 +617,9 @@ export class EditorApp {
   }
 
   setSelection(ids: Iterable<string>): void {
-    this.selectionManager.setSelection(ids);
+    // Locked groups lock their whole subtree out of the selection.
+    const filtered = [...ids].filter((id) => !effectiveGroupState(this.document, id).locked);
+    this.selectionManager.setSelection(filtered);
   }
 
   /** Minimal entity placement for Gate 2; the full class-aware entity tool is P4.4. */

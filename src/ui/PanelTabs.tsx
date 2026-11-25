@@ -2,10 +2,11 @@ import { For } from 'solid-js';
 import type { ViewId } from '@render/index';
 import styles from './PanelTabs.module.css';
 
-export type BottomTab = 'textures' | 'log';
+export type BottomTab = 'textures' | 'tree' | 'log';
 
 const contentTabs: readonly { id: BottomTab; label: string }[] = [
   { id: 'textures', label: 'Textures' },
+  { id: 'tree', label: 'Tree' },
   { id: 'log', label: 'Log' },
 ];
 const viewTabs: readonly { id: ViewId; label: string; key: string }[] = [
