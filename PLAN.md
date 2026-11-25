@@ -615,14 +615,14 @@ Goal: Qoole-level geometry operations, and textures that look exactly the same i
 - **Depends on:** P3.8
 - **Done when:** changes appear in the exported `.map` and the compiled `.bsp`.
 
-### [ ] P3.11 Editor and game UV parity test
+### [x] P3.11 Editor and game UV parity test
 
 - **Goal:** prove the gate's "textures look the same in the editor and in the game".
 - **Scope:** a test that compiles fixture maps with qbsp3.wasm, parses the texinfo lump of the `.bsp` (`ext/Quake-2/qcommon/qfiles.h`), and compares its `vecs` with `texAxes` for every face, within a small epsilon. The fixtures include decimal offsets and rotations so that the truncation rule is exercised.
 - **Depends on:** P2.11, P3.7
 - **Done when:** the test is green in CI, and one map has been checked in q2pro by hand, with the result recorded.
 
-**[ ] Gate 3:** every CSG property test passes, and textures match in the editor and the game (P3.11 plus the manual in-game check).
+**[x] Gate 3:** every CSG property test passes, and textures match in the editor and the game (P3.11 plus the manual in-game check, verified in q2pro on 25.11.2026).
 
 ---
 
