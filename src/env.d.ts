@@ -26,8 +26,18 @@ interface FileSystemDirectoryHandle {
   requestPermission(descriptor?: FileSystemPermissionDescriptor): Promise<PermissionState>;
 }
 
+interface FilePickerAcceptType {
+  description?: string;
+  accept: Record<string, string[]>;
+}
+
 interface Window {
   showDirectoryPicker(options?: {
     mode?: 'read' | 'readwrite';
   }): Promise<FileSystemDirectoryHandle>;
+  showOpenFilePicker(options?: {
+    multiple?: boolean;
+    types?: FilePickerAcceptType[];
+    excludeAcceptAllOption?: boolean;
+  }): Promise<FileSystemFileHandle[]>;
 }

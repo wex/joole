@@ -1,0 +1,155 @@
+import { createSignal, For, onSettled, Show } from 'solid-js';
+import { Icon } from './Icon';
+import styles from './Toolbar.module.css';
+
+export interface ToolbarProps {
+  readonly gridSize: number;
+  readonly theme: 'dark' | 'light';
+  readonly onOpenGameFolder: () => void;
+  readonly onOpenSinglePak: () => void;
+  readonly onOpenMap: () => void;
+  readonly onGridSize: (size: number) => void;
+  readonly onToggleTheme: () => void;
+}
+
+function tool(label: string, icon: Parameters<typeof Icon>[0]['name'], pressed = false) {
+  return { label, icon, pressed };
+}
+
+const tools = [
+  tool('Select (S)', 'mousePointer', true),
+  tool('Brush (B)', 'box'),
+  tool('Entity (E)', 'circleUser'),
+  tool('Clip (C)', 'clip'),
+  tool('Vertex (V)', 'move'),
+  tool('Face (F)', 'scan'),
+  tool('Texture (T)', 'brush'),
+];
+
+export function Toolbar(props: ToolbarProps) {
+  const [fileOpen, setFileOpen] = createSignal(false);
+  let root: HTMLDivElement | undefined;
+
+  onSettled(() => {
+    const close = (event: PointerEvent) => {
+      if (root && event.target instanceof Node && !root.contains(event.target)) {
+        setFileOpen(false);
+      }
+    };
+    const escape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setFileOpen(false);
+      }
+    };
+    document.addEventListener('pointerdown', close);
+    document.addEventListener('keydown', escape);
+    return () => {
+      document.removeEventListener('pointerdown', close);
+      document.removeEventListener('keydown', escape);
+    };
+  });
+
+  const choose = (action: () => void) => {
+    setFileOpen(false);
+    action();
+  };
+  const gridPower = () => Math.round(Math.log2(props.gridSize));
+  const setGridPower = (power: number) => props.onGridSize(2 ** power);
+
+  return (
+    <div class={styles.toolbar} ref={(el) => (root = el)}>
+      <div class={styles.menuHolder}>
+        <button
+          type="button"
+          class={styles.menuButton}
+          aria-haspopup="menu"
+          aria-expanded={fileOpen() ? 'true' : 'false'}
+          onClick={() => setFileOpen(!fileOpen())}
+        >
+          File <Icon name="chevronDown" />
+        </button>
+        <Show when={fileOpen()}>
+          <ul class={styles.menu} role="menu">
+            <li role="none">
+              <button type="button" role="menuitem" onClick={() => choose(props.onOpenGameFolder)}>
+                Open Game Folder…
+              </button>
+            </li>
+            <li role="none">
+              <button type="button" role="menuitem" onClick={() => choose(props.onOpenSinglePak)}>
+                Open pak0.pak…
+              </button>
+            </li>
+            <li role="none">
+              <button type="button" role="menuitem" onClick={() => choose(props.onOpenMap)}>
+                Open Map…
+              </button>
+            </li>
+          </ul>
+        </Show>
+      </div>
+      <button type="button" class={styles.iconButton} title="Save" disabled>
+        <Icon name="save" />
+      </button>
+      <span class={styles.separator} />
+      <button type="button" class={styles.iconButton} title="Undo" disabled>
+        <Icon name="undo" />
+      </button>
+      <button type="button" class={styles.iconButton} title="Redo" disabled>
+        <Icon name="redo" />
+      </button>
+      <span class={styles.separator} />
+      <For each={tools}>
+        {(item) => (
+          <button
+            type="button"
+            class={styles.iconButton}
+            title={item.label}
+            aria-label={item.label}
+            aria-pressed={item.pressed ? 'true' : 'false'}
+            disabled={!item.pressed}
+          >
+            <Icon name={item.icon} />
+          </button>
+        )}
+      </For>
+      <span class={styles.separator} />
+      <button type="button" class={styles.iconButton} title="CSG Subtract" disabled>
+        <Icon name="csgSubtract" />
+      </button>
+      <button type="button" class={styles.iconButton} title="Hollow" disabled>
+        <Icon name="hollow" />
+      </button>
+      <span class={styles.separator} />
+      <span class={styles.gridControl}>
+        <Icon name="grid" />
+        <input
+          type="range"
+          min="0"
+          max="8"
+          step="1"
+          value={gridPower()}
+          aria-label="Grid size"
+          onInput={(event) => setGridPower(Number(event.currentTarget.value))}
+        />
+        <output>{`Grid ${props.gridSize}`}</output>
+      </span>
+      <button type="button" class={styles.iconButton} title="Tex Lock" aria-pressed="true" disabled>
+        <Icon name="lock" />
+      </button>
+      <span class={styles.spacer} />
+      <button
+        type="button"
+        class={styles.iconButton}
+        title={props.theme === 'dark' ? 'Use Light Theme' : 'Use Dark Theme'}
+        aria-label={props.theme === 'dark' ? 'Use Light Theme' : 'Use Dark Theme'}
+        onClick={() => props.onToggleTheme()}
+      >
+        <Icon name="sunMoon" />
+      </button>
+      <button type="button" class={styles.compileButton} disabled>
+        <Icon name="play" /> Compile
+      </button>
+    </div>
+  );
+}
