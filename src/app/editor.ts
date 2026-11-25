@@ -10,6 +10,7 @@ import {
   writeProject,
 } from '@core/formats/index';
 import q2defText from '../game/q2/q2.def?raw';
+import { convertBrushesToEntityPatch } from './entities';
 import type { EntityClassDef } from '@core/formats/index';
 import type {
   Command,
@@ -326,7 +327,50 @@ export class EditorApp {
     this.modEntityDefTexts = [...texts];
   }
 
-  private entityDefsValue: readonly EntityClassDef[] =
+  /** The class the entity tool places, 'light' until one is chosen. */
+  get currentEntityClass(): string {
+    return this.currentEntityClassValue;
+  }
+
+  setCurrentEntityClass(classname: string): void {
+    this.currentEntityClassValue = classname;
+  }
+
+  private currentEntityClassValue = 'light';
+
+  /**
+   * Turns the selected brushes into a brush entity of the given class
+   * (func_*, trigger_*). Returns false with a log line when the selection
+   * cannot form one.
+   */
+  convertSelectionToEntity(classname: string): boolean {
+    const brushIds = [...this.selection].filter(
+      (id) => this.document.nodes.get(id)?.kind === 'brush',
+    );
+    try {
+      const { patch, id } = convertBrushesToEntityPatch(
+        this.document,
+        classname,
+        brushIds,
+        createId,
+      );
+      this.executeCommand({ label: `Convert to ${classname}`, run: () => patch });
+      this.setSelection([id]);
+      this.log('ok', `Converted ${plural(brushIds.length, 'brush')} to ${classname}.`);
+      return true;
+    } catch (error) {
+      this.log('warning', `Convert to entity failed: ${errorText(error)}`);
+      return false;
+    }
+  }
+
+  /** Whether the class is a brush entity (func_*, trigger_* and the ? form). */
+  isBrushClass(classname: string): boolean {
+    const def = this.entityDefsValue.find((d) => d.className === classname);
+    return def ? def.bbox === 'brush' : /^(func|trigger|path|multi)_/.test(classname);
+  }
+
+    private entityDefsValue: readonly EntityClassDef[] =
     parseQuakedBlocks(q2defText);
   private modEntityDefTexts: string[] = [];
 
