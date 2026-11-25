@@ -108,6 +108,27 @@ export function EditorShell(props: EditorShellProps) {
     y: number;
     point: [number, number, number];
   } | null>(null);
+  /** The open entity sub-menu: 'add' or 'apply' plus the chosen category. */
+  const [entityMenu, setEntityMenu] = createSignal<{
+    mode: 'add' | 'apply';
+    category: string | null;
+  } | null>(null);
+
+  /** Entity classes grouped by their prefix category, for the context menus. */
+  const entityCategories = () => {
+    const groups = new Map<string, string[]>();
+    const mode = entityMenu()?.mode ?? 'add';
+    for (const def of app.entityDefs()) {
+      if (def.className === 'worldspawn') continue;
+      // Add places point entities; Apply converts brushes into brush entities.
+      const brushClass = app.isBrushClass(def.className);
+      if (mode === 'add' ? brushClass : !brushClass) continue;
+      const category = def.className.includes('_') ? def.className.split('_')[0]! : 'misc';
+      if (!groups.has(category)) groups.set(category, []);
+      groups.get(category)!.push(def.className);
+    }
+    return [...groups.entries()].sort(([a], [b]) => a.localeCompare(b));
+  };
   const [activeTool, setActiveTool] = createSignal(app.activeTool);
   const [brushPrimitive, setBrushPrimitive] = createSignal(app.brushPrimitive);
   const [brushSides, setBrushSides] = createSignal(app.brushSides);
@@ -792,6 +813,7 @@ export function EditorShell(props: EditorShellProps) {
                     class={styles.contextMenuItem}
                     onClick={() => {
                       setViewMenu(null);
+                      setEntityMenu(null);
                       app.setToolMode('brush');
                     }}
                   >
@@ -804,11 +826,100 @@ export function EditorShell(props: EditorShellProps) {
                     onClick={() => {
                       const point = menu().point;
                       setViewMenu(null);
+                      setEntityMenu(null);
                       app.addEntityAt('info_player_start', point);
                     }}
                   >
                     Add Player Start
                   </button>
+                  <Show when={!entityMenu()}>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      class={styles.contextMenuItem}
+                      data-testid="menu-add-entity"
+                      onClick={() => setEntityMenu({ mode: 'add', category: null })}
+                    >
+                      Add Entity →
+                    </button>
+                    <Show
+                      when={[...app.selection].some(
+                        (id) => app.document.nodes.get(id)?.kind === 'brush',
+                      )}
+                    >
+                      <button
+                        type="button"
+                        role="menuitem"
+                        class={styles.contextMenuItem}
+                        data-testid="menu-apply-entity"
+                        onClick={() => setEntityMenu({ mode: 'apply', category: null })}
+                      >
+                        Apply Entity →
+                      </button>
+                    </Show>
+                  </Show>
+                  <Show when={entityMenu()}>
+                    {(sub) => (
+                      <>
+                        <button
+                          type="button"
+                          role="menuitem"
+                          class={styles.contextMenuItem}
+                          onClick={() => {
+                            if (sub().category) {
+                              setEntityMenu({ mode: sub().mode, category: null });
+                            } else {
+                              setEntityMenu(null);
+                            }
+                          }}
+                        >
+                          ← Back
+                        </button>
+                        <For each={sub().category === null ? entityCategories() : []}>
+                          {([category]) => (
+                            <button
+                              type="button"
+                              role="menuitem"
+                              class={styles.contextMenuItem}
+                              onClick={() => setEntityMenu({ mode: sub().mode, category })}
+                            >
+                              {category} →
+                            </button>
+                          )}
+                        </For>
+                        <For
+                          each={
+                            sub().category !== null
+                              ? (entityCategories().find(([c]) => c === sub().category)?.[1] ?? [])
+                              : []
+                          }
+                        >
+                          {(classname) => (
+                            <button
+                              type="button"
+                              role="menuitem"
+                              class={styles.contextMenuItem}
+                              data-testid={`menu-class-${classname}`}
+                              onClick={() => {
+                                const point = menu().point;
+                                const mode = sub().mode;
+                                setViewMenu(null);
+                                setEntityMenu(null);
+                                if (mode === 'add') {
+                                  app.setCurrentEntityClass(classname);
+                                  app.addEntityAt(classname, point);
+                                } else {
+                                  app.convertSelectionToEntity(classname);
+                                }
+                              }}
+                            >
+                              {classname}
+                            </button>
+                          )}
+                        </For>
+                      </>
+                    )}
+                  </Show>
                 </div>
               )}
             </Show>

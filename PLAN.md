@@ -659,7 +659,7 @@ Goal: everything needed to build a complete playable single-player level.
 - **Depends on:** P4.1
 - **Done when:** CTF (`ext/Quake-2/ctf`) classes can be loaded as a mod example. The CTF files used in tests are copied into fixtures with provenance.
 
-### [ ] P4.4 Entity tool (E) and entity rendering
+### [x] P4.4 Entity tool (E) and entity rendering
 
 - **Goal:** place and draw entities.
 - **Scope:**

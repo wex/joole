@@ -344,6 +344,45 @@ export class GeometryCache {
     this.gl.deleteTexture(this.stateTexture);
   }
 
+  /**
+   * The facing arrow of a point entity: a stem in the yaw direction of the
+   * angle key with two barbs, drawn only when the entity has an angle.
+   * Quake 2 yaw: 0 is +x (east), 90 is +y (north).
+   */
+  private entityAngleArrow(
+    props: readonly (readonly [string, string])[],
+    origin: readonly [number, number, number],
+    box: {
+      readonly min: readonly [number, number, number];
+      readonly max: readonly [number, number, number];
+    },
+  ): LineSegment[] | null {
+    const raw = props.find(([k]) => k === 'angle')?.[1];
+    if (raw === undefined) return null;
+    const degrees = Number(raw);
+    if (!Number.isFinite(degrees)) return null;
+    const yaw = (degrees * Math.PI) / 180;
+    const dx = Math.cos(yaw);
+    const dy = Math.sin(yaw);
+    const size = Math.max(box.max[0] - box.min[0], box.max[1] - box.min[1]) / 2;
+    const len = size + 16;
+    const tip: [number, number, number] = [origin[0] + dx * len, origin[1] + dy * len, origin[2]];
+    const barbLen = len * 0.3;
+    const barbAngle = (30 * Math.PI) / 180;
+    const barb = (sign: number): LineSegment => {
+      const a = yaw + sign * (Math.PI - barbAngle);
+      const end: [number, number, number] = [
+        tip[0] + Math.cos(a) * barbLen,
+        tip[1] + Math.sin(a) * barbLen,
+        tip[2],
+      ];
+      return [[tip[0], tip[1], tip[2]], end];
+    };
+    const start: [number, number, number] = [origin[0], origin[1], origin[2]];
+    const stem: LineSegment = [start, [tip[0], tip[1], tip[2]]];
+    return [stem, barb(1), barb(-1)];
+  }
+
   private addNode(doc: Readonly<MapDocument>, node: MapNode): void {
     if (node.kind === 'brush') {
       const index = this.takeIndex();
@@ -376,7 +415,9 @@ export class GeometryCache {
     const index = this.takeIndex();
     const box = entityBox(origin);
     const edges = boxEdges(box);
-    this.lines.write(node.id, writeLines(edges, index), edges.length);
+    const arrow = this.entityAngleArrow(node.props, origin, box);
+    const segments = arrow ? [...edges, ...arrow] : edges;
+    this.lines.write(node.id, writeLines(segments, index), segments.length);
     this.records.set(node.id, { kind: 'entity', index, aabb: box, batchKeys: [] });
     this.setState(index, 'entity', this.selected.has(node.id));
     this.setEntityColor(index, this.entityColorOf(node));
