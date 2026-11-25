@@ -57,6 +57,7 @@ import {
   VertexTool,
   type ToolOutput,
   type ToolPointerEvent,
+  EntityTool,
 } from './tools';
 import type { PrimitiveKind } from '@core/geom/index';
 import { entriesFromFileList, entriesFromSinglePak, openGameVfs } from '@platform/index';
@@ -118,7 +119,7 @@ export type EditorEvent =
   | { readonly type: 'recovery' };
 
 export type EditorListener = (event: EditorEvent) => void;
-export type EditorToolMode = 'select' | 'brush' | 'clip' | 'vertex' | 'face' | 'texture';
+export type EditorToolMode = 'select' | 'brush' | 'clip' | 'vertex' | 'face' | 'texture' | 'entity';
 
 const MAX_LOG_ENTRIES = 500;
 
@@ -164,6 +165,7 @@ export class EditorApp {
   private readonly clipTool: ClipTool;
   private readonly vertexTool: VertexTool;
   private readonly textureTool: TextureTool;
+  private readonly entityTool: EntityTool;
   private toolMode: EditorToolMode = 'select';
   private map: string | null = null;
   private vfs: Awaited<ReturnType<typeof openGameVfs>> | null = null;
@@ -213,6 +215,12 @@ export class EditorApp {
     );
     this.textureTool = new TextureTool(
       () => this.document,
+      () => this.gridSize,
+    );
+    this.entityTool = new EntityTool(
+      () => this.document,
+      () => this.currentEntityClassValue,
+      () => this.document.worldspawn,
       () => this.gridSize,
     );
     this.bus.subscribe((event) => {
@@ -691,6 +699,7 @@ export class EditorApp {
     this.clipTool.cancel();
     this.vertexTool.cancel();
     this.textureTool.cancel();
+    this.entityTool.cancel();
     this.toolMode = mode;
     this.emit({ type: 'tool' });
   }
@@ -716,7 +725,9 @@ export class EditorApp {
             ? this.vertexTool
             : this.toolMode === 'texture'
               ? this.textureTool
-              : this.selectTool;
+              : this.toolMode === 'entity'
+                ? this.entityTool
+                : this.selectTool;
     const output = tool.pointer(event);
     for (const command of output.commands) {
       try {

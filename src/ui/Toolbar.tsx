@@ -3,7 +3,7 @@ import type { PrimitiveKind } from '@core/geom/index';
 import { Icon } from './Icon';
 import styles from './Toolbar.module.css';
 
-export type ToolbarTool = 'select' | 'brush' | 'clip' | 'vertex' | 'face' | 'texture';
+export type ToolbarTool = 'select' | 'brush' | 'clip' | 'vertex' | 'face' | 'texture' | 'entity';
 
 export interface ToolbarProps {
   readonly gridSize: number;
@@ -45,7 +45,7 @@ function tool(
 const tools = [
   tool('select', 'Select (S)', 'mousePointer', true),
   tool('brush', 'Brush (B)', 'box', true),
-  tool('entity', 'Entity (E)', 'circleUser'),
+  tool('entity', 'Entity (E)', 'circleUser', true),
   tool('clip', 'Clip (C)', 'clip', true),
   tool('vertex', 'Vertex/edge (V)', 'move', true),
   tool('face', 'Face (F)', 'scan', true),

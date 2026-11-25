@@ -6,6 +6,7 @@ export type ShortcutAction =
   | 'tool-vertex-edge'
   | 'tool-face'
   | 'tool-texture'
+  | 'tool-entity'
   | 'undo'
   | 'redo'
   | 'save'
@@ -64,6 +65,8 @@ export function shortcutAction(input: ShortcutInput): ShortcutAction | null {
       return 'tool-vertex-edge';
     case 'f':
       return 'tool-face';
+    case 'e':
+      return 'tool-entity';
     case 't':
       return 'tool-texture';
     case '[':

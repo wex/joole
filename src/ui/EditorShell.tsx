@@ -568,7 +568,8 @@ export function EditorShell(props: EditorShellProps) {
           action === 'tool-clip' ||
           action === 'tool-vertex-edge' ||
           action === 'tool-face' ||
-          action === 'tool-texture') &&
+          action === 'tool-texture' ||
+          action === 'tool-entity') &&
         !(pointerLocked || rightFly)
       ) {
         event.preventDefault();
@@ -583,7 +584,9 @@ export function EditorShell(props: EditorShellProps) {
                   ? 'vertex'
                   : action === 'tool-face'
                     ? 'face'
-                    : 'texture',
+                    : action === 'tool-entity'
+                      ? 'entity'
+                      : 'texture',
         );
         return;
       }
