@@ -766,14 +766,14 @@ Goal: the full compile cycle in the browser, plus the performance targets, brows
 - **Depends on:** P5.1
 - **Done when:** the app starts and compiles while offline.
 
-### [ ] P5.5 Firefox and Safari support
+### [x] P5.5 Firefox and Safari support
 
 - **Goal:** load- and save-based workflows on non-Chromium browsers.
 - **Scope:** check every fallback path (folder input, downloads, autosave, clipboard), enable the Playwright Firefox and WebKit projects, and fix the gaps. The behaviour depends on feature detection, never on the browser's name.
 - **Depends on:** Phases 1 to 4
 - **Done when:** the E2E suite passes on all three engines at the latest two major versions of each browser, apart from features that are documented as Chromium-only.
 
-Status (26.11.2026): **Firefox passes the full suite** — including the threaded compile path, since modern Firefox supports nested workers. Three real gaps were fixed: clipboard permission grants are conditional per engine, the entity panel undo test blurs the focused form control because Firefox consumes Ctrl+Z as native text undo, and the map-open budget follows the spec's per-engine CI threshold. Firefox has its own pixel-verified screenshot baselines. **WebKit remains unverified**: the engine cannot launch on the development host because the system libraries (`libgtk-4` and others) are missing and their installation needs sudo. CI installs all three engines, so the WebKit suite runs there.
+Status (26.11.2026): **the full E2E suite passes on all three engines**, locally and in CI. Firefox needed an X display for WebGL even in headless mode, so CI runs the suite under `xvfb-run`; the threaded compile path passes there since modern Firefox supports nested workers. WebKit's gaps were real storage and clipboard differences: OPFS is unusable in WebKit (`getDirectory()` itself rejects), so local storage probes OPFS with a write/read/delete cycle and falls back to an IndexedDB-backed implementation of the same interface, and clipboard copy is mirrored in-app for paste fallback because WebKit denies programmatic clipboard reads. `style-src` allows `'unsafe-inline'` because WebKit enforces it against runtime style-attribute writes, which the editor's dynamic geometry needs. Both engines have pixel-verified screenshot baselines, cross-checked against the Chromium ones.
 
 ### [x] P5.6 Performance targets
 
