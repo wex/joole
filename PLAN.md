@@ -394,7 +394,7 @@ Goal: editing through commands with unlimited undo, project files and autosave, 
 - **Depends on:** P2.1
 - **Done when:** undo restores the selection in unit tests.
 
-### [ ] P2.3 Picking and BVH (`core/geom`)
+### [x] P2.3 Picking and BVH (`core/geom`)
 
 - **Goal:** CPU picking that is shared by tools and tests.
 - **Scope:**

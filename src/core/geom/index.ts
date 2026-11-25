@@ -6,3 +6,4 @@ export * from './winding';
 export * from './brush';
 export * from './integerPoints';
 export * from './texAxes';
+export * from './picking';

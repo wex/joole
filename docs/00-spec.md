@@ -415,6 +415,8 @@ The targets are sized so that a large Q2 map works on an integrated GPU. They ar
 
 The texture conversion proxy measured on the same machine was 72 ms for 512 synthetic 256×256 textures, single-threaded in Node. No valid measurement shows a target clearly at risk. The GPU frame rate still needs reference-hardware measurement, and P5.6 already contains the profiling/culling work package, so P1.12 adds no new mitigation WP.
 
+**P2.3 picking benchmark (25.11.2026):** measured in Node with Vitest on the same Ryzen 7 7800X3D/WSL2 development machine, using 20,000 valid 96³ box brushes on a 128-unit lattice. Building the initial BVH, including brush analysis and wireframe caches, took about 0.8–1.0 s in this non-reference environment. The steady-state picking measurements were a mean of 3.45 ms for batches of 100 ray picks (about 35 µs per pick) and 44.4 ms for batches of 1,000 2D picks (about 44 µs per pick). Incremental patch updates do not rebuild the whole tree.
+
 **Testing:**
 
 - **Unit tests (Vitest)** for the geometry core and the parsers, with a target of at least 90 % line coverage in the `core/` folder. Every CSG operation gets property-based tests (fast-check): for random convex brushes, the result must be valid, and in subtraction the sum of the volumes must match within tolerance.
