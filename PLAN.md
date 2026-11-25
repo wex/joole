@@ -277,7 +277,7 @@ Goal: read Q2 game data and `.map` files without loss, and show the map in four 
 - **Depends on:** P1.1, P1.5
 - **Done when:** a parsed fixture becomes a document, and the patch properties hold.
 
-### [ ] P1.8 Game data access (`platform`)
+### [x] P1.8 Game data access (`platform`)
 
 - **Goal:** let the user open their Q2 installation in any supported browser.
 - **Scope:**

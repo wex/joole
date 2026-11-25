@@ -145,7 +145,104 @@ function buildPcx(): Uint8Array {
   return out;
 }
 
+function buildTexturePak(entries: [string, string][]): Uint8Array {
+  const encoder = new TextEncoder();
+  const parts: number[] = [];
+  const dir: number[] = [];
+  const u32 = (n: number) => [n & 0xff, (n >> 8) & 0xff, (n >> 16) & 0xff, (n >>> 24) & 0xff];
+  parts.push(...ascii('PACK'));
+  const dirOfsPos = parts.length;
+  parts.push(...u32(0), ...u32(0));
+  const offsets: [string, number, number][] = [];
+  for (const [name, content] of entries) {
+    const bytes = encoder.encode(content);
+    offsets.push([name, parts.length, bytes.length]);
+    parts.push(...bytes);
+  }
+  const dirOffset = parts.length;
+  for (const [name, offset, length] of offsets) {
+    const padded = new Uint8Array(56);
+    padded.set(ascii(name).slice(0, 56));
+    dir.push(...padded, ...u32(offset), ...u32(length));
+  }
+  parts.push(...dir);
+  const out = new Uint8Array(parts);
+  const view = new DataView(out.buffer);
+  view.setInt32(dirOfsPos, dirOffset, true);
+  view.setInt32(dirOfsPos + 4, dir.length, true);
+  return out;
+}
+
 writeFileSync('tests/fixtures/tiny.pak', buildPak());
+writeFileSync(
+  'tests/fixtures/textures.pak',
+  buildTexturePak([
+    ['textures/e2u1/mine10_1.wal', 'base texture'],
+    ['textures/e2u1/mine10_2.wal', 'another base texture'],
+  ]),
+);
+writeFileSync(
+  'tests/fixtures/modtex.pkz',
+  (() => {
+    // a pkz with one stored texture entry, built on the tiny zip writer
+    const entry = zipEntry(
+      'textures/e2u1/mine10_1.wal',
+      new TextEncoder().encode('mod texture'),
+      0,
+    );
+    const u16 = (n: number) => [n & 0xff, (n >> 8) & 0xff];
+    const u32 = (n: number) => [n & 0xff, (n >> 8) & 0xff, (n >> 16) & 0xff, (n >>> 24) & 0xff];
+    const parts: number[] = [];
+    const local = [
+      ...u32(0x04034b50),
+      ...u16(20),
+      ...u16(0),
+      ...u16(0),
+      ...u16(0),
+      ...u16(0),
+      ...u32(entry.crc),
+      ...u32(entry.payload.length),
+      ...u32(entry.data.length),
+      ...u16(entry.nameBytes.length),
+      ...u16(0),
+      ...entry.nameBytes,
+    ];
+    parts.push(...local, ...entry.payload);
+    const cdOffset = parts.length;
+    const central = [
+      ...u32(0x02014b50),
+      ...u16(20),
+      ...u16(20),
+      ...u16(0),
+      ...u16(0),
+      ...u16(0),
+      ...u16(0),
+      ...u32(entry.crc),
+      ...u32(entry.payload.length),
+      ...u32(entry.data.length),
+      ...u16(entry.nameBytes.length),
+      ...u16(0),
+      ...u16(0),
+      ...u16(0),
+      ...u16(0),
+      ...u32(0),
+      ...u32(0),
+      ...entry.nameBytes,
+    ];
+    parts.push(...central);
+    parts.push(
+      ...u32(0x06054b50),
+      ...u16(0),
+      ...u16(0),
+      ...u16(1),
+      ...u16(1),
+      ...u32(central.length),
+      ...u32(cdOffset),
+      ...u16(0),
+    );
+    return new Uint8Array(parts);
+  })(),
+);
 writeFileSync('tests/fixtures/tiny.pkz', buildPkz());
 writeFileSync('tests/fixtures/tiny.wal', buildWal());
 writeFileSync('tests/fixtures/colormap.pcx', buildPcx());

@@ -16,5 +16,6 @@
     "src/platform/**/*",
     "src/ui/**/*"
   ],
+  "exclude": ["src/**/*.test.ts", "src/**/*.bench.ts", "src/**/__tests__"],
   "references": [{ "path": "./tsconfig.core.json" }]
 }
