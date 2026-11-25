@@ -1,0 +1,33 @@
+.log {
+  min-height: 0;
+  flex: 1;
+  overflow: auto;
+  padding: var(--space-xs) var(--space-md);
+  background: var(--surface-1);
+  color: var(--ink);
+  font: var(--text-mono-body);
+}
+
+.row {
+  display: flex;
+  min-height: 16px;
+  gap: var(--space-sm);
+  white-space: pre-wrap;
+}
+
+.level {
+  flex: none;
+  color: var(--ink-muted);
+}
+
+.ok {
+  color: var(--ok);
+}
+
+.warning {
+  color: var(--warn);
+}
+
+.error {
+  color: var(--error);
+}

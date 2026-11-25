@@ -31,6 +31,7 @@ export class TextureManager {
   private readonly entries = new Map<string, Entry>();
   private placeholderTexture: WebGLTexture;
   private pendingCount = 0;
+  private generation = 0;
   private disposed = false;
 
   constructor(
@@ -79,6 +80,22 @@ export class TextureManager {
     };
   }
 
+  /**
+   * Forgets every requested texture, for example when game data is opened
+   * after a map. Requests already in flight are ignored when they finish.
+   */
+  reset(): void {
+    this.generation++;
+    this.pendingCount = 0;
+    for (const entry of this.entries.values()) {
+      if (entry.state === 'ready') {
+        this.gl.deleteTexture(entry.bound.texture);
+      }
+    }
+    this.entries.clear();
+    this.onChange();
+  }
+
   /** Rebuilds the checker after a theme change. */
   setPlaceholderColors(colors: readonly [Rgba, Rgba]): void {
     this.gl.deleteTexture(this.placeholderTexture);
@@ -99,7 +116,14 @@ export class TextureManager {
   private request(name: string, loader: TextureLoader): void {
     this.entries.set(name, { state: 'loading' });
     this.pendingCount++;
+    const generation = this.generation;
     const settle = (entry: Entry) => {
+      if (generation !== this.generation) {
+        if (entry.state === 'ready') {
+          this.gl.deleteTexture(entry.bound.texture);
+        }
+        return;
+      }
       this.pendingCount--;
       if (this.disposed) {
         return;

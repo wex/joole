@@ -453,4 +453,4 @@ The implementation proceeds in five phases. Each phase ends with a usable versio
 
 **To be refined later:**
 
-- [ ] **Performance-panel measurement of the texture pipeline (P1.9):** the 512-texture batch conversion was verified as a single-threaded Node measurement in the unit tests (24.11.2026), well within budget. The browser Performance-panel measurement needs the UI shell and the game data and is made with P1.11. The E2E test of a texture arriving in the renderer through the worker was added with P1.10 (25.11.2026). The E2E test of the game-data fallback path (P1.8) also waits for P1.11.
+- [ ] **Performance-panel measurement of the texture pipeline (P1.9):** the 512-texture batch conversion was verified as a single-threaded Node measurement in the unit tests (24.11.2026), well within budget. The browser Performance-panel measurement needs a larger real game-data corpus and is made in the P1.12 performance pass. The E2E test of a texture arriving in the renderer through the worker was added with P1.10 (25.11.2026). The E2E test of the game-data fallback path (P1.8) was added with P1.11 (25.11.2026).

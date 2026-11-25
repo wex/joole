@@ -15,7 +15,7 @@ for (const server of servers) {
     });
 
     await page.goto(server.url);
-    await expect(page.locator('#app')).toHaveText('Joole');
+    await expect(page.locator('[data-testid=editor-shell]')).toBeVisible();
     await expect.poll(() => page.evaluate(() => globalThis.crossOriginIsolated)).toBe(true);
 
     if (server.name === 'preview') {

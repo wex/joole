@@ -1,0 +1,145 @@
+.toolbar {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  height: var(--size-toolbar);
+  align-items: center;
+  gap: var(--space-xs);
+  padding: 0 var(--space-xs);
+  border-bottom: 1px solid var(--line);
+  background: var(--surface-1);
+  color: var(--ink);
+}
+
+.menuHolder {
+  position: relative;
+  display: flex;
+}
+
+.menuButton,
+.iconButton,
+.compileButton {
+  display: inline-flex;
+  height: var(--size-control);
+  min-width: var(--size-control);
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-xs);
+  padding: 0 var(--space-md);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--ink);
+  font: var(--text-ui-body);
+  cursor: pointer;
+}
+
+.iconButton {
+  padding: 0;
+  border-color: transparent;
+  background: transparent;
+}
+
+.menuButton:hover,
+.iconButton:hover,
+.compileButton:hover {
+  background: var(--surface-3);
+}
+
+.iconButton[aria-pressed='true'] {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.compileButton {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--on-accent);
+  font-weight: 600;
+}
+
+button:disabled,
+button:disabled:hover {
+  border-color: var(--line-strong);
+  background: var(--surface-2);
+  color: var(--ink-disabled);
+  cursor: default;
+  opacity: 0.75;
+}
+
+.iconButton:disabled,
+.iconButton:disabled:hover {
+  border-color: transparent;
+  background: transparent;
+}
+
+button:focus-visible,
+input:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 1px;
+}
+
+.separator {
+  width: 1px;
+  align-self: stretch;
+  margin: var(--space-sm) var(--space-2xs);
+  background: var(--line);
+}
+
+.spacer {
+  flex: 1;
+}
+
+.gridControl {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: 0 var(--space-sm);
+  color: var(--ink-muted);
+}
+
+.gridControl input {
+  width: 96px;
+  accent-color: var(--accent);
+}
+
+.gridControl output {
+  min-width: 52px;
+  font: var(--text-mono-small);
+}
+
+.menu {
+  position: absolute;
+  z-index: 10;
+  top: calc(100% + var(--space-2xs));
+  left: 0;
+  min-width: 192px;
+  margin: 0;
+  padding: var(--space-xs) 0;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  box-shadow: var(--shadow-float);
+  list-style: none;
+}
+
+.menu button {
+  display: flex;
+  width: 100%;
+  height: var(--size-row);
+  align-items: center;
+  padding: 0 var(--space-md) 0 var(--space-lg);
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font: var(--text-ui-body);
+  text-align: left;
+  cursor: pointer;
+}
+
+.menu button:hover,
+.menu button:focus-visible {
+  background: var(--accent);
+  color: var(--on-accent);
+}

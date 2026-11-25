@@ -248,6 +248,12 @@ export class Renderer {
     this.invalidate();
   }
 
+  /** Re-requests every texture, used when game data becomes available. */
+  reloadTextures(): void {
+    this.textures.reset();
+    this.invalidate();
+  }
+
   /** Re-reads the design tokens; call it whenever the theme changes. */
   refreshColors(): void {
     this.colors = readViewportColors(getComputedStyle(this.colorSource));

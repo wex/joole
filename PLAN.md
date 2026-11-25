@@ -333,7 +333,7 @@ Goal: read Q2 game data and `.map` files without loss, and show the map in four 
 - **Depends on:** P1.2, P1.7, P1.9
 - **Done when:** the fixture maps render correctly in all modes, and screenshots are committed as baselines.
 
-### [ ] P1.11 UI shell and cameras (`ui`)
+### [x] P1.11 UI shell and cameras (`ui`)
 
 - **Goal:** build the application frame around the renderer.
 - **Scope:**

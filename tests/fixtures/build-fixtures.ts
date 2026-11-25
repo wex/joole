@@ -3,7 +3,7 @@
  * this directory. Run with: node tests/fixtures/build-fixtures.ts
  */
 import { deflateRawSync } from 'node:zlib';
-import { writeFileSync } from 'node:fs';
+import { copyFileSync, mkdirSync, writeFileSync } from 'node:fs';
 
 function ascii(s: string): number[] {
   return [...s].map((c) => c.charCodeAt(0));
@@ -482,4 +482,8 @@ writeFileSync('tests/fixtures/tiny.wal', buildWal());
 writeFileSync('tests/fixtures/colormap.pcx', buildPcx());
 writeFileSync('tests/fixtures/harness.wal', buildHarnessWal());
 writeFileSync('tests/fixtures/room.map', buildRoomMap());
+mkdirSync('tests/fixtures/game/baseq2/pics', { recursive: true });
+mkdirSync('tests/fixtures/game/baseq2/textures/e2u1', { recursive: true });
+copyFileSync('tests/fixtures/colormap.pcx', 'tests/fixtures/game/baseq2/pics/colormap.pcx');
+copyFileSync('tests/fixtures/harness.wal', 'tests/fixtures/game/baseq2/textures/e2u1/mine10_1.wal');
 console.log('fixtures built');
