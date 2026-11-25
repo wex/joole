@@ -55,6 +55,27 @@ describe('SelectTool event scripts', () => {
     expect(tool.pointer(up(160, 32)).commands).toHaveLength(0);
   });
 
+  it('prefers the already selected overlapping brush when a drag starts', () => {
+    let doc = createEmptyDocument();
+    for (const b of [brush('a', [0, 0, 0], [64, 64, 64]), brush('b', [0, 0, 0], [64, 64, 64])]) {
+      doc = applyPatch(doc, addNodePatch(doc, doc.worldspawn, b));
+    }
+    const tool = new SelectTool(() => doc, 8);
+    const firstHit = tool.pointer(down(32, 32)).selection;
+    expect(firstHit?.size).toBe(1);
+    const selected = [...firstHit!][0]!;
+    const commands = runScript(tool, [move(48, 32), up(48, 32)]);
+    expect(commands.length).toBeGreaterThan(0);
+    let moved = doc;
+    for (const command of commands) moved = applyPatch(moved, command.run(moved));
+    const box = analyzeBrush(moved.nodes.get(selected) as BrushNode).aabb;
+    expect(box?.min[0]).toBe(16);
+    const other = [...moved.nodes.values()].find(
+      (node) => node.kind === 'brush' && node.id !== selected,
+    );
+    expect(analyzeBrush(other as BrushNode).aabb?.min[0]).toBe(0);
+  });
+
   it('dragging a selected brush produces merged translation commands snapped to the grid', () => {
     const doc = documentWithBrushes();
     const tool = new SelectTool(() => doc, 8);

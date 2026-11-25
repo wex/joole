@@ -14,6 +14,7 @@ export interface ToolbarProps {
   readonly onOpenGameFolder: () => void;
   readonly onOpenSinglePak: () => void;
   readonly onOpenMap: () => void;
+  readonly onExportMap: () => void;
   readonly onGridSize: (size: number) => void;
   readonly onToggleTheme: () => void;
   readonly onTool: (tool: ToolbarTool) => void;
@@ -98,6 +99,11 @@ export function Toolbar(props: ToolbarProps) {
             <li role="none">
               <button type="button" role="menuitem" onClick={() => choose(props.onOpenMap)}>
                 Open Map…
+              </button>
+            </li>
+            <li role="none">
+              <button type="button" role="menuitem" onClick={() => choose(props.onExportMap)}>
+                Export .map…
               </button>
             </li>
           </ul>

@@ -319,6 +319,10 @@ export class SelectTool {
       event.view === '3d'
         ? this.bvh.rayHits(event.point, event.direction ?? [1, 0, 0]).map((hit) => hit.id)
         : this.bvh.pick2D(event.point, event.view, event.tolerance).map((hit) => hit.id);
+    const selectedHit = hits.find((id) => this.selected.has(id));
+    if (selectedHit !== undefined) {
+      return selectedHit;
+    }
     const key = event.point.map((x) => Math.round(x / Math.max(1, this.gridSize()))).join(':');
     return this.cycler.choose(hits, `${event.view}:${key}`);
   }

@@ -512,7 +512,7 @@ Goal: editing through commands with unlimited undo, project files and autosave, 
 - **Depends on:** P1.5, P1.6, Gate 0
 - **Done when:** the compiler test runs in CI, and the reproducibility job is green.
 
-**[ ] Gate 2:** a simple room (four walls, a floor, a ceiling and an `info_player_start`, which qbsp3 needs for its flood fill (`FloodEntities` in `portals.c`)) can be built from scratch in the UI and saved as a project, and its exported `.map` passes qbsp3 with no warnings. This is an E2E script plus the compiler test. The entity is placed through the raw key–value editor or a minimal placement command, because the full entity tool arrives in P4.4.
+**[x] Gate 2:** a simple room (four walls, a floor, a ceiling and an `info_player_start`, which qbsp3 needs for its flood fill (`FloodEntities` in `portals.c`)) can be built from scratch in the UI and saved as a project, and its exported `.map` passes qbsp3 with no warnings. This is an E2E script plus the compiler test. The entity is placed through the raw key–value editor or a minimal placement command, because the full entity tool arrives in P4.4.
 
 ---
 

@@ -1,6 +1,13 @@
-import { createEmptyDocument } from '@core/doc/index';
+import { addNodePatch, createEmptyDocument, createId } from '@core/doc/index';
 import { parseMap, readPcxPalette, readProject, writeMap, writeProject } from '@core/formats/index';
-import type { Command, ConvertedTexture, Inflate, MapDocument, Patch } from '@core/types/index';
+import type {
+  Command,
+  ConvertedTexture,
+  Inflate,
+  MapDocument,
+  Patch,
+  Vec3,
+} from '@core/types/index';
 import { PALETTE_PATH } from '@game/q2/index';
 import type { GameFileEntry } from '@platform/index';
 import { CommandBus } from './commandBus';
@@ -324,6 +331,37 @@ export class EditorApp {
 
   setSelection(ids: Iterable<string>): void {
     this.selectionManager.setSelection(ids);
+  }
+
+  /** Minimal entity placement for Gate 2; the full class-aware entity tool is P4.4. */
+  addEntityAt(classname: string, point: Vec3): string | null {
+    if (!/^[A-Za-z0-9_]+$/.test(classname)) return null;
+    const grid = this.gridSize;
+    const snapped = point.map((value) => Math.round(value / grid) * grid) as Vec3;
+    const entity = {
+      kind: 'entity' as const,
+      id: createId(),
+      props: [
+        ['classname', classname] as [string, string],
+        ['origin', snapped.map((value) => String(value === 0 ? 0 : value)).join(' ')] as [
+          string,
+          string,
+        ],
+      ],
+      children: [],
+    };
+    try {
+      this.executeCommand({
+        label: `Add ${classname}`,
+        run: (doc) => addNodePatch(doc, doc.worldspawn, entity),
+      });
+      this.setSelection([entity.id]);
+      this.log('ok', `Added ${classname} at ${entity.props[1]![1]}.`);
+      return entity.id;
+    } catch (error) {
+      this.log('warning', errorText(error));
+      return null;
+    }
   }
 
   copySelectionText(): string | null {

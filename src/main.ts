@@ -137,6 +137,9 @@ declare global {
       stats: () => ReturnType<Renderer['stats']>;
       selection: () => string[];
       autosave: () => Promise<boolean>;
+      camera: (view: '3d' | 'top' | 'front' | 'side') => ReturnType<Renderer['getCamera']>;
+      viewRects: () => Record<string, { x: number; y: number; width: number; height: number }>;
+      project: () => string;
     };
   }
 }
@@ -145,6 +148,9 @@ window.joole = {
   stats: () => renderer.stats(),
   selection: () => [...app.selection],
   autosave: () => app.autosave(),
+  camera: (view) => renderer.getCamera(view),
+  viewRects: () => Object.fromEntries(renderer.viewRects()),
+  project: () => app.projectText(),
 };
 
 mountEditorShell({ app, renderer, canvas }, root);

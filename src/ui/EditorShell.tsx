@@ -101,7 +101,11 @@ export function EditorShell(props: EditorShellProps) {
   const [coordinates, setCoordinates] = createSignal(coordinateDefaults(false));
   const [rightWidth, setRightWidth] = createSignal(initialRightWidth);
   const [bottomHeight, setBottomHeight] = createSignal(initialBottomHeight);
-  const [viewMenu, setViewMenu] = createSignal<{ x: number; y: number } | null>(null);
+  const [viewMenu, setViewMenu] = createSignal<{
+    x: number;
+    y: number;
+    point: [number, number, number];
+  } | null>(null);
   const [activeTool, setActiveTool] = createSignal(app.activeTool);
   const [brushPrimitive, setBrushPrimitive] = createSignal(app.brushPrimitive);
   const [brushSides, setBrushSides] = createSignal(app.brushSides);
@@ -474,8 +478,17 @@ export function EditorShell(props: EditorShellProps) {
         setViewMenu(null);
         return;
       }
+      const camera = orthoCamera(hit.view);
+      if (!camera) {
+        setViewMenu(null);
+        return;
+      }
       const bounds = viewport.getBoundingClientRect();
-      setViewMenu({ x: event.clientX - bounds.left, y: event.clientY - bounds.top });
+      setViewMenu({
+        x: event.clientX - bounds.left,
+        y: event.clientY - bounds.top,
+        point: orthoWorldPoint(camera, hit.point, hit.size, hit.ratio),
+      });
     };
     const keyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
@@ -576,7 +589,9 @@ export function EditorShell(props: EditorShellProps) {
     const unsubscribe = app.subscribe((event) => {
       if (event.type === 'document') {
         setMapName(app.mapName);
-        controller.frame(renderer.bounds(), renderer.viewRects());
+        if (!event.patch) {
+          controller.frame(renderer.bounds(), renderer.viewRects());
+        }
       } else if (event.type === 'game') {
         setGameOpen(app.gameOpen);
         setTextureCount(app.textureCount);
@@ -621,6 +636,7 @@ export function EditorShell(props: EditorShellProps) {
         onOpenGameFolder={chooseGameFolder}
         onOpenSinglePak={() => pakInput?.click()}
         onOpenMap={chooseMap}
+        onExportMap={() => void app.exportMap()}
         onGridSize={(size) => app.setGridSize(size)}
         onToggleTheme={toggleTheme}
         activeTool={activeTool()}
@@ -693,6 +709,9 @@ export function EditorShell(props: EditorShellProps) {
                   aria-label="View actions"
                   data-testid="view-context-menu"
                   style={{ left: `${menu().x}px`, top: `${menu().y}px` }}
+                  ref={(el) => {
+                    el.addEventListener('pointerdown', (event) => event.stopPropagation());
+                  }}
                 >
                   <button
                     type="button"
@@ -704,6 +723,18 @@ export function EditorShell(props: EditorShellProps) {
                     }}
                   >
                     Add Brush
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    class={styles.contextMenuItem}
+                    onClick={() => {
+                      const point = menu().point;
+                      setViewMenu(null);
+                      app.addEntityAt('info_player_start', point);
+                    }}
+                  >
+                    Add Player Start
                   </button>
                 </div>
               )}
