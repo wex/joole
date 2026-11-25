@@ -437,7 +437,7 @@ Goal: editing through commands with unlimited undo, project files and autosave, 
 - **Depends on:** P2.2, P2.3, P2.4
 - **Done when:** a brush can be selected, moved, rotated and scaled in the views, and every step can be undone.
 
-### [ ] P2.6 Brush tool and primitives (`core/geom`, `app`)
+### [x] P2.6 Brush tool and primitives (`core/geom`, `app`)
 
 - **Goal:** create new brushes.
 - **Scope:**
