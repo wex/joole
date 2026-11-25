@@ -23,6 +23,7 @@ import { unionAabb, type Aabb } from './camera';
 export const STATE_SELECTED = 1;
 export const STATE_ENTITY = 2;
 export const STATE_INVALID = 4;
+export const STATE_DIMMED = 8;
 
 /** The state texture is this many texels wide, one byte per node index. */
 const STATE_WIDTH = 1024;
@@ -223,6 +224,36 @@ export class GeometryCache {
    * Marks the selection: the given nodes and, for entities and groups, every
    * brush and point entity below them.
    */
+  private scopeId: Id | null = null;
+  private scopeMembers = new Set<Id>();
+
+  /** Sets the entered scope: nodes outside it are dimmed. null shows everything. */
+  setScope(doc: Readonly<MapDocument>, scopeId: Id | null): void {
+    this.scopeId = scopeId;
+    this.scopeMembers.clear();
+    if (scopeId) {
+      const walk = (at: Id) => {
+        this.scopeMembers.add(at);
+        const node = doc.nodes.get(at);
+        if (node && (node.kind === 'entity' || node.kind === 'group')) {
+          for (const child of node.children) walk(child);
+        }
+      };
+      walk(scopeId);
+    }
+    this.refreshStates();
+    this.rebuildOverlay();
+  }
+
+  /** Rewrites every node's state bits from the selection and the scope. */
+  private refreshStates(): void {
+    for (const [id, record] of this.records) {
+      const dimmed = this.scopeId !== null && !this.scopeMembers.has(id);
+      this.setState(record.index, record.kind, this.selected.has(id), dimmed);
+    }
+    this.stateDirty = true;
+  }
+
   setSelection(doc: Readonly<MapDocument>, ids: Iterable<Id>): void {
     const selected = new Set<Id>();
     const walk = (id: Id) => {
@@ -241,7 +272,8 @@ export class GeometryCache {
     for (const id of new Set([...this.selected, ...selected])) {
       const record = this.records.get(id);
       if (record) {
-        this.setState(record.index, record.kind, selected.has(id));
+        const dimmed = this.scopeId !== null && !this.scopeMembers.has(id);
+        this.setState(record.index, record.kind, selected.has(id), dimmed);
       }
     }
     this.selected = selected;
@@ -493,9 +525,16 @@ export class GeometryCache {
     return index;
   }
 
-  private setState(index: number, kind: NodeRecord['kind'], selected: boolean): void {
+  private setState(
+    index: number,
+    kind: NodeRecord['kind'],
+    selected: boolean,
+    dimmed = false,
+  ): void {
     this.state[index * 4] =
-      (kind === 'entity' ? STATE_ENTITY : 0) | (selected ? STATE_SELECTED : 0);
+      (kind === 'entity' ? STATE_ENTITY : 0) |
+      (selected ? STATE_SELECTED : 0) |
+      (dimmed ? STATE_DIMMED : 0);
     this.stateDirty = true;
   }
 

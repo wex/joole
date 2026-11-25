@@ -175,6 +175,7 @@ export class BrushTool {
     private readonly getDocument: () => Readonly<MapDocument>,
     private readonly getGridSize: () => number,
     private readonly texture: FaceTexture = DEFAULT_FACE_TEXTURE,
+    private readonly getInsertParent?: () => string,
   ) {}
 
   pointer(event: ToolPointerEvent): ToolOutput {
@@ -238,7 +239,7 @@ export class BrushTool {
       commands: [
         {
           label: `Add ${this.primitive}`,
-          run: (doc) => addNodePatch(doc, doc.worldspawn, brush),
+          run: (doc) => addNodePatch(doc, this.getInsertParent?.() ?? doc.worldspawn, brush),
         },
       ],
       selection: new Set([brush.id]),

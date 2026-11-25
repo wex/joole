@@ -32,11 +32,15 @@ void main() {
   bool selected = (state & 1u) != 0u;
   bool entity = (state & 2u) != 0u;
   bool invalid = (state & 4u) != 0u;
+  bool dimmed = (state & 8u) != 0u;
   vec4 a = uViewProjection * vec4(aA, 1.0);
   vec4 b = uViewProjection * vec4(aB, 1.0);
   vec4 classColor = vec4(vec3(texel.gba) / 255.0, 1.0);
   bool hasClassColor = entity && (texel.g + texel.b + texel.a) > 0u;
   vColor = invalid ? uInvalidColor : selected ? uSelectColor : entity ? (hasClassColor ? classColor : uEntityColor) : uBrushColor;
+  if (dimmed) {
+    vColor = vec4(vColor.rgb * 0.35, vColor.a);
+  }
   // Freed instances are zeroed, so a == b; they and filtered lines collapse.
   if (aA == aB || selected != (uPass == 1) || (uEntitiesOnly && !entity) ||
       (a.w < NEAR_W && b.w < NEAR_W)) {

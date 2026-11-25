@@ -691,7 +691,7 @@ Goal: everything needed to build a complete playable single-player level.
 - **Depends on:** P2.1
 - **Done when:** grouping survives saving the project and exporting the `.map`.
 
-### [ ] P4.7 Scope (entering a group)
+### [x] P4.7 Scope (entering a group)
 
 - **Goal:** work inside one group.
 - **Scope:** double-clicking a group enters it. Selection and new brushes are then limited to that group, and the rest of the map is dimmed.

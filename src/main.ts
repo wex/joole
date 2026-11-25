@@ -153,6 +153,7 @@ app.subscribe((event) => {
       renderer.setDocument(app.document);
     }
     if (app.mapName) void projectStore?.saveRecentFiles([app.mapName]);
+    renderer.setScope(app.scope);
   } else if (event.type === 'selection') {
     renderer.setSelection(app.selection);
   } else if (event.type === 'game') {

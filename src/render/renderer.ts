@@ -220,6 +220,12 @@ export class Renderer {
     }
   }
 
+  /** Dims everything outside the entered scope (null clears the scope). */
+  setScope(scopeId: string | null): void {
+    if (!this.doc) return;
+    this.cache.setScope(this.doc, scopeId);
+  }
+
   /** Transient editing lines: ghost previews and drag rectangles. */
   setToolPreview(
     segments: readonly (readonly [Vec3, Vec3])[],

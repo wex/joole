@@ -76,6 +76,15 @@ export function TreeView(props: TreeViewProps) {
             draggable={row.id !== app.document.worldspawn ? 'true' : 'false'}
             data-testid={`tree-row-${row.id}`}
             data-node-id={row.id}
+            onDblClick={() => {
+              if (row.node.kind === 'group') {
+                if (app.scope === row.id) {
+                  app.exitScope();
+                } else {
+                  app.enterScope(row.id);
+                }
+              }
+            }}
             onClick={(e) => {
               if (e.shiftKey) {
                 app.setSelection([...app.selection, row.id]);

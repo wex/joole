@@ -217,6 +217,8 @@ export class EditorApp {
     this.brushTool = new BrushTool(
       () => this.document,
       () => this.gridSize,
+      undefined,
+      () => this.insertionParent,
     );
     this.clipTool = new ClipTool(
       () => this.document,
@@ -384,6 +386,54 @@ export class EditorApp {
       this.log('warning', `Convert to entity failed: ${errorText(error)}`);
       return false;
     }
+  }
+
+  /** The group the editor is scoped into, or null for the whole map. */
+  get scope(): string | null {
+    return this.scopeId;
+  }
+
+  private scopeId: string | null = null;
+
+  /** A node is inside the scope when it is the scope or one of its descendants. */
+  inScope(id: string): boolean {
+    if (!this.scopeId) return true;
+    let at: string | undefined = id;
+    while (at !== undefined) {
+      if (at === this.scopeId) return true;
+      at = this.document.parent.get(at);
+    }
+    return false;
+  }
+
+  /**
+   * Enters a group: selection and new brushes are limited to it and the rest
+   * of the map is dimmed (Qoole's scope, OpScopeChange).
+   */
+  enterScope(id: string): boolean {
+    const node = this.document.nodes.get(id);
+    if (!node || node.kind !== 'group') {
+      this.log('warning', 'Only a group can be entered.');
+      return false;
+    }
+    this.scopeId = id;
+    this.selectionManager.setSelection([...this.selection].filter((sel) => this.inScope(sel)));
+    this.emit({ type: 'document' });
+    this.log('info', `Entered group ${node.name}; the rest of the map is dimmed.`);
+    return true;
+  }
+
+  /** Leaves the scope back to the whole map. */
+  exitScope(): void {
+    if (!this.scopeId) return;
+    this.scopeId = null;
+    this.emit({ type: 'document' });
+    this.log('info', 'Left the group scope.');
+  }
+
+  /** The parent new top-level content goes to: the scope group or worldspawn. */
+  get insertionParent(): string {
+    return this.scopeId ?? this.document.worldspawn;
   }
 
   /** Groups the selected nodes under a new group (one undo step). */
@@ -618,7 +668,9 @@ export class EditorApp {
 
   setSelection(ids: Iterable<string>): void {
     // Locked groups lock their whole subtree out of the selection.
-    const filtered = [...ids].filter((id) => !effectiveGroupState(this.document, id).locked);
+    const filtered = [...ids].filter(
+      (id) => !effectiveGroupState(this.document, id).locked && this.inScope(id),
+    );
     this.selectionManager.setSelection(filtered);
   }
 
@@ -642,7 +694,7 @@ export class EditorApp {
     try {
       this.executeCommand({
         label: `Add ${classname}`,
-        run: (doc) => addNodePatch(doc, doc.worldspawn, entity),
+        run: (doc) => addNodePatch(doc, this.insertionParent, entity),
       });
       this.setSelection([entity.id]);
       this.log('ok', `Added ${classname} at ${entity.props[1]![1]}.`);
