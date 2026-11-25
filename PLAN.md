@@ -630,7 +630,7 @@ Goal: Qoole-level geometry operations, and textures that look exactly the same i
 
 Goal: everything needed to build a complete playable single-player level.
 
-### [ ] P4.1 Entity definition parser (`core/formats`)
+### [x] P4.1 Entity definition parser (`core/formats`)
 
 - **Goal:** parse `/*QUAKED … */` blocks from `.def` and `.c` text.
 - **Scope:**
@@ -640,7 +640,7 @@ Goal: everything needed to build a complete playable single-player level.
 - **Depends on:** P1.1
 - **Done when:** every vanilla block parses.
 
-### [ ] P4.2 Generating vanilla definitions (`scripts`, `game/q2`)
+### [x] P4.2 Generating vanilla definitions (`scripts`, `game/q2`)
 
 - **Goal:** create the committed `q2.def` file and the md2 model table.
 - **Scope:**
