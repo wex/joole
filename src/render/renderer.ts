@@ -301,6 +301,19 @@ export class Renderer {
     this.invalidate();
   }
 
+  /**
+   * The ratio of canvas backing-store pixels to CSS pixels. This is not
+   * necessarily window.devicePixelRatio: the backing store is sized from
+   * devicePixelContentBoxSize, and the two disagree wherever the browser
+   * rasterises the canvas 1:1 despite a higher devicePixelRatio. Input
+   * conversion must use this ratio so the picking maths always matches what
+   * is actually on screen.
+   */
+  backingRatio(): number {
+    const css = this.canvas.getBoundingClientRect().width;
+    return css > 0 && this.canvas.width > 0 ? this.canvas.width / css : 1;
+  }
+
   /** The view rectangles in device pixels with a top-left origin. */
   viewRects(): Map<ViewId, ViewRect> {
     const ratio = window.devicePixelRatio || 1;
@@ -446,7 +459,7 @@ export class Renderer {
     gl.useProgram(program);
     gl.uniformMatrix4fv(u.uViewProjection, false, toGlMatrix(vp, this.matrix));
     gl.uniform2f(u.uViewportSize, w, h);
-    gl.uniform1f(u.uWidth, this.lineWidth * (window.devicePixelRatio || 1));
+    gl.uniform1f(u.uWidth, this.lineWidth * this.backingRatio());
     gl.uniform1i(u.uEntitiesOnly, entitiesOnly ? 1 : 0);
     gl.uniform1i(u.uState, STATE_UNIT);
     gl.uniform4fv(u.uBrushColor, this.colors['vp-brush']);
