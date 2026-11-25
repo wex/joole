@@ -546,6 +546,57 @@ function buildUvParityMap(): string {
   return lines.join('\n') + '\n';
 }
 
+/**
+ * The playable parity-check room for the manual q2pro half of P3.11: a
+ * sealed room whose surfaces carry the same kinds of parameterisation as
+ * uvparity.map (rotation quadrants, non-uniform scale, decimal offsets that
+ * truncate), so a human can compare the editor's 3D view with the game.
+ */
+function buildParityRoom(): string {
+  const tex = 'e2u1/mine10_1';
+  const lines: string[] = ['{', '"classname" "worldspawn"'];
+  // Floor: rotation 45.7 (truncates to 45), decimal offsets.
+  lines.push(
+    ...boxBrush([-256, -256, -64], [256, 256, 0], {
+      name: tex,
+      offset: [8.9, -4.2],
+      rotation: 45.7,
+    }),
+  );
+  // Ceiling: rotation 90.
+  lines.push(...boxBrush([-256, -256, 256], [256, 256, 320], { name: tex, rotation: 90 }));
+  // North wall: non-uniform scale.
+  lines.push(...boxBrush([-256, 192, 0], [256, 256, 256], { name: tex, scale: [0.5, 2] }));
+  // South wall: rotation 180 with fractional scale.
+  lines.push(
+    ...boxBrush([-256, -256, 0], [256, -192, 256], {
+      name: tex,
+      rotation: 180,
+      scale: [0.75, 1.25],
+    }),
+  );
+  // East and west walls: plain, so the eye has a reference.
+  lines.push(...boxBrush([192, -192, 0], [256, 192, 256], { name: tex }));
+  lines.push(...boxBrush([-256, -192, 0], [-192, 192, 256], { name: tex }));
+  // A pillar in the middle: rotation 270 with negative decimal offsets.
+  lines.push(
+    ...boxBrush([-32, -32, 0], [32, 32, 128], {
+      name: tex,
+      offset: [-16.7, 33.3],
+      rotation: 270,
+      scale: [1.5, 1],
+    }),
+  );
+  lines.push('}');
+  // Player start inside the room.
+  lines.push('{');
+  lines.push('"classname" "info_player_start"');
+  lines.push('"origin" "0 -128 24"');
+  lines.push('}');
+  return lines.join('\n') + '\n';
+}
+
+writeFileSync('tests/fixtures/parity-room.map', buildParityRoom());
 writeFileSync('tests/fixtures/uvparity.map', buildUvParityMap());
 writeFileSync('tests/fixtures/room.map', buildRoomMap());
 mkdirSync('tests/fixtures/game/baseq2/pics', { recursive: true });
