@@ -347,7 +347,7 @@ export function EditorShell(props: EditorShellProps) {
         return false;
       }
       const output = app.selectPointer(toolEvent(hit, type, event));
-      renderer.setToolPreview(output.preview ?? []);
+      renderer.setToolPreview(output.preview ?? [], output.invalid ?? []);
       return true;
     };
 
@@ -510,7 +510,7 @@ export function EditorShell(props: EditorShellProps) {
       ) {
         event.preventDefault();
         const output = app.clipKey(event.key);
-        renderer.setToolPreview(output.preview ?? []);
+        renderer.setToolPreview(output.preview ?? [], output.invalid ?? []);
         return;
       }
       const action = shortcutAction({
@@ -547,12 +547,24 @@ export function EditorShell(props: EditorShellProps) {
         return;
       }
       if (
-        (action === 'tool-select' || action === 'tool-brush' || action === 'tool-clip') &&
+        (action === 'tool-select' ||
+          action === 'tool-brush' ||
+          action === 'tool-clip' ||
+          action === 'tool-vertex-edge' ||
+          action === 'tool-face') &&
         !(pointerLocked || rightFly)
       ) {
         event.preventDefault();
         app.setToolMode(
-          action === 'tool-select' ? 'select' : action === 'tool-brush' ? 'brush' : 'clip',
+          action === 'tool-select'
+            ? 'select'
+            : action === 'tool-brush'
+              ? 'brush'
+              : action === 'tool-clip'
+                ? 'clip'
+                : action === 'tool-vertex-edge'
+                  ? 'vertex'
+                  : 'face',
         );
         return;
       }

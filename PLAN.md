@@ -560,7 +560,7 @@ Goal: Qoole-level geometry operations, and textures that look exactly the same i
 - **Depends on:** P2.4
 - **Done when:** the commands and menu items exist.
 
-### [ ] P3.6 Vertex, edge and face editing (V, F)
+### [x] P3.6 Vertex, edge and face editing (V, F)
 
 - **Goal:** edit the derived elements of a brush.
 - **Scope:**

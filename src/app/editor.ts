@@ -15,7 +15,14 @@ import { SelectionManager } from './selection';
 import { mapTextToPastePatch, removeSelectionPatch, selectionToMapText } from './clipboard';
 import { hollowSelectionPatch, intersectSelectionPatch, subtractSelectionPatch } from './csg';
 import { createFlipCommand, createRotate90Command, mirrorSelectionPatch } from './mirrorCommands';
-import { BrushTool, ClipTool, SelectTool, type ToolOutput, type ToolPointerEvent } from './tools';
+import {
+  BrushTool,
+  ClipTool,
+  SelectTool,
+  VertexTool,
+  type ToolOutput,
+  type ToolPointerEvent,
+} from './tools';
 import type { PrimitiveKind } from '@core/geom/index';
 import { entriesFromFileList, entriesFromSinglePak, openGameVfs } from '@platform/index';
 
@@ -76,7 +83,7 @@ export type EditorEvent =
   | { readonly type: 'recovery' };
 
 export type EditorListener = (event: EditorEvent) => void;
-export type EditorToolMode = 'select' | 'brush' | 'clip';
+export type EditorToolMode = 'select' | 'brush' | 'clip' | 'vertex' | 'face';
 
 const MAX_LOG_ENTRIES = 500;
 
@@ -120,6 +127,7 @@ export class EditorApp {
   private readonly selectTool: SelectTool;
   private readonly brushTool: BrushTool;
   private readonly clipTool: ClipTool;
+  private readonly vertexTool: VertexTool;
   private toolMode: EditorToolMode = 'select';
   private map: string | null = null;
   private vfs: Awaited<ReturnType<typeof openGameVfs>> | null = null;
@@ -150,6 +158,11 @@ export class EditorApp {
     this.clipTool = new ClipTool(
       () => this.document,
       () => this.gridSize,
+    );
+    this.vertexTool = new VertexTool(
+      () => this.document,
+      () => this.gridSize,
+      () => this.selection,
     );
     this.bus.subscribe((event) => {
       if (event.type !== 'history') {
@@ -184,6 +197,10 @@ export class EditorApp {
 
   get brushSides(): number {
     return this.brushTool.sides;
+  }
+
+  get vertexSubmode(): 'vertex' | 'edge' | 'face' {
+    return this.vertexTool.submode;
   }
 
   get mapName(): string | null {
@@ -527,11 +544,22 @@ export class EditorApp {
 
   setToolMode(mode: EditorToolMode): void {
     if (mode === this.toolMode) {
+      // Pressing V again in vertex mode switches between vertex and edge editing.
+      if (mode === 'vertex') {
+        this.vertexTool.toggleVertexEdge();
+        this.emit({ type: 'tool' });
+      }
       return;
+    }
+    if (mode === 'face') {
+      this.vertexTool.submode = 'face';
+    } else if (mode === 'vertex' && this.vertexTool.submode === 'face') {
+      this.vertexTool.submode = 'vertex';
     }
     this.selectTool.cancel();
     this.brushTool.cancel();
     this.clipTool.cancel();
+    this.vertexTool.cancel();
     this.toolMode = mode;
     this.emit({ type: 'tool' });
   }
@@ -553,7 +581,9 @@ export class EditorApp {
         ? this.brushTool
         : this.toolMode === 'clip'
           ? this.clipTool
-          : this.selectTool;
+          : this.toolMode === 'vertex' || this.toolMode === 'face'
+            ? this.vertexTool
+            : this.selectTool;
     const output = tool.pointer(event);
     for (const command of output.commands) {
       try {

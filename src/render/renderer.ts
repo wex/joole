@@ -85,6 +85,7 @@ const LINE_UNIFORMS = [
   'uBrushColor',
   'uEntityColor',
   'uSelectColor',
+  'uInvalidColor',
 ] as const;
 const GRID_UNIFORMS = [
   'uViewportOrigin',
@@ -218,8 +219,11 @@ export class Renderer {
   }
 
   /** Transient editing lines: ghost previews and drag rectangles. */
-  setToolPreview(segments: readonly (readonly [Vec3, Vec3])[]): void {
-    this.cache.setToolPreview(segments);
+  setToolPreview(
+    segments: readonly (readonly [Vec3, Vec3])[],
+    invalid: readonly (readonly [Vec3, Vec3])[] = [],
+  ): void {
+    this.cache.setToolPreview(segments, invalid);
     this.invalidate();
   }
 
@@ -418,6 +422,7 @@ export class Renderer {
     gl.uniform4fv(u.uBrushColor, this.colors['vp-brush']);
     gl.uniform4fv(u.uEntityColor, this.colors['vp-entity']);
     gl.uniform4fv(u.uSelectColor, this.colors['vp-select']);
+    gl.uniform4fv(u.uInvalidColor, this.colors['vp-invalid']);
     gl.bindVertexArray(this.cache.lines.vao);
     for (const pass of [0, 1]) {
       gl.uniform1i(u.uPass, pass);

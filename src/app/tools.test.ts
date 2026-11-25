@@ -3,7 +3,7 @@ import { createEmptyDocument, addNodePatch, applyPatch } from '@core/doc/index';
 import { analyzeBrush, validateBrush } from '@core/geom/index';
 import type { BrushNode, Command, MapDocument } from '@core/types/index';
 import { makeBox } from '../core/geom/__tests__/helpers';
-import { BrushTool, ClipTool, SelectTool, type ToolPointerEvent } from './tools';
+import { BrushTool, ClipTool, SelectTool, VertexTool, type ToolPointerEvent } from './tools';
 
 function brush(
   id: string,
@@ -284,5 +284,67 @@ describe('ClipTool event scripts', () => {
     expect(cancelled.commands).toEqual([]);
     expect(cancelled.preview).toEqual([]);
     expect(tool.key('Enter').commands).toEqual([]);
+  });
+});
+
+describe('VertexTool event scripts', () => {
+  function vertexDocument(): MapDocument {
+    let doc = createEmptyDocument();
+    doc = applyPatch(
+      doc,
+      addNodePatch(doc, doc.worldspawn, brush('target', [0, 0, 0], [64, 64, 64])),
+    );
+    return doc;
+  }
+
+  function makeVertexTool(doc: MapDocument) {
+    return new VertexTool(
+      () => doc,
+      () => 8,
+      () => new Set(['target']),
+    );
+  }
+
+  it('dragging near a corner moves the vertex with an undoable command', () => {
+    const doc = vertexDocument();
+    const tool = makeVertexTool(doc);
+    const down1 = tool.pointer(down(2, 2));
+    expect(down1.commands).toHaveLength(0);
+    const moved = tool.pointer(move(10, 10));
+    expect(moved.commands).toHaveLength(1);
+    let edited = doc;
+    for (const command of moved.commands) edited = applyPatch(edited, command.run(edited));
+    const analysis = analyzeBrush(edited.nodes.get('target') as BrushNode);
+    expect(validateBrush(analysis).valid).toBe(true);
+    expect(analysis.volume).toBeLessThan(analyzeBrush(doc.nodes.get('target') as BrushNode).volume);
+    tool.pointer(up(10, 10));
+  });
+
+  it('shows handle crosses while idle', () => {
+    const doc = vertexDocument();
+    const tool = makeVertexTool(doc);
+    const output = tool.pointer(move(200, 200));
+    expect(output.preview!.length).toBeGreaterThan(0);
+  });
+
+  it('a rejected drag produces no command and dashed invalid segments', () => {
+    const doc = vertexDocument();
+    const tool = makeVertexTool(doc);
+    tool.pointer(down(2, 2));
+    const output = tool.pointer(move(200, 200));
+    expect(output.commands).toHaveLength(0);
+    expect(output.invalid!.length).toBeGreaterThan(0);
+  });
+
+  it('V toggles between vertex and edge submodes and edge drag moves both endpoints', () => {
+    const doc = vertexDocument();
+    const tool = makeVertexTool(doc);
+    expect(tool.submode).toBe('vertex');
+    tool.toggleVertexEdge();
+    expect(tool.submode).toBe('edge');
+    // The front-top edge runs along x at y=0, z=64: grab its midpoint.
+    tool.pointer({ ...down(32, 0), point: [32, 0, 64] });
+    const moved = tool.pointer({ ...move(32, 8), point: [32, 8, 64] });
+    expect(moved.commands).toHaveLength(1);
   });
 });

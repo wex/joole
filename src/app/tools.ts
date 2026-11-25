@@ -21,6 +21,8 @@ import { DEFAULT_TEXTURE } from '@game/q2/index';
 import { createTransformCommand } from './transformCommands';
 import { clipSelectionPatch } from './csg';
 import { clipPlaneFromPoints } from '@core/geom/csg';
+import { moveVertices } from '@core/geom/vertexEdit';
+import { extractWireframe } from '@core/geom/brush';
 
 export type ToolView = PickAxis | '3d';
 
@@ -44,6 +46,8 @@ export interface ToolOutput {
   readonly commands: Command[];
   readonly selection?: ReadonlySet<Id>;
   readonly preview?: readonly PreviewSegment[];
+  /** Rejected-edit segments, drawn dashed in `vp-invalid`. */
+  readonly invalid?: readonly PreviewSegment[];
 }
 
 function boxSegments(min: Vec3, max: Vec3): PreviewSegment[] {
@@ -341,6 +345,253 @@ export class ClipTool {
       selection: new Set(result.ids),
       preview: [],
     };
+  }
+}
+
+export type VertexSubmode = 'vertex' | 'edge' | 'face';
+
+type VertexDrag = {
+  readonly brush: Id;
+  positions: Vec3[];
+  readonly kind: VertexSubmode;
+  readonly key: string;
+  last: Vec3;
+  view: ToolView;
+};
+
+/** Splits a segment into dash-length pieces for the invalid-edit preview. */
+export function dashedSegment(a: Vec3, b: Vec3, dash = 4): PreviewSegment[] {
+  const length = Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2]);
+  if (length <= 1e-9) return [];
+  const count = Math.max(1, Math.floor(length / (dash * 2)));
+  const out: PreviewSegment[] = [];
+  for (let i = 0; i < count; i++) {
+    const t0 = (i * 2) / (count * 2);
+    const t1 = Math.min(1, (i * 2 + 1) / (count * 2));
+    out.push([
+      [a[0] + (b[0] - a[0]) * t0, a[1] + (b[1] - a[1]) * t0, a[2] + (b[2] - a[2]) * t0],
+      [a[0] + (b[0] - a[0]) * t1, a[1] + (b[1] - a[1]) * t1, a[2] + (b[2] - a[2]) * t1],
+    ]);
+  }
+  return out;
+}
+
+function segmentDistance(point: Vec3, a: Vec3, b: Vec3, axes: readonly [number, number]): number {
+  const pa = [point[axes[0]]! - a[axes[0]]!, point[axes[1]]! - a[axes[1]]!];
+  const ba = [b[axes[0]]! - a[axes[0]]!, b[axes[1]]! - a[axes[1]]!];
+  const len2 = ba[0]! * ba[0]! + ba[1]! * ba[1]!;
+  const t = len2 < 1e-12 ? 0 : Math.max(0, Math.min(1, (pa[0]! * ba[0]! + pa[1]! * ba[1]!) / len2));
+  return Math.hypot(pa[0]! - ba[0]! * t, pa[1]! - ba[1]! * t);
+}
+
+function cross3(center: Vec3, size: number): PreviewSegment[] {
+  return [
+    [
+      [center[0] - size, center[1], center[2]],
+      [center[0] + size, center[1], center[2]],
+    ],
+    [
+      [center[0], center[1] - size, center[2]],
+      [center[0], center[1] + size, center[2]],
+    ],
+    [
+      [center[0], center[1], center[2] - size],
+      [center[0], center[1], center[2] + size],
+    ],
+  ];
+}
+
+/**
+ * The vertex/edge/face editing tool. V toggles between vertex and edge
+ * submodes; F is the face submode. Dragging a handle of a selected brush
+ * recomputes the touching planes through `moveVertices`; a rejected edit
+ * applies nothing and shows the drag as dashed `vp-invalid` segments.
+ */
+export class VertexTool {
+  submode: VertexSubmode = 'vertex';
+  private drag: VertexDrag | null = null;
+  private serial = 0;
+
+  constructor(
+    private readonly getDocument: () => Readonly<MapDocument>,
+    private readonly gridSize: () => number,
+    private readonly getSelection: () => ReadonlySet<Id>,
+  ) {}
+
+  toggleVertexEdge(): void {
+    this.submode = this.submode === 'edge' ? 'vertex' : 'edge';
+  }
+
+  cancel(): void {
+    this.drag = null;
+  }
+
+  private brushAt(id: Id) {
+    const node = this.getDocument().nodes.get(id);
+    return node?.kind === 'brush' ? node : null;
+  }
+
+  /** Handle positions of the selected brushes for the current submode. */
+  handles(): { brush: Id; positions: Vec3[]; kind: VertexSubmode }[] {
+    const out: { brush: Id; positions: Vec3[]; kind: VertexSubmode }[] = [];
+    for (const id of this.getSelection()) {
+      const brush = this.brushAt(id);
+      if (!brush) continue;
+      const analysis = analyzeBrush(brush);
+      if (this.submode === 'vertex') {
+        for (const v of extractWireframe(analysis.polygons).vertices) {
+          out.push({ brush: id, positions: [v], kind: 'vertex' });
+        }
+      } else if (this.submode === 'edge') {
+        const wire = extractWireframe(analysis.polygons);
+        for (const [a, b] of wire.edges) {
+          out.push({ brush: id, positions: [wire.vertices[a]!, wire.vertices[b]!], kind: 'edge' });
+        }
+      } else {
+        for (const polygon of analysis.polygons) {
+          if (!polygon) continue;
+          const center: Vec3 = [0, 0, 0];
+          for (const p of polygon) {
+            center[0] += p[0] / polygon.length;
+            center[1] += p[1] / polygon.length;
+            center[2] += p[2] / polygon.length;
+          }
+          out.push({ brush: id, positions: [...polygon], kind: 'face' });
+        }
+      }
+    }
+    return out;
+  }
+
+  /** Small crosses at every handle, drawn while the tool is idle. */
+  handlePreview(size: number): PreviewSegment[] {
+    const out: PreviewSegment[] = [];
+    for (const handle of this.handles()) {
+      const center: Vec3 = [0, 0, 0];
+      for (const p of handle.positions) {
+        center[0] += p[0] / handle.positions.length;
+        center[1] += p[1] / handle.positions.length;
+        center[2] += p[2] / handle.positions.length;
+      }
+      out.push(...cross3(center, size));
+    }
+    return out;
+  }
+
+  private pickHandle(
+    event: ToolPointerEvent,
+  ): { brush: Id; positions: Vec3[]; kind: VertexSubmode } | null {
+    if (event.view === '3d') return null;
+    const axes = planeAxes(event.view) as readonly [number, number];
+    let best: { brush: Id; positions: Vec3[]; kind: VertexSubmode } | null = null;
+    let bestDistance = Infinity;
+    for (const handle of this.handles()) {
+      let d: number;
+      if (handle.kind === 'vertex') {
+        const v = handle.positions[0]!;
+        d = Math.hypot(v[axes[0]]! - event.point[axes[0]]!, v[axes[1]]! - event.point[axes[1]]!);
+      } else if (handle.kind === 'edge') {
+        d = segmentDistance(event.point, handle.positions[0]!, handle.positions[1]!, axes);
+      } else {
+        const center: Vec3 = [0, 0, 0];
+        for (const p of handle.positions) {
+          center[0] += p[0] / handle.positions.length;
+          center[1] += p[1] / handle.positions.length;
+          center[2] += p[2] / handle.positions.length;
+        }
+        d = Math.hypot(
+          center[axes[0]]! - event.point[axes[0]]!,
+          center[axes[1]]! - event.point[axes[1]]!,
+        );
+      }
+      if (d < bestDistance) {
+        bestDistance = d;
+        best = handle;
+      }
+    }
+    return bestDistance <= event.tolerance ? best : null;
+  }
+
+  pointer(event: ToolPointerEvent): ToolOutput {
+    if (event.button !== 0 && event.type === 'down') return { commands: [] };
+    if (event.type === 'down') {
+      const handle = this.pickHandle(event);
+      if (!handle) return { commands: [], preview: this.handlePreview(event.tolerance) };
+      this.drag = {
+        brush: handle.brush,
+        positions: handle.positions.map((p) => [...p] as Vec3),
+        kind: handle.kind,
+        key: `vertex-${++this.serial}`,
+        last: event.point,
+        view: event.view,
+      };
+      return { commands: [] };
+    }
+    if (event.type === 'move') {
+      if (!this.drag) return { commands: [], preview: this.handlePreview(event.tolerance) };
+      if (event.view !== this.drag.view) return { commands: [] };
+      const axes = planeAxes(this.drag.view);
+      const grid = this.gridSize();
+      const delta: Vec3 = [0, 0, 0];
+      let nonzero = false;
+      for (const axis of axes) {
+        const amount = snap(event.point[axis]! - this.drag.last[axis]!, grid);
+        delta[axis] = amount;
+        nonzero ||= amount !== 0;
+      }
+      if (!nonzero) return { commands: [] };
+      const brush = this.brushAt(this.drag.brush);
+      if (!brush) {
+        this.drag = null;
+        return { commands: [] };
+      }
+      const result = moveVertices(brush, this.drag.positions, delta);
+      if (!result.ok) {
+        // Rejected: nothing is applied; the drag is shown dashed instead.
+        const preview: PreviewSegment[] = [];
+        for (const pos of this.drag.positions) {
+          preview.push(
+            ...dashedSegment(pos, [pos[0] + delta[0], pos[1] + delta[1], pos[2] + delta[2]]),
+          );
+        }
+        return { commands: [], invalid: preview };
+      }
+      this.drag.last = [
+        this.drag.last[0] + delta[0],
+        this.drag.last[1] + delta[1],
+        this.drag.last[2] + delta[2],
+      ];
+      this.drag.positions = this.drag.positions.map(
+        (p) => [p[0] + delta[0], p[1] + delta[1], p[2] + delta[2]] as Vec3,
+      );
+      const positions = this.drag.positions.map((p) => [...p] as Vec3);
+      const before = positions.map(
+        (p) => [p[0] - delta[0], p[1] - delta[1], p[2] - delta[2]] as Vec3,
+      );
+      return {
+        commands: [
+          {
+            label: `Move ${this.drag.kind}`,
+            mergeKey: this.drag.key,
+            run: (doc) => {
+              const node = doc.nodes.get(this.drag!.brush);
+              if (node?.kind !== 'brush') throw new Error('edited brush is gone');
+              const applied = moveVertices(node, before, delta);
+              if (!applied.ok) throw new Error(`Move ${this.drag!.kind} was rejected`);
+              const patch = {
+                before: new Map([[node.id, node]]),
+                after: new Map([[node.id, applied.value]]),
+                parentBefore: new Map(),
+                parentAfter: new Map(),
+              };
+              return patch;
+            },
+          },
+        ],
+      };
+    }
+    this.drag = null;
+    return { commands: [] };
   }
 }
 
