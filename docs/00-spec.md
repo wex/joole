@@ -443,7 +443,7 @@ The texture conversion proxy measured on the same machine was 72 ms for 512 synt
 | Drag input-to-frame latency, 5,000-brush map       |                       median 29 ms, p90 148 ms under SwiftShader |   < 8 ms | GPU-bound on this host: the frame cost is software rasterization of the full scene, not input or document work. Not evidence for or against the target per the CI/SwiftShader rule; reference-hardware verification remains part of the Gate 5 sign-off |
 | 3D orbit frame rate, 20,000 brushes                |                                        6.0 fps under SwiftShader | ≥ 60 fps | Same SwiftShader caveat as the P1.12 baseline; reference-hardware verification remains manual                                                                                                                                                           |
 
-No valid measurement shows a CPU-bound target at risk. The two GPU-bound metrics still need the reference-hardware pass at Gate 5.
+No valid measurement shows a CPU-bound target at risk. The two GPU-bound metrics still need the reference-hardware pass at Gate 5. The harness is run on the reference hardware with plain `pnpm measure` — the real GPU is the default; `JOOLE_MEASURE_SOFTWARE_GL=1` recreates the comparable development-machine numbers. On the WSL2 development machine Chromium cannot use the host GPU at all (verified 26.11.2026: every ANGLE/GL flag combination falls back to SwiftShader or loses WebGL2), so the reference-hardware pass cannot be taken there.
 
 **Testing:**
 

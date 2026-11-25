@@ -24,7 +24,14 @@ export default defineConfig({
       name: 'chromium',
       use: {
         ...devices['Desktop Chrome'],
-        launchOptions: { args: ['--use-angle=swiftshader'] },
+        // The harness exists for the reference-hardware GPU measurement, so
+        // the real GPU is the default. JOOLE_MEASURE_SOFTWARE_GL=1 forces
+        // SwiftShader for comparable development-machine runs, where no GPU
+        // is available (WSL2, CI runners).
+        launchOptions:
+          process.env.JOOLE_MEASURE_SOFTWARE_GL === '1'
+            ? { args: ['--use-angle=swiftshader'] }
+            : undefined,
       },
     },
   ],

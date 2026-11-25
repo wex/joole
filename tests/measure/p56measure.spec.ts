@@ -3,6 +3,8 @@ import path from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
 import { writeGeneratedBrushMap } from '../fixtures/generatedMap';
 
+const glNote = process.env.JOOLE_MEASURE_SOFTWARE_GL === '1' ? 'software GL' : 'hardware GL';
+
 const projectRoot = fileURLToPath(new URL('../../', import.meta.url));
 const fixtureDir = path.join(projectRoot, 'tests/fixtures');
 const gameDir = path.join(fixtureDir, 'game');
@@ -82,7 +84,7 @@ test('measures memory and orbit fps with a 20000-brush map', async ({
   await page.evaluate(() => (window as unknown as JooleWindow).joole!.whenIdle());
   const end = await joole(page);
   const fps = ((end.frames - start.frames) / 3).toFixed(1);
-  const note2 = `orbit fps 20k brushes (software GL): ${fps}`;
+  const note2 = `orbit fps 20k brushes (${glNote}): ${fps}`;
   testInfo.annotations.push({ type: 'measurement', description: note2 });
   console.log('P5.6 MEASUREMENT:', note2);
 });
@@ -134,7 +136,7 @@ test('measures drag latency on the 5000-brush map', async ({ page }, testInfo) =
   samples.sort((a, b) => a - b);
   const median = samples[Math.floor(samples.length / 2)] ?? -1;
   const p90 = samples[Math.floor(samples.length * 0.9)] ?? -1;
-  const note = `drag 5k brushes input-to-frame: median ${median.toFixed(2)} ms, p90 ${p90.toFixed(2)} ms (${samples.length}/12 samples, software GL)`;
+  const note = `drag 5k brushes input-to-frame: median ${median.toFixed(2)} ms, p90 ${p90.toFixed(2)} ms (${samples.length}/12 samples, ${glNote})`;
   testInfo.annotations.push({ type: 'measurement', description: note });
   console.log('P5.6 MEASUREMENT:', note);
   expect(samples.length).toBeGreaterThan(4);
