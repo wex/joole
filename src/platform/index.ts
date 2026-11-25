@@ -5,6 +5,7 @@ export * from './gameFiles';
 export * from './gameAccess';
 export * from './textureClient';
 export * from './textureCache';
+export { kvDirectory, openLocalDirectory, type KvBackend } from './localDirectory';
 export * from './projectStore';
 export { PrefabStore, type PrefabEntry } from './prefabStore';
 export { CompileClient } from './compileClient';

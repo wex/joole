@@ -1,28 +1,18 @@
-/** OPFS persistence for prefab .map snippets. */
+import { openLocalDirectory } from './localDirectory';
+import type { CacheDirectory } from './localDirectory';
+
+/** Local persistence for prefab .map snippets. */
 export interface PrefabEntry {
   readonly name: string;
   readonly text: string;
   readonly savedAt: number;
 }
 
-interface CacheDirectory {
-  getDirectoryHandle(name: string, options?: { create?: boolean }): Promise<CacheDirectory>;
-  getFileHandle(
-    name: string,
-    options?: { create?: boolean },
-  ): Promise<{
-    createWritable(): Promise<{ write(data: Uint8Array): Promise<void>; close(): Promise<void> }>;
-    getFile(): Promise<{ arrayBuffer(): Promise<ArrayBuffer> }>;
-  }>;
-  removeEntry(name: string): Promise<void>;
-  entries(): AsyncIterableIterator<[string, unknown]>;
-}
-
 export class PrefabStore {
   private constructor(private readonly dir: CacheDirectory) {}
 
-  static async openOpfs(): Promise<PrefabStore> {
-    const root = (await navigator.storage.getDirectory()) as unknown as CacheDirectory;
+  static async openLocal(): Promise<PrefabStore> {
+    const root = await openLocalDirectory();
     return new PrefabStore(await root.getDirectoryHandle('prefabs', { create: true }));
   }
 

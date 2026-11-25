@@ -1,22 +1,8 @@
 import type { ConvertedTexture } from '@core/types/index';
+import { openLocalDirectory } from './localDirectory';
+import type { CacheDirectory, CacheFile } from './localDirectory';
 
-/**
- * The minimal slice of the OPFS / File System Access directory API the cache
- * uses, structural so tests can substitute an in-memory directory in Node.
- */
-export interface CacheDirectory {
-  getDirectoryHandle(name: string, options?: { create?: boolean }): Promise<CacheDirectory>;
-  getFileHandle(name: string, options?: { create?: boolean }): Promise<CacheFile>;
-  removeEntry(name: string): Promise<void>;
-}
-
-export interface CacheFile {
-  getFile(): Promise<{ arrayBuffer(): Promise<ArrayBuffer> }>;
-  createWritable(): Promise<{
-    write(data: ArrayBuffer | Uint8Array): Promise<void>;
-    close(): Promise<void>;
-  }>;
-}
+export type { CacheDirectory, CacheFile } from './localDirectory';
 
 const CACHE_DIR = 'texture-cache';
 
@@ -43,10 +29,9 @@ export class TextureCache {
     return new TextureCache(await root.getDirectoryHandle(CACHE_DIR, { create: true }));
   }
 
-  /** The production entry point: the OPFS root of the origin. */
-  static async openOpfs(): Promise<TextureCache> {
-    const root = (await navigator.storage.getDirectory()) as unknown as CacheDirectory;
-    return TextureCache.open(root);
+  /** The production entry point: the origin's local storage, OPFS or the IndexedDB fallback. */
+  static async openLocal(): Promise<TextureCache> {
+    return TextureCache.open(await openLocalDirectory());
   }
 
   async get(key: string): Promise<ConvertedTexture | null> {
