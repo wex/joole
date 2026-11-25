@@ -27,7 +27,11 @@ export default defineConfig({
         // The harness exists for the reference-hardware GPU measurement, so
         // the real GPU is the default. JOOLE_MEASURE_SOFTWARE_GL=1 forces
         // SwiftShader for comparable development-machine runs, where no GPU
-        // is available (WSL2, CI runners).
+        // is available (WSL2, CI runners). The hardware pass runs headed:
+        // the default headless shell does not use the real GPU, so a
+        // headless hardware run would silently measure SwiftShader again.
+        // Do not cover or minimise the browser window while it runs.
+        headless: process.env.JOOLE_MEASURE_SOFTWARE_GL === '1',
         launchOptions:
           process.env.JOOLE_MEASURE_SOFTWARE_GL === '1'
             ? { args: ['--use-angle=swiftshader'] }

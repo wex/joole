@@ -5,6 +5,27 @@ import { writeGeneratedBrushMap } from '../fixtures/generatedMap';
 
 const glNote = process.env.JOOLE_MEASURE_SOFTWARE_GL === '1' ? 'software GL' : 'hardware GL';
 
+/** The measurement is only meaningful when the renderer string proves the
+    expected GL path; a hardware pass that silently fell back to SwiftShader
+    must fail instead of recording a worthless number. */
+async function probeGlRenderer(page: Page): Promise<string> {
+  const renderer = await page.evaluate(() => {
+    const gl = document.createElement('canvas').getContext('webgl2');
+    if (!gl) return 'no webgl2';
+    const ext = gl.getExtension('WEBGL_debug_renderer_info');
+    return ext
+      ? String(gl.getParameter(ext.UNMASKED_RENDERER_WEBGL))
+      : String(gl.getParameter(gl.RENDERER));
+  });
+  console.log('P5.6 GL renderer:', renderer);
+  if (glNote === 'hardware GL' && /swiftshader|no webgl2/i.test(renderer)) {
+    throw new Error(
+      `hardware-GL measurement but the renderer is "${renderer}" — refusing to record a meaningless number`,
+    );
+  }
+  return renderer;
+}
+
 const projectRoot = fileURLToPath(new URL('../../', import.meta.url));
 const fixtureDir = path.join(projectRoot, 'tests/fixtures');
 const gameDir = path.join(fixtureDir, 'game');
@@ -53,6 +74,7 @@ test('measures memory and orbit fps with a 20000-brush map', async ({
   };
   const memBefore = await heap();
 
+  await probeGlRenderer(page);
   await page.locator('[data-testid=map-input]').setInputFiles(bigMap);
   await expect(page.locator('[data-testid=properties-panel]')).toContainText('brushes-20000.map', {
     timeout: 60000,
@@ -96,6 +118,7 @@ test('measures drag latency on the 5000-brush map', async ({ page }, testInfo) =
   await page.goto('/');
   await page.locator('[data-testid=game-directory-input]').setInputFiles(gameDir);
   await expect(page.locator('[data-testid=texture-browser]')).toBeVisible();
+  await probeGlRenderer(page);
   await page.locator('[data-testid=map-input]').setInputFiles(mapFile);
   await page.evaluate(() => (window as unknown as JooleWindow).joole!.whenIdle());
 
