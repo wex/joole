@@ -22,7 +22,9 @@ export interface ToolbarProps {
   readonly onMirror: (axis: 0 | 1 | 2) => void;
   readonly onRotate90: () => void;
   readonly onGridSize: (size: number) => void;
+  readonly textureLock: boolean;
   readonly onToggleTheme: () => void;
+  readonly onToggleTextureLock: () => void;
   readonly onTool: (tool: ToolbarTool) => void;
   readonly onBrushPrimitive: (kind: PrimitiveKind, sides: number) => void;
 }
@@ -298,7 +300,14 @@ export function Toolbar(props: ToolbarProps) {
         />
         <output>{`Grid ${props.gridSize}`}</output>
       </span>
-      <button type="button" class={styles.iconButton} title="Tex Lock" aria-pressed="true" disabled>
+      <button
+        type="button"
+        class={styles.iconButton}
+        title="Texture lock"
+        aria-label="Texture lock"
+        aria-pressed={props.textureLock ? 'true' : 'false'}
+        onClick={() => props.onToggleTextureLock()}
+      >
         <Icon name="lock" />
       </button>
       <span class={styles.spacer} />

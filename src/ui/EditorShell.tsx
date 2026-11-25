@@ -109,6 +109,7 @@ export function EditorShell(props: EditorShellProps) {
   const [activeTool, setActiveTool] = createSignal(app.activeTool);
   const [brushPrimitive, setBrushPrimitive] = createSignal(app.brushPrimitive);
   const [brushSides, setBrushSides] = createSignal(app.brushSides);
+  const [textureLock, setTextureLock] = createSignal(app.textureLockEnabled);
   const [recoveryAvailable, setRecoveryAvailable] = createSignal(app.recoveryProject !== null);
 
   let viewportElement: HTMLDivElement | undefined;
@@ -631,6 +632,7 @@ export function EditorShell(props: EditorShellProps) {
         setActiveTool(app.activeTool);
         setBrushPrimitive(app.brushPrimitive);
         setBrushSides(app.brushSides);
+        setTextureLock(app.textureLockEnabled);
       } else if (event.type === 'recovery') {
         setRecoveryAvailable(app.recoveryProject !== null);
       }
@@ -673,6 +675,8 @@ export function EditorShell(props: EditorShellProps) {
         onRotate90={() => app.rotate90Selection()}
         onGridSize={(size) => app.setGridSize(size)}
         onToggleTheme={toggleTheme}
+        textureLock={textureLock()}
+        onToggleTextureLock={() => app.setTextureLock(!app.textureLockEnabled)}
         activeTool={activeTool()}
         brushPrimitive={brushPrimitive()}
         brushSides={brushSides()}

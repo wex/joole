@@ -134,6 +134,7 @@ export class EditorApp {
   private palette: Uint8Array | null = null;
   private textures = 0;
   private grid = 8;
+  private textureLock = false;
 
   constructor(options: EditorAppOptions) {
     this.inflate = options.inflate;
@@ -150,6 +151,12 @@ export class EditorApp {
     this.selectTool = new SelectTool(
       () => this.document,
       () => this.gridSize,
+      () => this.textureLock,
+      (errorTexels) =>
+        this.log(
+          'warning',
+          `Texture lock error ${errorTexels.toFixed(2)} texels exceeds the 0.5-texel limit on a face.`,
+        ),
     );
     this.brushTool = new BrushTool(
       () => this.document,
@@ -237,6 +244,10 @@ export class EditorApp {
   }
 
   log(level: LogLevel, text: string): void {
+    const last = this.entries[this.entries.length - 1];
+    if (last && last.level === level && last.text === text) {
+      return;
+    }
     this.entries = [...this.entries, { id: this.nextLogId++, level, text }].slice(-MAX_LOG_ENTRIES);
     this.emit({ type: 'log' });
   }
@@ -251,6 +262,19 @@ export class EditorApp {
       this.emit({ type: 'grid' });
     }
     return true;
+  }
+
+  get textureLockEnabled(): boolean {
+    return this.textureLock;
+  }
+
+  /** Texture lock toggle: textures stick to surfaces on move and rotate when on. */
+  setTextureLock(enabled: boolean): void {
+    if (enabled !== this.textureLock) {
+      this.textureLock = enabled;
+      this.log('info', `Texture lock ${enabled ? 'on' : 'off'}.`);
+      this.emit({ type: 'tool' });
+    }
   }
 
   /** The `[` key behaviour: halve the grid, down to 1. */

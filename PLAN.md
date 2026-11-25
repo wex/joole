@@ -574,7 +574,7 @@ Goal: Qoole-level geometry operations, and textures that look exactly the same i
 - **Depends on:** P2.5, P2.7
 - **Done when:** the spec's behaviour is reproduced, including rejection.
 
-### [ ] P3.7 Texture lock (`core/geom`)
+### [x] P3.7 Texture lock (`core/geom`)
 
 - **Goal:** keep textures in place while brushes are moved and rotated.
 - **Scope:**

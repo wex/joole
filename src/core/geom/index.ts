@@ -11,3 +11,4 @@ export * from './transform';
 export * from './primitives';
 export * from './csg';
 export * from './vertexEdit';
+export * from './texLock';

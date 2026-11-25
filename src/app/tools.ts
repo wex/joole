@@ -613,6 +613,8 @@ export class SelectTool {
   constructor(
     private readonly getDocument: () => Readonly<MapDocument>,
     gridSize: number | (() => number) = 8,
+    private readonly textureLock: () => boolean = () => false,
+    private readonly onLockWarning: (errorTexels: number) => void = () => {},
   ) {
     this.gridSize = typeof gridSize === 'function' ? gridSize : () => gridSize;
     this.doc = getDocument();
@@ -796,12 +798,11 @@ export class SelectTool {
       ];
       return {
         commands: [
-          createTransformCommand(
-            'Move selection',
-            [...this.selected],
-            mat4Translation(delta),
-            this.mode.key,
-          ),
+          createTransformCommand('Move selection', [...this.selected], mat4Translation(delta), {
+            mergeKey: this.mode.key,
+            textureLock: this.textureLock(),
+            onLockWarning: this.onLockWarning,
+          }),
         ],
       };
     }
@@ -827,7 +828,11 @@ export class SelectTool {
             'Rotate selection',
             [...this.selected],
             around(c, rotationFor(this.mode.view, degrees)),
-            this.mode.key,
+            {
+              mergeKey: this.mode.key,
+              textureLock: this.textureLock(),
+              onLockWarning: this.onLockWarning,
+            },
           ),
         ],
       };
@@ -852,7 +857,7 @@ export class SelectTool {
             'Scale selection',
             [...this.selected],
             around(this.mode.anchor, mat4Scaling(factors)),
-            this.mode.key,
+            { mergeKey: this.mode.key },
           ),
         ],
       };

@@ -290,3 +290,83 @@ describe('EditorApp', () => {
     expect(app.document.nodes.size).toBe(2);
   });
 });
+
+describe('texture lock', () => {
+  it('move with lock on keeps textures anchored and produces integer parameters', () => {
+    const { app } = makeApp();
+    const target = { ...makeBox([0, 0, 0], [64, 64, 64]), id: 'target' };
+    app.executeCommand({
+      label: 'Add brush',
+      run: (doc) => addNodePatch(doc, doc.worldspawn, target),
+    });
+    app.setSelection(['target']);
+    app.setTextureLock(true);
+    expect(app.textureLockEnabled).toBe(true);
+    const before = app.document.nodes.get('target') as BrushNode;
+    app.selectPointer({
+      type: 'down',
+      button: 0,
+      view: 'xy',
+      point: [32, 32, 0],
+      tolerance: 4,
+      shift: false,
+      ctrl: false,
+    });
+    const output = app.selectPointer({
+      type: 'move',
+      button: 0,
+      view: 'xy',
+      point: [48, 32, 0],
+      tolerance: 4,
+      shift: false,
+      ctrl: false,
+    });
+    expect(output.commands.length).toBeGreaterThan(0);
+    const after = app.document.nodes.get('target') as BrushNode;
+    // Texture parameters changed to compensate the move on faces whose
+    // texture axis has a component along the move direction.
+    const changed = after.faces.some(
+      (face, i) =>
+        face.tex.offset[0] !== before.faces[i]!.tex.offset[0] ||
+        face.tex.offset[1] !== before.faces[i]!.tex.offset[1],
+    );
+    expect(changed).toBe(true);
+    for (const face of after.faces) {
+      expect(Number.isInteger(face.tex.offset[0])).toBe(true);
+      expect(Number.isInteger(face.tex.offset[1])).toBe(true);
+    }
+    expect(app.undo()).toBe(true);
+  });
+
+  it('move with lock off leaves texture parameters unchanged', () => {
+    const { app } = makeApp();
+    const target = { ...makeBox([0, 0, 0], [64, 64, 64]), id: 'target' };
+    app.executeCommand({
+      label: 'Add brush',
+      run: (doc) => addNodePatch(doc, doc.worldspawn, target),
+    });
+    app.setSelection(['target']);
+    expect(app.textureLockEnabled).toBe(false);
+    const before = app.document.nodes.get('target') as BrushNode;
+    app.selectPointer({
+      type: 'down',
+      button: 0,
+      view: 'xy',
+      point: [32, 32, 0],
+      tolerance: 4,
+      shift: false,
+      ctrl: false,
+    });
+    app.selectPointer({
+      type: 'move',
+      button: 0,
+      view: 'xy',
+      point: [48, 32, 0],
+      tolerance: 4,
+      shift: false,
+      ctrl: false,
+    });
+    const after = app.document.nodes.get('target') as BrushNode;
+    expect(after.faces.map((f) => f.tex)).toEqual(before.faces.map((f) => f.tex));
+  });
+});
