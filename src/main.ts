@@ -140,6 +140,8 @@ declare global {
       camera: (view: '3d' | 'top' | 'front' | 'side') => ReturnType<Renderer['getCamera']>;
       viewRects: () => Record<string, { x: number; y: number; width: number; height: number }>;
       project: () => string;
+      texture: (name?: string) => string;
+      faces: () => number;
     };
   }
 }
@@ -151,6 +153,11 @@ window.joole = {
   camera: (view) => renderer.getCamera(view),
   viewRects: () => Object.fromEntries(renderer.viewRects()),
   project: () => app.projectText(),
+  texture: (name?: string) => {
+    if (name) app.setCurrentTexture(name);
+    return app.currentTextureName;
+  },
+  faces: () => app.faceSelectionCount,
 };
 
 mountEditorShell({ app, renderer, canvas }, root);

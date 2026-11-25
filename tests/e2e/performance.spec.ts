@@ -30,9 +30,7 @@ test('opens a generated 5000-brush map within the performance budget', async ({
   await page.goto('/');
   await expect(page.locator('[data-testid=editor-shell]')).toBeVisible();
   await page.locator('[data-testid=game-directory-input]').setInputFiles(gameDir);
-  await expect(page.locator('[data-testid=texture-placeholder]')).toContainText(
-    '1 textures indexed',
-  );
+  await expect(page.locator('[data-testid=texture-browser]')).toBeVisible();
   await page.evaluate(() => (window as unknown as JooleWindow).joole!.whenIdle());
 
   const start = performance.now();

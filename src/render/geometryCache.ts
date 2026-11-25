@@ -22,6 +22,7 @@ import { unionAabb, type Aabb } from './camera';
 /** Bits of a node's byte in the state texture, read by the shaders. */
 export const STATE_SELECTED = 1;
 export const STATE_ENTITY = 2;
+export const STATE_INVALID = 4;
 
 /** The state texture is this many texels wide, one byte per node index. */
 const STATE_WIDTH = 1024;
@@ -163,8 +164,12 @@ export class GeometryCache {
   private nextIndex = 1;
   private selected = new Set<Id>();
   private toolSegments: readonly LineSegment[] = [];
+  private invalidSegments: readonly LineSegment[] = [];
+  private readonly invalidIndex: number;
 
   constructor(private readonly gl: WebGL2RenderingContext) {
+    this.invalidIndex = this.takeIndex();
+    this.state[this.invalidIndex] = STATE_SELECTED | STATE_INVALID;
     this.cornerBuffer = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, this.cornerBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([0, -1, 0, 1, 1, -1, 1, 1]), gl.STATIC_DRAW);
@@ -224,8 +229,9 @@ export class GeometryCache {
   }
 
   /** Replaces the transient editing preview: brush ghosts and drag rectangles. */
-  setToolPreview(segments: readonly LineSegment[]): void {
+  setToolPreview(segments: readonly LineSegment[], invalid: readonly LineSegment[] = []): void {
     this.toolSegments = segments;
+    this.invalidSegments = invalid;
     this.rebuildOverlay();
   }
 
@@ -260,6 +266,15 @@ export class GeometryCache {
       this.lines.remove('__overlay');
     } else {
       this.lines.write('__overlay', writeLines(segments, 0), segments.length);
+    }
+    if (this.invalidSegments.length === 0) {
+      this.lines.remove('__overlayInvalid');
+    } else {
+      this.lines.write(
+        '__overlayInvalid',
+        writeLines(this.invalidSegments, this.invalidIndex),
+        this.invalidSegments.length,
+      );
     }
     this.state[0] = STATE_SELECTED;
     this.stateDirty = true;

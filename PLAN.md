@@ -520,7 +520,7 @@ Goal: editing through commands with unlimited undo, project files and autosave, 
 
 Goal: Qoole-level geometry operations, and textures that look exactly the same in the editor and in the game.
 
-### [ ] P3.1 CSG subtract (`core/geom`, `app`)
+### [x] P3.1 CSG subtract (`core/geom`, `app`)
 
 - **Goal:** implement the spec's subtract algorithm.
 - **Scope:** each target is split by every plane of the cutter: the part outside the plane becomes a new brush, and the part inside continues to the next plane, until what is left inside is discarded. New faces get the cutter's texture. The result is valid brushes or an error. Exposed as a command and a menu item.
@@ -530,14 +530,14 @@ Goal: Qoole-level geometry operations, and textures that look exactly the same i
 - **Depends on:** P2.1
 - **Done when:** the properties and the benchmark pass.
 
-### [ ] P3.2 CSG intersect ⇄
+### [x] P3.2 CSG intersect ⇄
 
 - **Goal:** merge brush plane sets and drop redundant faces.
 - **Tests:** properties (the result is contained in every input, and is idempotent).
 - **Depends on:** P1.2, P2.1
 - **Done when:** the properties pass.
 
-### [ ] P3.3 Hollow, inward and outward
+### [x] P3.3 Hollow, inward and outward
 
 - **Goal:** turn a brush into a shell with thickness d (8 by default).
 - **Scope:** the original minus a copy with every plane moved inwards by d; the outward variant works the other way. Non-axis-aligned planes produce non-integer points, which is acceptable because P1.6 handles export.
@@ -545,7 +545,7 @@ Goal: Qoole-level geometry operations, and textures that look exactly the same i
 - **Depends on:** P3.1
 - **Done when:** both directions work, and the result passes the compiler test.
 
-### [ ] P3.4 Plane clip and Clip tool (C)
+### [x] P3.4 Plane clip and Clip tool (C)
 
 - **Goal:** cut brushes with a plane given in a 2D view.
 - **Scope:** the plane is defined by two points plus the view's depth axis, with modes front, back or both. In the tool, Enter applies the clip and Tab switches which side is kept.
@@ -553,14 +553,14 @@ Goal: Qoole-level geometry operations, and textures that look exactly the same i
 - **Depends on:** P2.5
 - **Done when:** the tool works in every 2D view.
 
-### [ ] P3.5 Mirror, flip and rotate 90° ⇄
+### [x] P3.5 Mirror, flip and rotate 90° ⇄
 
 - **Goal:** mirror on X, Y or Z with each face's point order reversed so normals still point outwards, and rotate by 90°.
 - **Tests:** properties (validity, and mirroring twice gives the identity).
 - **Depends on:** P2.4
 - **Done when:** the commands and menu items exist.
 
-### [ ] P3.6 Vertex, edge and face editing (V, F)
+### [x] P3.6 Vertex, edge and face editing (V, F)
 
 - **Goal:** edit the derived elements of a brush.
 - **Scope:**
@@ -574,7 +574,7 @@ Goal: Qoole-level geometry operations, and textures that look exactly the same i
 - **Depends on:** P2.5, P2.7
 - **Done when:** the spec's behaviour is reproduced, including rejection.
 
-### [ ] P3.7 Texture lock (`core/geom`)
+### [x] P3.7 Texture lock (`core/geom`)
 
 - **Goal:** keep textures in place while brushes are moved and rotated.
 - **Scope:**
@@ -586,7 +586,7 @@ Goal: Qoole-level geometry operations, and textures that look exactly the same i
 - **Depends on:** P1.10 (`texAxes`), P2.4
 - **Done when:** transforms with lock on behave as the spec describes.
 
-### [ ] P3.8 Texture tools (T)
+### [x] P3.8 Texture tools (T)
 
 - **Goal:** Qoole-level texture work.
 - **Scope:**
@@ -599,7 +599,7 @@ Goal: Qoole-level geometry operations, and textures that look exactly the same i
 - **Depends on:** P3.7, P2.5
 - **Done when:** all the spec's texture tools exist.
 
-### [ ] P3.9 Texture browser (`ui`)
+### [x] P3.9 Texture browser (`ui`)
 
 - **Goal:** find and choose textures quickly.
 - **Scope:** implements the design system's `TextureBrowser`. A folder tree (`textures/e1u1` …), search by name, an in-use filter, previews with sizes, the mod's textures as their own root with source markers, lazy loading, and a virtualised grid.
@@ -607,7 +607,7 @@ Goal: Qoole-level geometry operations, and textures that look exactly the same i
 - **Depends on:** P1.8, P1.9
 - **Done when:** the full vanilla texture set browses smoothly.
 
-### [ ] P3.10 Surface and content flags panel (`ui`, `app`)
+### [x] P3.10 Surface and content flags panel (`ui`, `app`)
 
 - **Goal:** edit each face's flags, contents and value.
 - **Scope:** checkboxes from the `game/q2` constants, an indicator when a value differs from the `.wal` default, and edits that set `attribsInFile` where needed. The properties panel also shows the selection's texture with the design system's `ObjectPreview` (one texture, or "Multiple textures").
@@ -615,14 +615,14 @@ Goal: Qoole-level geometry operations, and textures that look exactly the same i
 - **Depends on:** P3.8
 - **Done when:** changes appear in the exported `.map` and the compiled `.bsp`.
 
-### [ ] P3.11 Editor and game UV parity test
+### [x] P3.11 Editor and game UV parity test
 
 - **Goal:** prove the gate's "textures look the same in the editor and in the game".
 - **Scope:** a test that compiles fixture maps with qbsp3.wasm, parses the texinfo lump of the `.bsp` (`ext/Quake-2/qcommon/qfiles.h`), and compares its `vecs` with `texAxes` for every face, within a small epsilon. The fixtures include decimal offsets and rotations so that the truncation rule is exercised.
 - **Depends on:** P2.11, P3.7
 - **Done when:** the test is green in CI, and one map has been checked in q2pro by hand, with the result recorded.
 
-**[ ] Gate 3:** every CSG property test passes, and textures match in the editor and the game (P3.11 plus the manual in-game check).
+**[x] Gate 3:** every CSG property test passes, and textures match in the editor and the game (P3.11 plus the manual in-game check, verified in q2pro on 25.11.2026).
 
 ---
 

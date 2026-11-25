@@ -18,6 +18,7 @@ import { Icon } from './Icon';
 import { LogPanel } from './LogPanel';
 import { PanelTabs, type BottomTab } from './PanelTabs';
 import { PropertiesPanel } from './PropertiesPanel';
+import { TextureBrowser } from './TextureBrowser';
 import { Toolbar } from './Toolbar';
 import styles from './EditorShell.module.css';
 
@@ -91,7 +92,8 @@ export function EditorShell(props: EditorShellProps) {
   const canvasElement = untrack(() => props.canvas);
   const [mapName, setMapName] = createSignal(app.mapName);
   const [gameOpen, setGameOpen] = createSignal(app.gameOpen);
-  const [textureCount, setTextureCount] = createSignal(app.textureCount);
+  const [textureList, setTextureList] = createSignal(app.textureList());
+  const [currentTexture, setCurrentTexture] = createSignal(app.currentTextureName);
   const [gridSize, setGridSize] = createSignal(app.gridSize);
   const [entries, setEntries] = createSignal<readonly LogEntry[]>(app.logEntries());
   const [activeView, setActiveView] = createSignal<ViewId>('3d');
@@ -109,7 +111,9 @@ export function EditorShell(props: EditorShellProps) {
   const [activeTool, setActiveTool] = createSignal(app.activeTool);
   const [brushPrimitive, setBrushPrimitive] = createSignal(app.brushPrimitive);
   const [brushSides, setBrushSides] = createSignal(app.brushSides);
+  const [textureLock, setTextureLock] = createSignal(app.textureLockEnabled);
   const [recoveryAvailable, setRecoveryAvailable] = createSignal(app.recoveryProject !== null);
+  const [panelVersion, setPanelVersion] = createSignal(0);
 
   let viewportElement: HTMLDivElement | undefined;
   let mainElement: HTMLDivElement | undefined;
@@ -347,7 +351,7 @@ export function EditorShell(props: EditorShellProps) {
         return false;
       }
       const output = app.selectPointer(toolEvent(hit, type, event));
-      renderer.setToolPreview(output.preview ?? []);
+      renderer.setToolPreview(output.preview ?? [], output.invalid ?? []);
       return true;
     };
 
@@ -503,6 +507,28 @@ export function EditorShell(props: EditorShellProps) {
       if (isEditableTarget(event.target)) {
         return;
       }
+      if (
+        app.activeTool === 'clip' &&
+        (event.key === 'Enter' || event.key === 'Tab' || event.key === 'Escape') &&
+        !(pointerLocked || rightFly)
+      ) {
+        event.preventDefault();
+        const output = app.clipKey(event.key);
+        renderer.setToolPreview(output.preview ?? [], output.invalid ?? []);
+        return;
+      }
+      if (
+        app.activeTool === 'texture' &&
+        (event.key === 'ArrowLeft' ||
+          event.key === 'ArrowRight' ||
+          event.key === 'ArrowUp' ||
+          event.key === 'ArrowDown')
+      ) {
+        if (app.textureArrow(event.key, event.shiftKey)) {
+          event.preventDefault();
+          return;
+        }
+      }
       const action = shortcutAction({
         key: event.key,
         ctrl: event.ctrlKey || event.metaKey,
@@ -536,9 +562,29 @@ export function EditorShell(props: EditorShellProps) {
         stepGrid(action === 'grid-down' ? -1 : 1);
         return;
       }
-      if ((action === 'tool-select' || action === 'tool-brush') && !(pointerLocked || rightFly)) {
+      if (
+        (action === 'tool-select' ||
+          action === 'tool-brush' ||
+          action === 'tool-clip' ||
+          action === 'tool-vertex-edge' ||
+          action === 'tool-face' ||
+          action === 'tool-texture') &&
+        !(pointerLocked || rightFly)
+      ) {
         event.preventDefault();
-        app.setToolMode(action === 'tool-select' ? 'select' : 'brush');
+        app.setToolMode(
+          action === 'tool-select'
+            ? 'select'
+            : action === 'tool-brush'
+              ? 'brush'
+              : action === 'tool-clip'
+                ? 'clip'
+                : action === 'tool-vertex-edge'
+                  ? 'vertex'
+                  : action === 'tool-face'
+                    ? 'face'
+                    : 'texture',
+        );
         return;
       }
       if (action && action.startsWith('tool-') && !(pointerLocked || rightFly)) {
@@ -594,16 +640,28 @@ export function EditorShell(props: EditorShellProps) {
         }
       } else if (event.type === 'game') {
         setGameOpen(app.gameOpen);
-        setTextureCount(app.textureCount);
+        setTextureList(app.textureList());
       } else if (event.type === 'log') {
         setEntries(app.logEntries());
       } else if (event.type === 'grid') {
         setGridSize(app.gridSize);
       } else if (event.type === 'tool') {
+        renderer.setToolPreview([]);
         setActiveTool(app.activeTool);
         setBrushPrimitive(app.brushPrimitive);
         setBrushSides(app.brushSides);
-      } else if (event.type === 'recovery') {
+        setTextureLock(app.textureLockEnabled);
+        setCurrentTexture(app.currentTextureName);
+      }
+      if (
+        event.type === 'document' ||
+        event.type === 'selection' ||
+        event.type === 'tool' ||
+        event.type === 'game'
+      ) {
+        setPanelVersion((v) => v + 1);
+      }
+      if (event.type === 'recovery') {
         setRecoveryAvailable(app.recoveryProject !== null);
       }
     });
@@ -637,8 +695,20 @@ export function EditorShell(props: EditorShellProps) {
         onOpenSinglePak={() => pakInput?.click()}
         onOpenMap={chooseMap}
         onExportMap={() => void app.exportMap()}
+        onCsgSubtract={() => app.csgSubtract()}
+        onCsgIntersect={() => app.csgIntersect()}
+        onHollow={(direction) => app.hollowSelection(direction)}
+        onFlip={(axis) => app.flipSelection(axis)}
+        onMirror={(axis) => app.mirrorSelection(axis)}
+        onRotate90={() => app.rotate90Selection()}
+        onApplyTexture={() => app.applyCurrentTexture()}
+        onFitTexture={() => app.fitTextures()}
+        onResetTexture={() => app.resetTextures()}
+        onJustifyTexture={(edge) => app.justifyTextures(edge)}
         onGridSize={(size) => app.setGridSize(size)}
         onToggleTheme={toggleTheme}
+        textureLock={textureLock()}
+        onToggleTextureLock={() => app.setTextureLock(!app.textureLockEnabled)}
         activeTool={activeTool()}
         brushPrimitive={brushPrimitive()}
         brushSides={brushSides()}
@@ -760,11 +830,22 @@ export function EditorShell(props: EditorShellProps) {
             <Show
               when={bottomTab() === 'log'}
               fallback={
-                <div class={styles.texturePlaceholder} data-testid="texture-placeholder">
-                  {gameOpen()
-                    ? `Texture browser: ${textureCount()} textures indexed.`
-                    : 'Open a game folder to index textures.'}
-                </div>
+                <Show
+                  when={gameOpen()}
+                  fallback={
+                    <div class={styles.texturePlaceholder} data-testid="texture-placeholder">
+                      Open a game folder to index textures.
+                    </div>
+                  }
+                >
+                  <TextureBrowser
+                    entries={textureList()}
+                    inUse={() => app.texturesInUse()}
+                    selected={() => currentTexture()}
+                    onSelect={(name) => app.setCurrentTexture(name)}
+                    load={(name) => app.loadTexture(name)}
+                  />
+                </Show>
               }
             >
               <LogPanel entries={entries()} />
@@ -781,7 +862,12 @@ export function EditorShell(props: EditorShellProps) {
           onPointerDown={(event) => beginSplitterDrag(event, 'vertical')}
           onKeyDown={(event) => splitterKey(event, 'vertical')}
         />
-        <PropertiesPanel mapName={mapName()} gameOpen={gameOpen()} />
+        <PropertiesPanel
+          app={app}
+          mapName={mapName()}
+          gameOpen={gameOpen()}
+          version={panelVersion}
+        />
       </div>
       <Show when={recoveryAvailable()}>
         <div

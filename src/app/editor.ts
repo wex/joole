@@ -1,5 +1,12 @@
 import { addNodePatch, createEmptyDocument, createId } from '@core/doc/index';
-import { parseMap, readPcxPalette, readProject, writeMap, writeProject } from '@core/formats/index';
+import {
+  parseMap,
+  readPcxPalette,
+  readProject,
+  readWalHeader,
+  writeMap,
+  writeProject,
+} from '@core/formats/index';
 import type {
   Command,
   ConvertedTexture,
@@ -8,12 +15,44 @@ import type {
   Patch,
   Vec3,
 } from '@core/types/index';
-import { PALETTE_PATH } from '@game/q2/index';
+import {
+  CONTENT_FLAG_BITS,
+  DEFAULT_TEXTURE,
+  PALETTE_PATH,
+  SURFACE_FLAG_BITS,
+} from '@game/q2/index';
 import type { GameFileEntry } from '@platform/index';
 import { CommandBus } from './commandBus';
 import { SelectionManager } from './selection';
 import { mapTextToPastePatch, removeSelectionPatch, selectionToMapText } from './clipboard';
-import { BrushTool, SelectTool, type ToolOutput, type ToolPointerEvent } from './tools';
+import { hollowSelectionPatch, intersectSelectionPatch, subtractSelectionPatch } from './csg';
+import {
+  readSurfaceState,
+  toggleBitPatch,
+  editSurfacePatch,
+  type SurfaceState,
+} from './surfaceProps';
+import {
+  allFacesOf,
+  applyTexturePatch,
+  fitTexturePatch,
+  justifyTexturePatch,
+  resetTexturePatch,
+  rotateTexturePatch,
+  shiftTexturePatch,
+  type FaceRef,
+  type JustifyEdge,
+} from './textureOps';
+import { createFlipCommand, createRotate90Command, mirrorSelectionPatch } from './mirrorCommands';
+import {
+  BrushTool,
+  ClipTool,
+  SelectTool,
+  TextureTool,
+  VertexTool,
+  type ToolOutput,
+  type ToolPointerEvent,
+} from './tools';
 import type { PrimitiveKind } from '@core/geom/index';
 import { entriesFromFileList, entriesFromSinglePak, openGameVfs } from '@platform/index';
 
@@ -74,7 +113,7 @@ export type EditorEvent =
   | { readonly type: 'recovery' };
 
 export type EditorListener = (event: EditorEvent) => void;
-export type EditorToolMode = 'select' | 'brush';
+export type EditorToolMode = 'select' | 'brush' | 'clip' | 'vertex' | 'face' | 'texture';
 
 const MAX_LOG_ENTRIES = 500;
 
@@ -117,12 +156,20 @@ export class EditorApp {
   private readonly selectionManager: SelectionManager;
   private readonly selectTool: SelectTool;
   private readonly brushTool: BrushTool;
+  private readonly clipTool: ClipTool;
+  private readonly vertexTool: VertexTool;
+  private readonly textureTool: TextureTool;
   private toolMode: EditorToolMode = 'select';
   private map: string | null = null;
   private vfs: Awaited<ReturnType<typeof openGameVfs>> | null = null;
   private palette: Uint8Array | null = null;
   private textures = 0;
   private grid = 8;
+  private textureLock = false;
+  private currentTexture = DEFAULT_TEXTURE;
+  private textureDims = new Map<string, readonly [number, number]>();
+  private walAttribs = new Map<string, { flags: number; contents: number; value: number }>();
+  private walAttribsPending = new Set<string>();
 
   constructor(options: EditorAppOptions) {
     this.inflate = options.inflate;
@@ -139,8 +186,27 @@ export class EditorApp {
     this.selectTool = new SelectTool(
       () => this.document,
       () => this.gridSize,
+      () => this.textureLock,
+      (errorTexels) =>
+        this.log(
+          'warning',
+          `Texture lock error ${errorTexels.toFixed(2)} texels exceeds the 0.5-texel limit on a face.`,
+        ),
     );
     this.brushTool = new BrushTool(
+      () => this.document,
+      () => this.gridSize,
+    );
+    this.clipTool = new ClipTool(
+      () => this.document,
+      () => this.gridSize,
+    );
+    this.vertexTool = new VertexTool(
+      () => this.document,
+      () => this.gridSize,
+      () => this.selection,
+    );
+    this.textureTool = new TextureTool(
       () => this.document,
       () => this.gridSize,
     );
@@ -148,11 +214,13 @@ export class EditorApp {
       if (event.type !== 'history') {
         this.dirty = true;
         this.selectTool.applyPatch(event.document, event.patch);
+        this.textureTool.applyPatch(event.document, event.patch);
         this.emit({ type: 'document', patch: event.patch });
       }
     });
     this.selectionManager.subscribe(() => {
       this.selectTool.setSelection(this.selectionManager.selection);
+      this.clipTool.setSelection(this.selectionManager.selection);
       this.emit({ type: 'selection' });
     });
     this.log('info', 'Joole ready. Open a game folder and a map.');
@@ -176,6 +244,10 @@ export class EditorApp {
 
   get brushSides(): number {
     return this.brushTool.sides;
+  }
+
+  get vertexSubmode(): 'vertex' | 'edge' | 'face' {
+    return this.vertexTool.submode;
   }
 
   get mapName(): string | null {
@@ -212,6 +284,10 @@ export class EditorApp {
   }
 
   log(level: LogLevel, text: string): void {
+    const last = this.entries[this.entries.length - 1];
+    if (last && last.level === level && last.text === text) {
+      return;
+    }
     this.entries = [...this.entries, { id: this.nextLogId++, level, text }].slice(-MAX_LOG_ENTRIES);
     this.emit({ type: 'log' });
   }
@@ -226,6 +302,19 @@ export class EditorApp {
       this.emit({ type: 'grid' });
     }
     return true;
+  }
+
+  get textureLockEnabled(): boolean {
+    return this.textureLock;
+  }
+
+  /** Texture lock toggle: textures stick to surfaces on move and rotate when on. */
+  setTextureLock(enabled: boolean): void {
+    if (enabled !== this.textureLock) {
+      this.textureLock = enabled;
+      this.log('info', `Texture lock ${enabled ? 'on' : 'off'}.`);
+      this.emit({ type: 'tool' });
+    }
   }
 
   /** The `[` key behaviour: halve the grid, down to 1. */
@@ -306,6 +395,7 @@ export class EditorApp {
       this.bus.reset(doc);
       this.selectionManager.clear();
       this.selectTool.syncDocument(doc);
+      this.textureTool.syncDocument(doc);
       this.map = name;
       this.emit({ type: 'document' });
       this.log('ok', `Opened map ${name} (${plural(doc.nodes.size, 'node')}).`);
@@ -364,6 +454,115 @@ export class EditorApp {
     }
   }
 
+  /** Qoole semantics: selected brushes are cutters; overlapping unselected brushes are targets. */
+  csgSubtract(): boolean {
+    const result = subtractSelectionPatch(this.document, this.selection);
+    if (!result) {
+      this.log('warning', 'CSG Subtract needs a selected cutter overlapping another brush.');
+      return false;
+    }
+    try {
+      this.executeCommand({ label: 'CSG Subtract', run: () => result.patch });
+      this.setSelection(result.ids);
+      this.log(
+        'ok',
+        `CSG Subtract cut ${plural(result.targets, 'target')} into ${plural(result.ids.length, 'fragment')}.`,
+      );
+      return true;
+    } catch (error) {
+      this.log('warning', `CSG Subtract failed: ${errorText(error)}`);
+      return false;
+    }
+  }
+
+  /** Flips the selected brushes in place across the axis plane through their center. */
+  flipSelection(axis: 0 | 1 | 2): boolean {
+    if (this.selection.size === 0) {
+      this.log('warning', 'Flip needs a selection.');
+      return false;
+    }
+    try {
+      this.executeCommand(createFlipCommand([...this.selection], axis));
+      this.log('ok', `Flipped the selection on ${'XYZ'[axis]}.`);
+      return true;
+    } catch (error) {
+      this.log('warning', `Flip failed: ${errorText(error)}`);
+      return false;
+    }
+  }
+
+  /** Duplicates the selection and flips the copies; the copies become selected. */
+  mirrorSelection(axis: 0 | 1 | 2): boolean {
+    const result = mirrorSelectionPatch(this.document, this.selection, axis);
+    if (!result) {
+      this.log('warning', 'Mirror needs a selected brush.');
+      return false;
+    }
+    try {
+      this.executeCommand({ label: `Mirror ${'XYZ'[axis]}`, run: () => result.patch });
+      this.setSelection(result.ids);
+      this.log('ok', `Mirrored ${plural(result.targets, 'brush')} on ${'XYZ'[axis]}.`);
+      return true;
+    } catch (error) {
+      this.log('warning', `Mirror failed: ${errorText(error)}`);
+      return false;
+    }
+  }
+
+  /** Rotates the selection exactly 90° counterclockwise about Z through its center. */
+  rotate90Selection(): boolean {
+    if (this.selection.size === 0) {
+      this.log('warning', 'Rotate 90° needs a selection.');
+      return false;
+    }
+    try {
+      this.executeCommand(createRotate90Command([...this.selection]));
+      this.log('ok', 'Rotated the selection 90°.');
+      return true;
+    } catch (error) {
+      this.log('warning', `Rotate 90° failed: ${errorText(error)}`);
+      return false;
+    }
+  }
+
+  /** Replaces two or more selected brushes by their convex intersection. */
+  csgIntersect(): boolean {
+    const result = intersectSelectionPatch(this.document, this.selection);
+    if (!result) {
+      this.log('warning', 'CSG Intersect needs overlapping selected brushes with one parent.');
+      return false;
+    }
+    try {
+      this.executeCommand({ label: 'CSG Intersect', run: () => result.patch });
+      this.setSelection(result.ids);
+      this.log('ok', `CSG Intersect merged ${plural(result.targets, 'brush')}.`);
+      return true;
+    } catch (error) {
+      this.log('warning', `CSG Intersect failed: ${errorText(error)}`);
+      return false;
+    }
+  }
+
+  hollowSelection(direction: 'inward' | 'outward', thickness = 8): boolean {
+    const result = hollowSelectionPatch(this.document, this.selection, direction, thickness);
+    if (!result) {
+      this.log('warning', 'Hollow needs exactly one selected brush.');
+      return false;
+    }
+    try {
+      this.executeCommand({ label: `Hollow ${direction}`, run: () => result.patch });
+      this.setSelection(result.ids);
+      this.log(
+        'ok',
+        `Hollowed one brush ${direction} into ${plural(result.ids.length, 'fragment')}.`,
+      );
+      return true;
+    } catch (error) {
+      this.log('warning', `Hollow failed: ${errorText(error)}`);
+      return false;
+    }
+  }
+
   copySelectionText(): string | null {
     return selectionToMapText(this.document, this.selection);
   }
@@ -410,10 +609,23 @@ export class EditorApp {
 
   setToolMode(mode: EditorToolMode): void {
     if (mode === this.toolMode) {
+      // Pressing V again in vertex mode switches between vertex and edge editing.
+      if (mode === 'vertex') {
+        this.vertexTool.toggleVertexEdge();
+        this.emit({ type: 'tool' });
+      }
       return;
+    }
+    if (mode === 'face') {
+      this.vertexTool.submode = 'face';
+    } else if (mode === 'vertex' && this.vertexTool.submode === 'face') {
+      this.vertexTool.submode = 'vertex';
     }
     this.selectTool.cancel();
     this.brushTool.cancel();
+    this.clipTool.cancel();
+    this.vertexTool.cancel();
+    this.textureTool.cancel();
     this.toolMode = mode;
     this.emit({ type: 'tool' });
   }
@@ -430,8 +642,42 @@ export class EditorApp {
 
   /** Feeding a neutral pointer event through the active tool and applying its effects. */
   selectPointer(event: ToolPointerEvent): ToolOutput {
-    const tool = this.toolMode === 'brush' ? this.brushTool : this.selectTool;
+    const tool =
+      this.toolMode === 'brush'
+        ? this.brushTool
+        : this.toolMode === 'clip'
+          ? this.clipTool
+          : this.toolMode === 'vertex' || this.toolMode === 'face'
+            ? this.vertexTool
+            : this.toolMode === 'texture'
+              ? this.textureTool
+              : this.selectTool;
     const output = tool.pointer(event);
+    for (const command of output.commands) {
+      try {
+        this.executeCommand(command);
+      } catch (error) {
+        this.log('warning', error instanceof Error ? error.message : String(error));
+        break;
+      }
+    }
+    if (output.selection) {
+      this.setSelection(output.selection);
+    }
+    if (output.faces) {
+      this.emit({ type: 'tool' });
+    }
+    if (output.pickedTexture) {
+      this.currentTexture = output.pickedTexture;
+      this.log('info', `Picked texture ${output.pickedTexture}.`);
+      this.emit({ type: 'tool' });
+    }
+    return output;
+  }
+
+  /** Feeds Enter, Tab and Escape to the Clip tool without intercepting ordinary shortcuts. */
+  clipKey(key: string): ToolOutput {
+    const output = this.clipTool.key(key);
     for (const command of output.commands) {
       try {
         this.executeCommand(command);
@@ -504,6 +750,202 @@ export class EditorApp {
     return saved;
   }
 
+  /** The surface-attribute bit tables for the properties panel. */
+  readonly surfaceFlagBits = SURFACE_FLAG_BITS;
+  readonly contentFlagBits = CONTENT_FLAG_BITS;
+
+  /** The combined surface state of the texture tool's target faces, or null. */
+  surfaceState(): SurfaceState | null {
+    const faces = this.textureTargets();
+    if (faces.length === 0) return null;
+    return readSurfaceState(
+      this.document,
+      faces,
+      SURFACE_FLAG_BITS.map(([bit]) => bit),
+      CONTENT_FLAG_BITS.map(([bit]) => bit),
+    );
+  }
+
+  /** The distinct texture names of the target faces, for the ObjectPreview. */
+  selectionTextureNames(): readonly string[] {
+    const names = new Set<string>();
+    for (const ref of this.textureTargets()) {
+      const node = this.document.nodes.get(ref.brush);
+      if (node?.kind === 'brush') {
+        const face = node.faces[ref.face];
+        if (face) names.add(face.tex.name);
+      }
+    }
+    return [...names].sort();
+  }
+
+  /**
+   * The wal default attributes of a texture, or null when unknown. The first
+   * call starts loading; a 'game' event is emitted when they arrive.
+   */
+  walDefaultAttribs(name: string): { flags: number; contents: number; value: number } | null {
+    const cached = this.walAttribs.get(name);
+    if (cached) return cached;
+    if (!this.vfs || this.walAttribsPending.has(name)) return null;
+    this.walAttribsPending.add(name);
+    const hit = this.vfs.find(`textures/${name}.wal`);
+    if (!hit) return null;
+    void hit.read().then((bytes) => {
+      try {
+        const header = readWalHeader(new Uint8Array(bytes));
+        this.walAttribs.set(name, {
+          flags: header.flags,
+          contents: header.contents,
+          value: header.value,
+        });
+        this.emit({ type: 'game' });
+      } catch {
+        // An unreadable wal has no usable defaults; the panel hides the marker.
+      }
+    });
+    return null;
+  }
+
+  /** Toggles one surface or contents bit on the target faces, undoably. */
+  toggleSurfaceBit(field: 'flags' | 'contents', bit: number): boolean {
+    const faces = this.textureTargets();
+    if (faces.length === 0) {
+      this.log('info', 'No faces or brushes selected.');
+      return false;
+    }
+    const patch = toggleBitPatch(this.document, faces, field, bit);
+    if (!patch) return false;
+    this.executeCommand({
+      label: field === 'flags' ? 'Surface Flag' : 'Contents Flag',
+      run: () => patch,
+    });
+    return true;
+  }
+
+  /** Sets the light value of the target faces, undoably. */
+  setSurfaceValue(value: number): boolean {
+    if (!Number.isFinite(value)) return false;
+    const faces = this.textureTargets();
+    if (faces.length === 0) {
+      this.log('info', 'No faces or brushes selected.');
+      return false;
+    }
+    const patch = editSurfacePatch(this.document, faces, (tex) => ({
+      ...tex,
+      value: Math.round(value),
+    }));
+    if (!patch) return false;
+    this.executeCommand({ label: 'Surface Value', run: () => patch });
+    return true;
+  }
+
+  /** The face targets of the texture tools: picked faces, or whole selected brushes. */
+  textureTargets(): FaceRef[] {
+    const picked = this.textureTool.faceSelection;
+    if (picked.length > 0) {
+      return [...picked];
+    }
+    return allFacesOf(this.document, this.selection);
+  }
+
+  get faceSelectionCount(): number {
+    return this.textureTool.faceSelection.length;
+  }
+
+  get currentTextureName(): string {
+    return this.currentTexture;
+  }
+
+  setCurrentTexture(name: string): void {
+    if (!name) return;
+    this.currentTexture = name;
+    this.emit({ type: 'tool' });
+  }
+
+  clearFaceSelection(): void {
+    this.textureTool.clearFaceSelection();
+    this.emit({ type: 'tool' });
+  }
+
+  private textureSize(name: string): readonly [number, number] {
+    // Fit and justify need real texel dimensions; unloaded textures use the
+    // wal default of 64x64 until the renderer has converted them.
+    return this.textureDims.get(name) ?? [64, 64];
+  }
+
+  private editTextures(label: string, build: (faces: readonly FaceRef[]) => Patch | null): boolean {
+    const faces = this.textureTargets();
+    if (faces.length === 0) {
+      this.log('info', 'No faces or brushes selected.');
+      return false;
+    }
+    const patch = build(faces);
+    if (!patch) {
+      this.log('warning', 'Texture edit did not apply to the selection.');
+      return false;
+    }
+    this.executeCommand({ label, run: () => patch });
+    return true;
+  }
+
+  /** Applies the current texture to the selected faces or brushes. */
+  applyCurrentTexture(): boolean {
+    return this.editTextures('Apply Texture', (faces) =>
+      applyTexturePatch(this.document, faces, this.currentTexture),
+    );
+  }
+
+  /** Arrow-key texture shift: offsets move by the grid step in integer texels. */
+  shiftTextures(ds: number, dt: number): boolean {
+    return this.editTextures('Shift Texture', (faces) =>
+      shiftTexturePatch(this.document, faces, ds, dt),
+    );
+  }
+
+  rotateTextures(degrees: number): boolean {
+    return this.editTextures('Rotate Texture', (faces) =>
+      rotateTexturePatch(this.document, faces, degrees),
+    );
+  }
+
+  fitTextures(): boolean {
+    return this.editTextures('Fit Texture', (faces) => {
+      const [w, h] = this.textureSize(this.currentTexture);
+      return fitTexturePatch(this.document, faces, w, h);
+    });
+  }
+
+  justifyTextures(edge: JustifyEdge): boolean {
+    return this.editTextures('Justify Texture', (faces) => {
+      const [w, h] = this.textureSize(this.currentTexture);
+      return justifyTexturePatch(this.document, faces, edge, w, h);
+    });
+  }
+
+  resetTextures(): boolean {
+    return this.editTextures('Reset Texture', (faces) => resetTexturePatch(this.document, faces));
+  }
+
+  /**
+   * Arrow keys with the texture tool active. Plain arrows shift the texture
+   * by the grid step in the arrow direction (the texture follows the arrow);
+   * Shift+Left/Right rotates by the grid step in degrees.
+   */
+  textureArrow(key: string, shift: boolean): boolean {
+    const grid = this.gridSize;
+    if (shift && (key === 'ArrowLeft' || key === 'ArrowRight')) {
+      return this.rotateTextures(key === 'ArrowLeft' ? -grid : grid);
+    }
+    if (shift) return false;
+    // A positive shift moves the sampled texel forward, so the texture moves
+    // against the offset direction: right/up subtract the grid step.
+    if (key === 'ArrowLeft') return this.shiftTextures(grid, 0);
+    if (key === 'ArrowRight') return this.shiftTextures(-grid, 0);
+    if (key === 'ArrowUp') return this.shiftTextures(0, grid);
+    if (key === 'ArrowDown') return this.shiftTextures(0, -grid);
+    return false;
+  }
+
   async exportMap(): Promise<boolean> {
     if (!this.saveMapText) return false;
     const result = this.exportMapText();
@@ -518,6 +960,7 @@ export class EditorApp {
       this.bus.reset(doc);
       this.selectionManager.clear();
       this.selectTool.syncDocument(doc);
+      this.textureTool.syncDocument(doc);
       this.map = name;
       this.emit({ type: 'document' });
       this.log('ok', `Opened project ${name} (${plural(doc.nodes.size, 'node')}).`);
@@ -526,6 +969,31 @@ export class EditorApp {
       this.log('error', `Project failed to open: ${errorText(error)}`);
       return false;
     }
+  }
+
+  /** The indexed textures with their source label, for the texture browser. */
+  textureList(): readonly { name: string; source: string }[] {
+    if (!this.vfs) return [];
+    const out: { name: string; source: string }[] = [];
+    for (const [name, source] of this.vfs.textureIndex()) {
+      out.push({
+        name,
+        source:
+          source.kind === 'pack' ? `${source.gameDir}/${source.packFile}` : `${source.gameDir}`,
+      });
+    }
+    out.sort((a, b) => a.name.localeCompare(b.name));
+    return out;
+  }
+
+  /** Texture names used by the document's brushes, for the in-use filter. */
+  texturesInUse(): ReadonlySet<string> {
+    const used = new Set<string>();
+    for (const node of this.document.nodes.values()) {
+      if (node.kind !== 'brush') continue;
+      for (const face of node.faces) used.add(face.tex.name);
+    }
+    return used;
   }
 
   /** The renderer's lazy texture loader, over the open VFS, worker and cache. */
@@ -545,10 +1013,12 @@ export class EditorApp {
     const key = `${source}:${path}:${hit.size}`;
     const cached = await this.textureCache?.get(key);
     if (cached) {
+      this.textureDims.set(name, [cached.width, cached.height]);
       return cached;
     }
     const wal = await hit.read();
     const converted = await this.textureClient.convert(copyBuffer(wal), copyBuffer(this.palette));
+    this.textureDims.set(name, [converted.width, converted.height]);
     if (this.textureCache) {
       void this.textureCache.put(key, converted).catch(() => {
         // A cache write failure only means the next open converts the texture again.

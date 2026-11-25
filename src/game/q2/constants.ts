@@ -50,3 +50,41 @@ export const PALETTE_PATH = 'pics/colormap.pcx';
  */
 export const COMPILE_PROFILES = ['fast', 'normal', 'final'] as const;
 export type CompileProfile = (typeof COMPILE_PROFILES)[number];
+
+/** Surface flags as bit/name pairs in panel order, for the surface properties panel. */
+export const SURFACE_FLAG_BITS = [
+  [SURF_LIGHT, 'LIGHT'],
+  [SURF_SLICK, 'SLICK'],
+  [SURF_SKY, 'SKY'],
+  [SURF_WARP, 'WARP'],
+  [SURF_TRANS33, 'TRANS33'],
+  [SURF_TRANS66, 'TRANS66'],
+  [SURF_FLOWING, 'FLOWING'],
+  [SURF_NODRAW, 'NODRAW'],
+  [SURF_HINT, 'HINT'],
+  [SURF_SKIP, 'SKIP'],
+] as const;
+
+/** Contents flags as bit/name pairs in panel order, for the surface properties panel. */
+export const CONTENT_FLAG_BITS = [
+  [CONTENTS_SOLID, 'SOLID'],
+  [CONTENTS_WINDOW, 'WINDOW'],
+  [CONTENTS_AUX, 'AUX'],
+  [CONTENTS_LAVA, 'LAVA'],
+  [CONTENTS_SLIME, 'SLIME'],
+  [CONTENTS_WATER, 'WATER'],
+  [CONTENTS_MIST, 'MIST'],
+  [CONTENTS_AREAPORTAL, 'AREAPORTAL'],
+  [CONTENTS_PLAYERCLIP, 'PLAYERCLIP'],
+  [CONTENTS_MONSTERCLIP, 'MONSTERCLIP'],
+  [CONTENTS_CURRENT_0, 'CURRENT_0'],
+  [CONTENTS_CURRENT_90, 'CURRENT_90'],
+  [CONTENTS_CURRENT_180, 'CURRENT_180'],
+  [CONTENTS_CURRENT_270, 'CURRENT_270'],
+  [CONTENTS_CURRENT_UP, 'CURRENT_UP'],
+  [CONTENTS_CURRENT_DOWN, 'CURRENT_DOWN'],
+  [CONTENTS_ORIGIN, 'ORIGIN'],
+  [CONTENTS_DETAIL, 'DETAIL'],
+  [CONTENTS_TRANSLUCENT, 'TRANSLUCENT'],
+  [CONTENTS_LADDER, 'LADDER'],
+] as const;

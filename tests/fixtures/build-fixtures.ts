@@ -481,9 +481,145 @@ writeFileSync('tests/fixtures/tiny.pkz', buildPkz());
 writeFileSync('tests/fixtures/tiny.wal', buildWal());
 writeFileSync('tests/fixtures/colormap.pcx', buildPcx());
 writeFileSync('tests/fixtures/harness.wal', buildHarnessWal());
+/**
+ * The UV parity fixture: every face exercises a different texture
+ * parameterisation so that the qbsp3 texinfo comparison covers rotation
+ * quadrants, non-uniform scale, negative offsets and the decimal truncation
+ * rule (8.9 truncates to 8, -4.2 to -4, 45.7 to 45). The prism adds a sloped
+ * plane, so the base-orientation choice is exercised off the axis planes.
+ */
+function buildUvParityMap(): string {
+  const tex = 'e2u1/mine10_1';
+  const lines: string[] = ['{', '"classname" "worldspawn"'];
+  // Axis-aligned box, decimal offsets and rotation (truncation exercise).
+  lines.push(
+    ...boxBrush([0, 0, 0], [64, 64, 64], {
+      name: tex,
+      offset: [8.9, -4.2],
+      rotation: 45.7,
+    }),
+  );
+  // Exact 90 degree rotation with non-uniform scale.
+  lines.push(
+    ...boxBrush([128, 0, 0], [192, 64, 64], {
+      name: tex,
+      rotation: 90,
+      scale: [0.5, 2],
+    }),
+  );
+  // Rotation 270 with negative offsets.
+  lines.push(
+    ...boxBrush([256, 0, 0], [320, 64, 64], {
+      name: tex,
+      offset: [-16.7, 33.3],
+      rotation: 270,
+      scale: [1.5, 1],
+    }),
+  );
+  // Rotation 180 with fractional scale.
+  lines.push(
+    ...boxBrush([384, 0, 0], [448, 64, 64], {
+      name: tex,
+      rotation: 180,
+      scale: [0.75, 1.25],
+    }),
+  );
+  // A triangular prism with a 45 degree slope (the x+z=64 plane), shifted
+  // away from the other brushes; rotation 45 truncates exactly.
+  const ox = 0;
+  const oy = 192;
+  const at = (p: Point): Point => [p[0] + ox, p[1] + oy, p[2]];
+  const prismTex: Tex = { name: tex, rotation: 45, offset: [3.9, 3.9] };
+  lines.push('{');
+  // bottom z=0, outward normal -z
+  lines.push(faceLine([at([0, 0, 0]), at([64, 0, 0]), at([0, 64, 0])], [0, 0, -1], prismTex));
+  // wall x=0, outward normal -x
+  lines.push(faceLine([at([0, 0, 0]), at([0, 64, 0]), at([0, 0, 64])], [-1, 0, 0], prismTex));
+  // slope x+z=64, outward normal +x+z
+  lines.push(faceLine([at([64, 0, 0]), at([0, 0, 64]), at([64, 64, 0])], [1, 0, 1], prismTex));
+  // wall y=0, outward normal -y
+  lines.push(faceLine([at([0, 0, 0]), at([64, 0, 0]), at([0, 0, 64])], [0, -1, 0], prismTex));
+  // wall y=64, outward normal +y
+  lines.push(faceLine([at([0, 64, 0]), at([64, 64, 0]), at([0, 64, 64])], [0, 1, 0], prismTex));
+  lines.push('}');
+  lines.push('}');
+  return lines.join('\n') + '\n';
+}
+
+/**
+ * The playable parity-check room for the manual q2pro half of P3.11: a
+ * sealed room whose surfaces carry the same kinds of parameterisation as
+ * uvparity.map (rotation quadrants, non-uniform scale, decimal offsets that
+ * truncate), so a human can compare the editor's 3D view with the game.
+ */
+function buildParityRoom(): string {
+  const tex = 'e2u1/mine10_1';
+  const lines: string[] = ['{', '"classname" "worldspawn"'];
+  // Floor: rotation 45.7 (truncates to 45), decimal offsets.
+  lines.push(
+    ...boxBrush([-256, -256, -64], [256, 256, 0], {
+      name: tex,
+      offset: [8.9, -4.2],
+      rotation: 45.7,
+    }),
+  );
+  // Ceiling: rotation 90.
+  lines.push(...boxBrush([-256, -256, 256], [256, 256, 320], { name: tex, rotation: 90 }));
+  // North wall: non-uniform scale.
+  lines.push(...boxBrush([-256, 192, 0], [256, 256, 256], { name: tex, scale: [0.5, 2] }));
+  // South wall: rotation 180 with fractional scale.
+  lines.push(
+    ...boxBrush([-256, -256, 0], [256, -192, 256], {
+      name: tex,
+      rotation: 180,
+      scale: [0.75, 1.25],
+    }),
+  );
+  // East and west walls: plain, so the eye has a reference.
+  lines.push(...boxBrush([192, -192, 0], [256, 192, 256], { name: tex }));
+  lines.push(...boxBrush([-256, -192, 0], [-192, 192, 256], { name: tex }));
+  // A pillar in the middle: rotation 270 with negative decimal offsets.
+  lines.push(
+    ...boxBrush([-32, -32, 0], [32, 32, 128], {
+      name: tex,
+      offset: [-16.7, 33.3],
+      rotation: 270,
+      scale: [1.5, 1],
+    }),
+  );
+  lines.push('}');
+  // Player start inside the room.
+  lines.push('{');
+  lines.push('"classname" "info_player_start"');
+  lines.push('"origin" "0 -128 24"');
+  lines.push('}');
+  return lines.join('\n') + '\n';
+}
+
+writeFileSync('tests/fixtures/parity-room.map', buildParityRoom());
+writeFileSync('tests/fixtures/uvparity.map', buildUvParityMap());
 writeFileSync('tests/fixtures/room.map', buildRoomMap());
 mkdirSync('tests/fixtures/game/baseq2/pics', { recursive: true });
 mkdirSync('tests/fixtures/game/baseq2/textures/e2u1', { recursive: true });
 copyFileSync('tests/fixtures/colormap.pcx', 'tests/fixtures/game/baseq2/pics/colormap.pcx');
 copyFileSync('tests/fixtures/harness.wal', 'tests/fixtures/game/baseq2/textures/e2u1/mine10_1.wal');
+// Extra textures for the texture browser E2E in a separate game directory, so
+// the other UI tests keep their single-texture renderer statistics.
+mkdirSync('tests/fixtures/game-browser/baseq2/pics', { recursive: true });
+mkdirSync('tests/fixtures/game-browser/baseq2/textures/e1u1', { recursive: true });
+mkdirSync('tests/fixtures/game-browser/baseq2/textures/e2u1', { recursive: true });
+copyFileSync('tests/fixtures/colormap.pcx', 'tests/fixtures/game-browser/baseq2/pics/colormap.pcx');
+for (const name of [
+  'e2u1/mine10_1',
+  'e2u1/mine10_2',
+  'e2u1/mine10_3',
+  'e1u1/basic1_1',
+  'e1u1/basic1_2',
+  'e1u1/metal1_1',
+]) {
+  copyFileSync(
+    'tests/fixtures/harness.wal',
+    `tests/fixtures/game-browser/baseq2/textures/${name}.wal`,
+  );
+}
 console.log('fixtures built');

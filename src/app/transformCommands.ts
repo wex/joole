@@ -1,6 +1,11 @@
 import type { BrushNode, Command, Id, MapDocument, MapNode, Patch } from '@core/types/index';
 import { allBrushesOf, replaceNodePatch } from '@core/doc/index';
-import { snapBrushToGrid, transformBrush, type Mat4 } from '@core/geom/index';
+import {
+  snapBrushToGrid,
+  transformBrush,
+  transformBrushTextureLock,
+  type Mat4,
+} from '@core/geom/index';
 
 function emptyPatch(): Patch {
   return {
@@ -41,23 +46,50 @@ export function brushTargets(doc: Readonly<MapDocument>, ids: readonly Id[]): Br
  * Creates a move/rotate/scale command. Groups are expanded to their
  * descendant brushes because the document has no local transform matrices.
  */
+export interface TransformOptions {
+  readonly mergeKey?: string;
+  /** Texture lock: recompute texture parameters so textures stick to the surface. */
+  readonly textureLock?: boolean;
+  /** Reports the worst texture lock error in texels when it exceeds the limit. */
+  readonly onLockWarning?: (errorTexels: number) => void;
+}
+
 export function createTransformCommand(
   label: string,
   ids: readonly Id[],
   matrix: Mat4,
-  mergeKey?: string,
+  mergeKeyOrOptions?: string | TransformOptions,
 ): Command {
+  const options: TransformOptions =
+    typeof mergeKeyOrOptions === 'string'
+      ? { mergeKey: mergeKeyOrOptions }
+      : (mergeKeyOrOptions ?? {});
   return {
     label,
-    mergeKey,
+    mergeKey: options.mergeKey,
     run(doc) {
       const patch = emptyPatch();
+      let worstError = 0;
+      let flagged = 0;
       for (const brush of brushTargets(doc, ids)) {
-        const result = transformBrush(brush, matrix);
-        if (!result.ok) {
-          throw new Error(`${label} would make brush ${brush.id} invalid`);
+        if (options.textureLock) {
+          const result = transformBrushTextureLock(brush, matrix);
+          if (!result.ok) {
+            throw new Error(`${label} would make brush ${brush.id} invalid`);
+          }
+          worstError = Math.max(worstError, result.value.maxErrorTexels);
+          flagged += result.value.flaggedFaces.length;
+          mergeIndependent(patch, replaceNodePatch(doc, brush.id, result.value.brush));
+        } else {
+          const result = transformBrush(brush, matrix);
+          if (!result.ok) {
+            throw new Error(`${label} would make brush ${brush.id} invalid`);
+          }
+          mergeIndependent(patch, replaceNodePatch(doc, brush.id, result.value));
         }
-        mergeIndependent(patch, replaceNodePatch(doc, brush.id, result.value));
+      }
+      if (flagged > 0 && options.onLockWarning) {
+        options.onLockWarning(worstError);
       }
       return patch;
     },

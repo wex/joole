@@ -3,7 +3,7 @@ import { createEmptyDocument, addNodePatch, applyPatch } from '@core/doc/index';
 import { analyzeBrush, validateBrush } from '@core/geom/index';
 import type { BrushNode, Command, MapDocument } from '@core/types/index';
 import { makeBox } from '../core/geom/__tests__/helpers';
-import { BrushTool, SelectTool, type ToolPointerEvent } from './tools';
+import { BrushTool, ClipTool, SelectTool, VertexTool, type ToolPointerEvent } from './tools';
 
 function brush(
   id: string,
@@ -204,5 +204,147 @@ describe('BrushTool', () => {
       expect(analyzeBrush(frontBrush).aabb?.min.map((x) => x + 0)).toEqual([0, -32, 0]);
       expect(analyzeBrush(frontBrush).aabb?.max.map((x) => x + 0)).toEqual([64, 32, 64]);
     }
+  });
+});
+
+describe('ClipTool event scripts', () => {
+  function clippedDocument(): MapDocument {
+    let doc = createEmptyDocument();
+    doc = applyPatch(
+      doc,
+      addNodePatch(doc, doc.worldspawn, brush('target', [0, 0, 0], [64, 64, 64])),
+    );
+    return doc;
+  }
+
+  it('two clicks define a clip plane and Enter clips the selection', () => {
+    const doc = clippedDocument();
+    const tool = new ClipTool(
+      () => doc,
+      () => 8,
+    );
+    tool.setSelection(['target']);
+    expect(tool.pointer(down(32, 0)).preview).toHaveLength(1);
+    expect(tool.pointer(move(32, 64)).preview).toHaveLength(1);
+    const defined = tool.pointer(down(32, 64));
+    expect(defined.preview).toHaveLength(1);
+    const output = tool.key('Enter');
+    expect(output.commands).toHaveLength(1);
+    expect(output.preview).toEqual([]);
+    let edited = doc;
+    for (const command of output.commands) edited = applyPatch(edited, command.run(edited));
+    const clipped = edited.nodes.get('target') as BrushNode;
+    expect(validateBrush(analyzeBrush(clipped)).valid).toBe(true);
+    expect(analyzeBrush(clipped).aabb?.min[0]).toBeCloseTo(32, 5);
+    expect(output.selection?.has('target')).toBe(true);
+  });
+
+  it('clips in the xz and yz views with the view depth axis', () => {
+    for (const view of ['xz', 'yz'] as const) {
+      const doc = clippedDocument();
+      const tool = new ClipTool(
+        () => doc,
+        () => 8,
+      );
+      tool.setSelection(['target']);
+      const at = (a: number, b: number): ToolPointerEvent => ({
+        ...down(0, 0),
+        view,
+        point: view === 'xz' ? [a, 32, b] : [32, a, b],
+      });
+      // A vertical line through the middle of the view: x = 32 in xz, y = 32 in yz.
+      tool.pointer(at(32, 0));
+      tool.pointer(at(32, 64));
+      const output = tool.key('Enter');
+      expect(output.commands).toHaveLength(1);
+      let edited = doc;
+      for (const command of output.commands) edited = applyPatch(edited, command.run(edited));
+      const clipped = edited.nodes.get('target') as BrushNode;
+      const analysis = analyzeBrush(clipped);
+      expect(validateBrush(analysis).valid).toBe(true);
+      expect(analysis.volume).toBeCloseTo(32 * 64 * 64, 4);
+    }
+  });
+
+  it('Tab cycles front, back and both, and Escape cancels without a command', () => {
+    const doc = clippedDocument();
+    const tool = new ClipTool(
+      () => doc,
+      () => 8,
+    );
+    tool.setSelection(['target']);
+    tool.pointer(down(32, 0));
+    tool.pointer(down(32, 64));
+    expect(tool.side).toBe('front');
+    tool.key('Tab');
+    expect(tool.side).toBe('back');
+    tool.key('Tab');
+    expect(tool.side).toBe('both');
+    const cancelled = tool.key('Escape');
+    expect(cancelled.commands).toEqual([]);
+    expect(cancelled.preview).toEqual([]);
+    expect(tool.key('Enter').commands).toEqual([]);
+  });
+});
+
+describe('VertexTool event scripts', () => {
+  function vertexDocument(): MapDocument {
+    let doc = createEmptyDocument();
+    doc = applyPatch(
+      doc,
+      addNodePatch(doc, doc.worldspawn, brush('target', [0, 0, 0], [64, 64, 64])),
+    );
+    return doc;
+  }
+
+  function makeVertexTool(doc: MapDocument) {
+    return new VertexTool(
+      () => doc,
+      () => 8,
+      () => new Set(['target']),
+    );
+  }
+
+  it('dragging near a corner moves the vertex with an undoable command', () => {
+    const doc = vertexDocument();
+    const tool = makeVertexTool(doc);
+    const down1 = tool.pointer(down(2, 2));
+    expect(down1.commands).toHaveLength(0);
+    const moved = tool.pointer(move(10, 10));
+    expect(moved.commands).toHaveLength(1);
+    let edited = doc;
+    for (const command of moved.commands) edited = applyPatch(edited, command.run(edited));
+    const analysis = analyzeBrush(edited.nodes.get('target') as BrushNode);
+    expect(validateBrush(analysis).valid).toBe(true);
+    expect(analysis.volume).toBeLessThan(analyzeBrush(doc.nodes.get('target') as BrushNode).volume);
+    tool.pointer(up(10, 10));
+  });
+
+  it('shows handle crosses while idle', () => {
+    const doc = vertexDocument();
+    const tool = makeVertexTool(doc);
+    const output = tool.pointer(move(200, 200));
+    expect(output.preview!.length).toBeGreaterThan(0);
+  });
+
+  it('a rejected drag produces no command and dashed invalid segments', () => {
+    const doc = vertexDocument();
+    const tool = makeVertexTool(doc);
+    tool.pointer(down(2, 2));
+    const output = tool.pointer(move(200, 200));
+    expect(output.commands).toHaveLength(0);
+    expect(output.invalid!.length).toBeGreaterThan(0);
+  });
+
+  it('V toggles between vertex and edge submodes and edge drag moves both endpoints', () => {
+    const doc = vertexDocument();
+    const tool = makeVertexTool(doc);
+    expect(tool.submode).toBe('vertex');
+    tool.toggleVertexEdge();
+    expect(tool.submode).toBe('edge');
+    // The front-top edge runs along x at y=0, z=64: grab its midpoint.
+    tool.pointer({ ...down(32, 0), point: [32, 0, 64] });
+    const moved = tool.pointer({ ...move(32, 8), point: [32, 8, 64] });
+    expect(moved.commands).toHaveLength(1);
   });
 });

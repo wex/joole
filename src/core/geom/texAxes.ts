@@ -55,6 +55,35 @@ function dot3(a: Vec3, b: readonly [number, number, number]): number {
   return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 }
 
+export interface BaseOrientation {
+  /** Index 0..5 in the qbsp3 base axis table. */
+  readonly index: number;
+  /** The unrotated s base vector, a signed unit axis. */
+  readonly bs: Vec3;
+  /** The unrotated t base vector, a signed unit axis. */
+  readonly bt: Vec3;
+  /** bs[sv]·bt[tv], the sign coupling of qbsp3's in-plane rotation. */
+  readonly sigma: number;
+}
+
+/** The base orientation qbsp3 chooses for a plane normal, with its frame vectors. */
+export function baseOrientationForNormal(n: Vec3): BaseOrientation {
+  let best = 0;
+  let bestAxis = 0;
+  for (let i = 0; i < 6; i++) {
+    const d = dot3(n, BASE_AXIS[i * 3]!);
+    if (d > best) {
+      best = d;
+      bestAxis = i;
+    }
+  }
+  const bs = [...BASE_AXIS[bestAxis * 3 + 1]!] as Vec3;
+  const bt = [...BASE_AXIS[bestAxis * 3 + 2]!] as Vec3;
+  const sv = bs[0] !== 0 ? 0 : bs[1] !== 0 ? 1 : 2;
+  const tv = bt[0] !== 0 ? 0 : bt[1] !== 0 ? 1 : 2;
+  return { index: bestAxis, bs, bt, sigma: bs[sv]! * bt[tv]! };
+}
+
 /** The texture axes of a face, exactly as qbsp3 computes them. */
 export function texAxes(
   plane: Plane,

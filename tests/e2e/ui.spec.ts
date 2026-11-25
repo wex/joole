@@ -39,9 +39,7 @@ async function openEditor(page: Page): Promise<void> {
 async function openFixtureMap(page: Page): Promise<void> {
   await openEditor(page);
   await page.locator('[data-testid=game-directory-input]').setInputFiles(gameDir);
-  await expect(page.locator('[data-testid=texture-placeholder]')).toContainText(
-    '1 textures indexed',
-  );
+  await expect(page.locator('[data-testid=texture-browser]')).toBeVisible();
   await page.locator('[data-testid=map-input]').setInputFiles(roomMap);
   await expect(page.locator('[data-testid=properties-panel]')).toContainText('room.map');
   await page.evaluate(() => (window as unknown as JooleWindow).joole!.whenIdle());

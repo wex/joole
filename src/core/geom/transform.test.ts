@@ -123,3 +123,96 @@ describe('transformBrush and snapping', () => {
     }
   });
 });
+
+describe('flipBrush', () => {
+  it('mirrors a box across an axis plane through its center exactly', async () => {
+    const { flipBrush } = await import('./transform');
+    const box = makeBox([0, 0, 0], [64, 32, 16]);
+    const result = flipBrush(box, 0, 32);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const analysis = analyzeBrush(result.value);
+    expect(validateBrush(analysis).valid).toBe(true);
+    expectVecClose(analysis.aabb!.min, [0, 0, 0]);
+    expectVecClose(analysis.aabb!.max, [64, 32, 16]);
+    expect(analysis.volume).toBeCloseTo(64 * 32 * 16, 6);
+  });
+
+  it('fast-check: flipping twice is the identity and the volume is preserved', async () => {
+    const { flipBrush } = await import('./transform');
+    const arb = fc.record({
+      min: fc.tuple(
+        fc.integer({ min: -256, max: 0 }),
+        fc.integer({ min: -256, max: 0 }),
+        fc.integer({ min: -256, max: 0 }),
+      ),
+      size: fc.tuple(
+        fc.integer({ min: 4, max: 256 }),
+        fc.integer({ min: 4, max: 256 }),
+        fc.integer({ min: 4, max: 256 }),
+      ),
+      axis: fc.constantFrom(0, 1, 2) as fc.Arbitrary<0 | 1 | 2>,
+    });
+    fc.assert(
+      fc.property(arb, ({ min, size, axis }) => {
+        const box = makeBox(min as [number, number, number], [
+          min[0] + size[0],
+          min[1] + size[1],
+          min[2] + size[2],
+        ]);
+        const once = flipBrush(box, axis);
+        expect(once.ok).toBe(true);
+        if (!once.ok) return;
+        expect(validateBrush(analyzeBrush(once.value)).valid).toBe(true);
+        expect(analyzeBrush(once.value).volume).toBeCloseTo(analyzeBrush(box).volume, 5);
+        const twice = flipBrush(once.value, axis);
+        expect(twice.ok).toBe(true);
+        if (!twice.ok) return;
+        expect(twice.value.faces).toEqual(box.faces);
+      }),
+      { numRuns: 50 },
+    );
+  });
+});
+
+describe('rotate90Brush', () => {
+  it('rotates exactly, keeping integer coordinates integral', async () => {
+    const { rotate90Brush } = await import('./transform');
+    const box = makeBox([16, 8, 0], [48, 24, 32]);
+    const result = rotate90Brush(box, [0, 0]);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const analysis = analyzeBrush(result.value);
+    expect(validateBrush(analysis).valid).toBe(true);
+    expectVecClose(analysis.aabb!.min, [-24, 16, 0]);
+    expectVecClose(analysis.aabb!.max, [-8, 48, 32]);
+    for (const face of result.value.faces) {
+      for (const point of face.points) {
+        for (const c of point) expect(Number.isInteger(c)).toBe(true);
+      }
+    }
+  });
+
+  it('fast-check: four quarter turns are the identity', async () => {
+    const { rotate90Brush } = await import('./transform');
+    fc.assert(
+      fc.property(
+        fc.integer({ min: -128, max: 0 }),
+        fc.integer({ min: -128, max: 0 }),
+        fc.integer({ min: 4, max: 128 }),
+        (x, y, size) => {
+          let brush = makeBox([x, y, 0], [x + size, y + size, 64]);
+          const original = brush.faces;
+          for (let i = 0; i < 4; i++) {
+            const result = rotate90Brush(brush, [0, 0]);
+            expect(result.ok).toBe(true);
+            if (!result.ok) return;
+            brush = result.value;
+          }
+          expect(brush.faces).toEqual(original);
+        },
+      ),
+      { numRuns: 50 },
+    );
+  });
+});
