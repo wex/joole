@@ -94,6 +94,46 @@ export function subtractBrush(target: BrushNode, cutter: BrushNode): Result<Brus
   return { ok: true, value: output };
 }
 
+export type HollowDirection = 'inward' | 'outward';
+
+function offsetBrushPlanes(brush: BrushNode, amount: number): BrushNode {
+  return {
+    ...brush,
+    faces: brush.faces.map((face) => {
+      const plane = planeFromPoints(...face.points);
+      if (!plane)
+        return {
+          ...face,
+          points: face.points.map((point) => [...point] as Vec3) as Face['points'],
+        };
+      return {
+        tex: { ...face.tex },
+        points: face.points.map((point) => [
+          point[0] + plane.n[0]! * amount,
+          point[1] + plane.n[1]! * amount,
+          point[2] + plane.n[2]! * amount,
+        ]) as Face['points'],
+      };
+    }),
+  };
+}
+
+/**
+ * Creates a shell by subtraction. Inward hollowing removes a copy shrunk by
+ * the thickness; outward hollowing removes the original from an expanded copy.
+ */
+export function hollowBrush(
+  brush: BrushNode,
+  thickness = 8,
+  direction: HollowDirection = 'inward',
+): Result<BrushNode[], CsgError> {
+  if (!Number.isFinite(thickness) || thickness <= 0) return { ok: false, error: 'invalid-target' };
+  if (!validateBrush(analyzeBrush(brush)).valid) return { ok: false, error: 'invalid-target' };
+  return direction === 'inward'
+    ? subtractBrush(brush, offsetBrushPlanes(brush, -thickness))
+    : subtractBrush(offsetBrushPlanes(brush, thickness), brush);
+}
+
 /**
  * Intersects convex brushes by merging their plane sets. Faces made redundant
  * by the intersection are dropped. Returns null-valued output as an error when

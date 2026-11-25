@@ -197,3 +197,24 @@ describe('intersectBrushes', () => {
     ).toEqual({ ok: false, error: 'invalid-result' });
   });
 });
+
+describe('hollowBrush', () => {
+  it('creates a valid inward shell with the expected volume', async () => {
+    const { hollowBrush } = await import('./csg');
+    const result = hollowBrush(makeBox([0, 0, 0], [64, 64, 64]), 8, 'inward');
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.length).toBeGreaterThan(1);
+    for (const brush of result.value) expect(validateBrush(analyzeBrush(brush)).valid).toBe(true);
+    expect(volumeSum(result.value)).toBeCloseTo(64 ** 3 - 48 ** 3, 3);
+  });
+
+  it('creates a valid outward shell with the expected volume', async () => {
+    const { hollowBrush } = await import('./csg');
+    const result = hollowBrush(makeBox([0, 0, 0], [64, 64, 64]), 8, 'outward');
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    for (const brush of result.value) expect(validateBrush(analyzeBrush(brush)).valid).toBe(true);
+    expect(volumeSum(result.value)).toBeCloseTo(80 ** 3 - 64 ** 3, 3);
+  });
+});

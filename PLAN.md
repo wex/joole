@@ -537,7 +537,7 @@ Goal: Qoole-level geometry operations, and textures that look exactly the same i
 - **Depends on:** P1.2, P2.1
 - **Done when:** the properties pass.
 
-### [ ] P3.3 Hollow, inward and outward
+### [x] P3.3 Hollow, inward and outward
 
 - **Goal:** turn a brush into a shell with thickness d (8 by default).
 - **Scope:** the original minus a copy with every plane moved inwards by d; the outward variant works the other way. Non-axis-aligned planes produce non-integer points, which is acceptable because P1.6 handles export.

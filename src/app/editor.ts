@@ -13,7 +13,7 @@ import type { GameFileEntry } from '@platform/index';
 import { CommandBus } from './commandBus';
 import { SelectionManager } from './selection';
 import { mapTextToPastePatch, removeSelectionPatch, selectionToMapText } from './clipboard';
-import { intersectSelectionPatch, subtractSelectionPatch } from './csg';
+import { hollowSelectionPatch, intersectSelectionPatch, subtractSelectionPatch } from './csg';
 import { BrushTool, SelectTool, type ToolOutput, type ToolPointerEvent } from './tools';
 import type { PrimitiveKind } from '@core/geom/index';
 import { entriesFromFileList, entriesFromSinglePak, openGameVfs } from '@platform/index';
@@ -400,6 +400,26 @@ export class EditorApp {
       return true;
     } catch (error) {
       this.log('warning', `CSG Intersect failed: ${errorText(error)}`);
+      return false;
+    }
+  }
+
+  hollowSelection(direction: 'inward' | 'outward', thickness = 8): boolean {
+    const result = hollowSelectionPatch(this.document, this.selection, direction, thickness);
+    if (!result) {
+      this.log('warning', 'Hollow needs exactly one selected brush.');
+      return false;
+    }
+    try {
+      this.executeCommand({ label: `Hollow ${direction}`, run: () => result.patch });
+      this.setSelection(result.ids);
+      this.log(
+        'ok',
+        `Hollowed one brush ${direction} into ${plural(result.ids.length, 'fragment')}.`,
+      );
+      return true;
+    } catch (error) {
+      this.log('warning', `Hollow failed: ${errorText(error)}`);
       return false;
     }
   }

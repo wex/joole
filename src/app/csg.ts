@@ -1,5 +1,5 @@
 import { applyPatch, createId, mergePatches } from '@core/doc/index';
-import { analyzeBrush, intersectBrushes, subtractBrush } from '@core/geom/index';
+import { analyzeBrush, hollowBrush, intersectBrushes, subtractBrush } from '@core/geom/index';
 import { PLANE_EPS } from '@core/geom/constants';
 import type { BrushNode, Id, MapDocument, MapNode, Patch } from '@core/types/index';
 
@@ -131,4 +131,39 @@ export function intersectSelectionPatch(
     children: parent.children.filter((child) => !removed.has(child)),
   });
   return { patch: effective, ids: [keepId], targets: brushes.length };
+}
+
+/** Replaces one selected brush with its hollowed shell fragments. */
+export function hollowSelectionPatch(
+  doc: Readonly<MapDocument>,
+  selection: ReadonlySet<Id>,
+  direction: 'inward' | 'outward',
+  thickness = 8,
+): CsgSubtractResult | null {
+  const target = [...selection]
+    .map((id) => doc.nodes.get(id))
+    .find((node): node is BrushNode => node?.kind === 'brush');
+  if (!target || selection.size !== 1) return null;
+  const hollow = hollowBrush(target, thickness, direction);
+  if (!hollow.ok) return null;
+  const parentId = doc.parent.get(target.id);
+  const parent = parentId ? doc.nodes.get(parentId) : undefined;
+  if (!parentId || !parent || parent.kind === 'brush') return null;
+
+  const ids = hollow.value.map((_, index) => (index === 0 ? target.id : createId()));
+  const replacements = hollow.value.map((piece, index) => ({ ...piece, id: ids[index]! }));
+  const effective = emptyPatch();
+  record(effective, target.id, target, replacements[0] ?? null);
+  effective.parentBefore.set(target.id, parentId);
+  effective.parentAfter.set(target.id, replacements.length > 0 ? parentId : null);
+  for (let i = 1; i < replacements.length; i++) {
+    record(effective, replacements[i]!.id, null, replacements[i]!);
+    effective.parentBefore.set(replacements[i]!.id, null);
+    effective.parentAfter.set(replacements[i]!.id, parentId);
+  }
+  record(effective, parentId, parent, {
+    ...parent,
+    children: parent.children.flatMap((child) => (child === target.id ? ids : [child])),
+  });
+  return { patch: effective, ids, targets: 1 };
 }

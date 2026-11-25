@@ -82,3 +82,21 @@ describe('intersectSelectionPatch', () => {
     expect(undone.nodes.get('b')).toEqual(b);
   });
 });
+
+describe('hollowSelectionPatch', () => {
+  it('replaces one selected brush with shell fragments and undo restores it', async () => {
+    const { hollowSelectionPatch } = await import('./csg');
+    const target = { ...makeBox([0, 0, 0], [64, 64, 64]), id: 'target' };
+    const doc = documentWith([target]);
+    const result = hollowSelectionPatch(doc, new Set(['target']), 'inward')!;
+    const edited = applyPatch(doc, result.patch);
+    expect(result.ids.length).toBeGreaterThan(1);
+    const volume = result.ids.reduce(
+      (sum, id) => sum + analyzeBrush(edited.nodes.get(id) as BrushNode).volume,
+      0,
+    );
+    expect(volume).toBeCloseTo(64 ** 3 - 48 ** 3, 3);
+    const undone = applyPatch(edited, invertPatch(result.patch));
+    expect(undone.nodes.get('target')).toEqual(target);
+  });
+});

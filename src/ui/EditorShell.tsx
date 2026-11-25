@@ -639,6 +639,7 @@ export function EditorShell(props: EditorShellProps) {
         onExportMap={() => void app.exportMap()}
         onCsgSubtract={() => app.csgSubtract()}
         onCsgIntersect={() => app.csgIntersect()}
+        onHollow={(direction) => app.hollowSelection(direction)}
         onGridSize={(size) => app.setGridSize(size)}
         onToggleTheme={toggleTheme}
         activeTool={activeTool()}

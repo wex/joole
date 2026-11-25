@@ -17,6 +17,7 @@ export interface ToolbarProps {
   readonly onExportMap: () => void;
   readonly onCsgSubtract: () => void;
   readonly onCsgIntersect: () => void;
+  readonly onHollow: (direction: 'inward' | 'outward') => void;
   readonly onGridSize: (size: number) => void;
   readonly onToggleTheme: () => void;
   readonly onTool: (tool: ToolbarTool) => void;
@@ -143,6 +144,24 @@ export function Toolbar(props: ToolbarProps) {
                 CSG Intersect
               </button>
             </li>
+            <li role="none">
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => choose(() => props.onHollow('inward'))}
+              >
+                Hollow Inward
+              </button>
+            </li>
+            <li role="none">
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => choose(() => props.onHollow('outward'))}
+              >
+                Hollow Outward
+              </button>
+            </li>
           </ul>
         </Show>
       </div>
@@ -211,7 +230,13 @@ export function Toolbar(props: ToolbarProps) {
       >
         <Icon name="csgSubtract" />
       </button>
-      <button type="button" class={styles.iconButton} title="Hollow" disabled>
+      <button
+        type="button"
+        class={styles.iconButton}
+        title="Hollow"
+        aria-label="Hollow"
+        onClick={() => props.onHollow('inward')}
+      >
         <Icon name="hollow" />
       </button>
       <span class={styles.separator} />
