@@ -303,7 +303,7 @@ Goal: read Q2 game data and `.map` files without loss, and show the map in four 
 - **Depends on:** P1.4, P1.8
 - **Done when:** a 512-texture batch converts without blocking the UI, measured with the Performance panel.
 
-### [ ] P1.10 Renderer core (`render`)
+### [x] P1.10 Renderer core (`render`)
 
 - **Goal:** draw the document in four views from one WebGL2 context.
 - **Scope:**

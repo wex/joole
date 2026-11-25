@@ -1,0 +1,386 @@
+import type { Id, MapDocument, MapNode, Patch } from '@core/types/index';
+import { RangeAllocator } from './allocator';
+import {
+  boxEdges,
+  buildBrushMesh,
+  entityBox,
+  entityOrigin,
+  FACE_OFFSET_INDEX,
+  FACE_OFFSET_NORMAL,
+  FACE_OFFSET_POSITION,
+  FACE_OFFSET_UV,
+  FACE_STRIDE,
+  LINE_OFFSET_A,
+  LINE_OFFSET_B,
+  LINE_OFFSET_INDEX,
+  LINE_STRIDE,
+  writeLines,
+  type FaceClass,
+} from './brushMesh';
+import { unionAabb, type Aabb } from './camera';
+
+/** Bits of a node's byte in the state texture, read by the shaders. */
+export const STATE_SELECTED = 1;
+export const STATE_ENTITY = 2;
+
+/** The state texture is this many texels wide, one byte per node index. */
+const STATE_WIDTH = 1024;
+const INITIAL_CAPACITY = 1024;
+
+interface Range {
+  offset: number;
+  count: number;
+}
+
+/**
+ * One growable GPU buffer of fixed-stride elements, with the element ranges
+ * of each node. A freed range is zeroed, which draws as degenerate triangles
+ * or zero-length lines, so a batch is always drawn up to its high-water mark.
+ */
+export class GpuStore {
+  buffer: WebGLBuffer;
+  readonly vao: WebGLVertexArrayObject;
+  readonly ranges = new Map<Id, Range>();
+  private readonly allocator: RangeAllocator;
+
+  constructor(
+    private readonly gl: WebGL2RenderingContext,
+    private readonly stride: number,
+    private readonly bindAttributes: (buffer: WebGLBuffer) => void,
+  ) {
+    this.allocator = new RangeAllocator(INITIAL_CAPACITY);
+    this.buffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.buffer);
+    gl.bufferData(gl.ARRAY_BUFFER, INITIAL_CAPACITY * stride, gl.DYNAMIC_DRAW);
+    this.vao = gl.createVertexArray();
+    gl.bindVertexArray(this.vao);
+    bindAttributes(this.buffer);
+    gl.bindVertexArray(null);
+  }
+
+  /** The number of elements to draw. */
+  get drawCount(): number {
+    return this.allocator.highWater;
+  }
+
+  write(id: Id, data: ArrayBuffer, count: number): void {
+    this.remove(id);
+    if (count === 0) {
+      return;
+    }
+    let offset = this.allocator.alloc(count);
+    if (offset === null) {
+      this.grow(Math.max(this.allocator.capacity * 2, this.allocator.capacity + count));
+      offset = this.allocator.alloc(count)!;
+    }
+    const gl = this.gl;
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.buffer);
+    gl.bufferSubData(
+      gl.ARRAY_BUFFER,
+      offset * this.stride,
+      new Uint8Array(data, 0, count * this.stride),
+    );
+    this.ranges.set(id, { offset, count });
+  }
+
+  remove(id: Id): void {
+    const range = this.ranges.get(id);
+    if (!range) {
+      return;
+    }
+    this.ranges.delete(id);
+    this.allocator.release(range.offset, range.count);
+    const gl = this.gl;
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.buffer);
+    gl.bufferSubData(
+      gl.ARRAY_BUFFER,
+      range.offset * this.stride,
+      new Uint8Array(range.count * this.stride),
+    );
+  }
+
+  dispose(): void {
+    this.gl.deleteBuffer(this.buffer);
+    this.gl.deleteVertexArray(this.vao);
+  }
+
+  private grow(capacity: number): void {
+    const gl = this.gl;
+    const old = this.buffer;
+    const buffer = gl.createBuffer();
+    gl.bindBuffer(gl.COPY_WRITE_BUFFER, buffer);
+    gl.bufferData(gl.COPY_WRITE_BUFFER, capacity * this.stride, gl.DYNAMIC_DRAW);
+    gl.bindBuffer(gl.COPY_READ_BUFFER, old);
+    gl.copyBufferSubData(
+      gl.COPY_READ_BUFFER,
+      gl.COPY_WRITE_BUFFER,
+      0,
+      0,
+      this.allocator.capacity * this.stride,
+    );
+    gl.bindBuffer(gl.COPY_READ_BUFFER, null);
+    gl.bindBuffer(gl.COPY_WRITE_BUFFER, null);
+    gl.deleteBuffer(old);
+    this.buffer = buffer;
+    this.allocator.grow(capacity);
+    gl.bindVertexArray(this.vao);
+    this.bindAttributes(buffer);
+    gl.bindVertexArray(null);
+  }
+}
+
+export interface FaceBatch {
+  readonly key: string;
+  readonly cls: FaceClass;
+  readonly texture: string;
+  readonly store: GpuStore;
+}
+
+/** A drawn node: a brush, or a point entity drawn as a box. */
+export interface NodeRecord {
+  readonly kind: 'brush' | 'entity';
+  readonly index: number;
+  readonly aabb: Aabb | null;
+  readonly batchKeys: readonly string[];
+}
+
+/**
+ * The brush geometry cache of the spec: each brush's polygons are built once
+ * after a change and stored in per-texture vertex buffers, and a patch
+ * rebuilds only the nodes it touches.
+ */
+export class GeometryCache {
+  readonly batches = new Map<string, FaceBatch>();
+  readonly records = new Map<Id, NodeRecord>();
+  readonly lines: GpuStore;
+  private readonly cornerBuffer: WebGLBuffer;
+  private readonly stateTexture: WebGLTexture;
+  private state = new Uint8Array(STATE_WIDTH);
+  private stateDirty = true;
+  private stateRowsOnGpu = 0;
+  private readonly freeIndices: number[] = [];
+  private nextIndex = 0;
+  private selected = new Set<Id>();
+
+  constructor(private readonly gl: WebGL2RenderingContext) {
+    this.cornerBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.cornerBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([0, -1, 0, 1, 1, -1, 1, 1]), gl.STATIC_DRAW);
+    this.lines = new GpuStore(gl, LINE_STRIDE, (buffer) => this.bindLineAttributes(buffer));
+    this.stateTexture = gl.createTexture();
+  }
+
+  /** Replaces everything with the nodes of a new document. */
+  setDocument(doc: Readonly<MapDocument>): void {
+    for (const id of [...this.records.keys()]) {
+      this.removeNode(id);
+    }
+    for (const node of doc.nodes.values()) {
+      this.addNode(doc, node);
+    }
+  }
+
+  /** Rebuilds only the nodes that a patch created, changed or removed. */
+  applyPatch(doc: Readonly<MapDocument>, patch: Patch): void {
+    for (const id of patch.after.keys()) {
+      this.removeNode(id);
+      const node = doc.nodes.get(id);
+      if (node) {
+        this.addNode(doc, node);
+      }
+    }
+  }
+
+  /**
+   * Marks the selection: the given nodes and, for entities and groups, every
+   * brush and point entity below them.
+   */
+  setSelection(doc: Readonly<MapDocument>, ids: Iterable<Id>): void {
+    const selected = new Set<Id>();
+    const walk = (id: Id) => {
+      const node = doc.nodes.get(id);
+      if (!node || selected.has(id)) {
+        return;
+      }
+      selected.add(id);
+      if (node.kind !== 'brush') {
+        node.children.forEach(walk);
+      }
+    };
+    for (const id of ids) {
+      walk(id);
+    }
+    for (const id of new Set([...this.selected, ...selected])) {
+      const record = this.records.get(id);
+      if (record) {
+        this.setState(record.index, record.kind, selected.has(id));
+      }
+    }
+    this.selected = selected;
+  }
+
+  /** The bounds of everything drawn. */
+  bounds(): Aabb | null {
+    return unionAabb([...this.records.values()].map((record) => record.aabb));
+  }
+
+  /** Uploads the state texture if it changed and binds it to a texture unit. */
+  bindState(unit: number): void {
+    const gl = this.gl;
+    gl.activeTexture(gl.TEXTURE0 + unit);
+    gl.bindTexture(gl.TEXTURE_2D, this.stateTexture);
+    if (!this.stateDirty) {
+      return;
+    }
+    const rows = this.state.length / STATE_WIDTH;
+    gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+    if (rows !== this.stateRowsOnGpu) {
+      gl.texImage2D(
+        gl.TEXTURE_2D,
+        0,
+        gl.R8UI,
+        STATE_WIDTH,
+        rows,
+        0,
+        gl.RED_INTEGER,
+        gl.UNSIGNED_BYTE,
+        this.state,
+      );
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+      this.stateRowsOnGpu = rows;
+    } else {
+      gl.texSubImage2D(
+        gl.TEXTURE_2D,
+        0,
+        0,
+        0,
+        STATE_WIDTH,
+        rows,
+        gl.RED_INTEGER,
+        gl.UNSIGNED_BYTE,
+        this.state,
+      );
+    }
+    this.stateDirty = false;
+  }
+
+  dispose(): void {
+    for (const batch of this.batches.values()) {
+      batch.store.dispose();
+    }
+    this.batches.clear();
+    this.records.clear();
+    this.lines.dispose();
+    this.gl.deleteBuffer(this.cornerBuffer);
+    this.gl.deleteTexture(this.stateTexture);
+  }
+
+  private addNode(doc: Readonly<MapDocument>, node: MapNode): void {
+    if (node.kind === 'brush') {
+      const index = this.takeIndex();
+      const mesh = buildBrushMesh(node, index);
+      for (const part of mesh.parts) {
+        this.batch(part.key, part.cls, part.texture).store.write(
+          node.id,
+          part.data,
+          part.vertexCount,
+        );
+      }
+      this.lines.write(node.id, mesh.lines, mesh.lineCount);
+      this.records.set(node.id, {
+        kind: 'brush',
+        index,
+        aabb: mesh.aabb,
+        batchKeys: mesh.parts.map((part) => part.key),
+      });
+      this.setState(index, 'brush', this.selected.has(node.id));
+      return;
+    }
+    // A point entity: an entity without brushes, drawn as a box at its origin.
+    if (node.kind !== 'entity' || node.id === doc.worldspawn || node.children.length > 0) {
+      return;
+    }
+    const origin = entityOrigin(node.props);
+    if (!origin) {
+      return;
+    }
+    const index = this.takeIndex();
+    const box = entityBox(origin);
+    const edges = boxEdges(box);
+    this.lines.write(node.id, writeLines(edges, index), edges.length);
+    this.records.set(node.id, { kind: 'entity', index, aabb: box, batchKeys: [] });
+    this.setState(index, 'entity', this.selected.has(node.id));
+  }
+
+  private removeNode(id: Id): void {
+    const record = this.records.get(id);
+    if (!record) {
+      return;
+    }
+    for (const key of record.batchKeys) {
+      this.batches.get(key)?.store.remove(id);
+    }
+    this.lines.remove(id);
+    this.records.delete(id);
+    this.state[record.index] = 0;
+    this.stateDirty = true;
+    this.freeIndices.push(record.index);
+  }
+
+  private batch(key: string, cls: FaceClass, texture: string): FaceBatch {
+    let batch = this.batches.get(key);
+    if (!batch) {
+      const store = new GpuStore(this.gl, FACE_STRIDE, (buffer) => this.bindFaceAttributes(buffer));
+      batch = { key, cls, texture, store };
+      this.batches.set(key, batch);
+    }
+    return batch;
+  }
+
+  private takeIndex(): number {
+    const index = this.freeIndices.pop() ?? this.nextIndex++;
+    if (index >= this.state.length) {
+      const grown = new Uint8Array(this.state.length * 2);
+      grown.set(this.state);
+      this.state = grown;
+    }
+    return index;
+  }
+
+  private setState(index: number, kind: NodeRecord['kind'], selected: boolean): void {
+    this.state[index] = (kind === 'entity' ? STATE_ENTITY : 0) | (selected ? STATE_SELECTED : 0);
+    this.stateDirty = true;
+  }
+
+  private bindFaceAttributes(buffer: WebGLBuffer): void {
+    const gl = this.gl;
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+    gl.enableVertexAttribArray(0);
+    gl.vertexAttribPointer(0, 3, gl.FLOAT, false, FACE_STRIDE, FACE_OFFSET_POSITION);
+    gl.enableVertexAttribArray(1);
+    gl.vertexAttribPointer(1, 2, gl.FLOAT, false, FACE_STRIDE, FACE_OFFSET_UV);
+    gl.enableVertexAttribArray(2);
+    gl.vertexAttribPointer(2, 3, gl.BYTE, true, FACE_STRIDE, FACE_OFFSET_NORMAL);
+    gl.enableVertexAttribArray(3);
+    gl.vertexAttribIPointer(3, 1, gl.UNSIGNED_INT, FACE_STRIDE, FACE_OFFSET_INDEX);
+  }
+
+  private bindLineAttributes(buffer: WebGLBuffer): void {
+    const gl = this.gl;
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.cornerBuffer);
+    gl.enableVertexAttribArray(0);
+    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+    gl.vertexAttribDivisor(0, 0);
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+    gl.enableVertexAttribArray(1);
+    gl.vertexAttribPointer(1, 3, gl.FLOAT, false, LINE_STRIDE, LINE_OFFSET_A);
+    gl.vertexAttribDivisor(1, 1);
+    gl.enableVertexAttribArray(2);
+    gl.vertexAttribPointer(2, 3, gl.FLOAT, false, LINE_STRIDE, LINE_OFFSET_B);
+    gl.vertexAttribDivisor(2, 1);
+    gl.enableVertexAttribArray(3);
+    gl.vertexAttribIPointer(3, 1, gl.UNSIGNED_INT, LINE_STRIDE, LINE_OFFSET_INDEX);
+    gl.vertexAttribDivisor(3, 1);
+  }
+}

@@ -1,6 +1,6 @@
 /**
  * Builds the tiny synthetic pak, pkz, wal and pcx fixtures committed in
- * this directory. Run with: pnpm exec vite-node tests/fixtures/build-fixtures.ts
+ * this directory. Run with: node tests/fixtures/build-fixtures.ts
  */
 import { deflateRawSync } from 'node:zlib';
 import { writeFileSync } from 'node:fs';
@@ -132,6 +132,240 @@ function buildWal(): Uint8Array {
   return out;
 }
 
+/**
+ * A 64 × 64 texture for the renderer's screenshot tests: 16-texel checker
+ * cells of palette indices 40 and 200, grid lines of index 255, and the
+ * top-left cell filled with index 128 so the texture's origin and
+ * orientation are visible. All four mip levels are present.
+ */
+function buildHarnessWal(): Uint8Array {
+  const size = 64;
+  const mipBytes = [size * size, (size / 2) ** 2, (size / 4) ** 2, (size / 8) ** 2];
+  const out = new Uint8Array(100 + mipBytes.reduce((a, b) => a + b, 0));
+  const view = new DataView(out.buffer);
+  out.set(ascii('e2u1/mine10_1'), 0);
+  view.setUint32(32, size, true);
+  view.setUint32(36, size, true);
+  let offset = 100;
+  mipBytes.forEach((bytes, level) => {
+    view.setUint32(40 + level * 4, offset, true);
+    const s = size >> level;
+    for (let y = 0; y < s; y++) {
+      for (let x = 0; x < s; x++) {
+        const tx = x << level;
+        const ty = y << level;
+        let index = ((tx >> 4) ^ (ty >> 4)) & 1 ? 200 : 40;
+        if (tx < 16 && ty < 16) {
+          index = 128;
+        }
+        if (tx % 16 === 0 || ty % 16 === 0) {
+          index = 255;
+        }
+        out[offset + y * s + x] = index;
+      }
+    }
+    offset += bytes;
+  });
+  return out;
+}
+
+type Point = [number, number, number];
+
+interface Tex {
+  name: string;
+  offset?: [number, number];
+  rotation?: number;
+  scale?: [number, number];
+  /** contents, flags and value; written only when given. */
+  attribs?: [number, number, number];
+}
+
+/**
+ * One .map face line. The three points are ordered so that qbsp3's
+ * PlaneFromPoints, normal = (p0 - p1) x (p2 - p1), points along the outward
+ * normal n.
+ */
+function faceLine([p0, p1, p2]: [Point, Point, Point], n: Point, tex: Tex): string {
+  const t1 = [p0[0] - p1[0], p0[1] - p1[1], p0[2] - p1[2]];
+  const t2 = [p2[0] - p1[0], p2[1] - p1[1], p2[2] - p1[2]];
+  const c = [
+    t1[1]! * t2[2]! - t1[2]! * t2[1]!,
+    t1[2]! * t2[0]! - t1[0]! * t2[2]!,
+    t1[0]! * t2[1]! - t1[1]! * t2[0]!,
+  ];
+  const points = c[0]! * n[0] + c[1]! * n[1] + c[2]! * n[2] > 0 ? [p0, p1, p2] : [p0, p2, p1];
+  const [xoff, yoff] = tex.offset ?? [0, 0];
+  const [xscale, yscale] = tex.scale ?? [1, 1];
+  const attribs = tex.attribs ? ` ${tex.attribs.join(' ')}` : '';
+  return `${points.map((p) => `( ${p.join(' ')} )`).join(' ')} ${tex.name} ${xoff} ${yoff} ${tex.rotation ?? 0} ${xscale} ${yscale}${attribs}`;
+}
+
+function boxBrush(min: Point, max: Point, tex: Tex): string[] {
+  const [x0, y0, z0] = min;
+  const [x1, y1, z1] = max;
+  return [
+    '{',
+    faceLine(
+      [
+        [x1, y0, z0],
+        [x1, y1, z0],
+        [x1, y0, z1],
+      ],
+      [1, 0, 0],
+      tex,
+    ),
+    faceLine(
+      [
+        [x0, y0, z0],
+        [x0, y1, z0],
+        [x0, y0, z1],
+      ],
+      [-1, 0, 0],
+      tex,
+    ),
+    faceLine(
+      [
+        [x0, y1, z0],
+        [x1, y1, z0],
+        [x0, y1, z1],
+      ],
+      [0, 1, 0],
+      tex,
+    ),
+    faceLine(
+      [
+        [x0, y0, z0],
+        [x1, y0, z0],
+        [x0, y0, z1],
+      ],
+      [0, -1, 0],
+      tex,
+    ),
+    faceLine(
+      [
+        [x0, y0, z1],
+        [x1, y0, z1],
+        [x0, y1, z1],
+      ],
+      [0, 0, 1],
+      tex,
+    ),
+    faceLine(
+      [
+        [x0, y0, z0],
+        [x1, y0, z0],
+        [x0, y1, z0],
+      ],
+      [0, 0, -1],
+      tex,
+    ),
+    '}',
+  ];
+}
+
+/**
+ * The renderer's fixture map: a closed room whose brushes cover every draw
+ * path of the views. The floor, the rotated south wall and the ramp use
+ * e2u1/mine10_1, which the E2E harness loads through the texture worker;
+ * e2u1/mine10_2 stays the checker. The ceiling is sky, two panes are
+ * TRANS33 and TRANS66, one brush is clip, the ramp is a grouped wedge with
+ * a sloped face, the door is a brush entity, and the player start and the
+ * light are point entities.
+ */
+function buildRoomMap(): string {
+  const wall: Tex = { name: 'e2u1/mine10_2' };
+  const floor: Tex = { name: 'e2u1/mine10_1' };
+  const lines = [
+    '{',
+    '"classname" "worldspawn"',
+    '"message" "Joole renderer fixture"',
+    ...boxBrush([-272, -272, -16], [272, 272, 0], floor),
+    ...boxBrush([-272, -272, 192], [272, 272, 208], { name: 'e1u1/sky1', attribs: [0, 4, 0] }),
+    ...boxBrush([-272, 256, 0], [272, 272, 192], wall),
+    ...boxBrush([-272, -272, 0], [272, -256, 192], {
+      name: 'e2u1/mine10_1',
+      rotation: 45,
+      scale: [2, 2],
+      offset: [16, 0],
+    }),
+    ...boxBrush([256, -256, 0], [272, 256, 192], wall),
+    ...boxBrush([-272, -256, 0], [-256, 256, 192], wall),
+    ...boxBrush([-128, -4, 0], [0, 4, 128], { name: 'e2u1/glass', attribs: [0, 16, 0] }),
+    ...boxBrush([32, -4, 0], [96, 4, 64], { name: 'e2u1/glass', attribs: [0, 32, 0] }),
+    ...boxBrush([128, 128, 0], [192, 192, 64], { name: 'e1u1/clip', attribs: [0x30000, 0, 0] }),
+    '}',
+    '{',
+    '"classname" "func_group"',
+    '"_joole_id" "g_ramp"',
+    '"_joole_name" "Ramp"',
+    '{',
+    faceLine(
+      [
+        [128, -192, 0],
+        [256, -192, 0],
+        [128, -64, 0],
+      ],
+      [0, 0, -1],
+      floor,
+    ),
+    faceLine(
+      [
+        [256, -192, 0],
+        [256, -64, 0],
+        [256, -192, 64],
+      ],
+      [1, 0, 0],
+      floor,
+    ),
+    faceLine(
+      [
+        [128, -192, 0],
+        [256, -192, 0],
+        [256, -192, 64],
+      ],
+      [0, -1, 0],
+      floor,
+    ),
+    faceLine(
+      [
+        [128, -64, 0],
+        [256, -64, 0],
+        [256, -64, 64],
+      ],
+      [0, 1, 0],
+      floor,
+    ),
+    faceLine(
+      [
+        [128, -192, 0],
+        [256, -192, 64],
+        [128, -64, 0],
+      ],
+      [-1, 0, 2],
+      floor,
+    ),
+    '}',
+    '}',
+    '{',
+    '"classname" "func_door"',
+    '"angle" "90"',
+    '"speed" "100"',
+    ...boxBrush([-48, 200, 0], [48, 216, 112], wall),
+    '}',
+    '{',
+    '"classname" "info_player_start"',
+    '"origin" "0 -128 24"',
+    '"angle" "90"',
+    '}',
+    '{',
+    '"classname" "light"',
+    '"origin" "0 0 160"',
+    '"light" "300"',
+    '}',
+  ];
+  return `${lines.join('\n')}\n`;
+}
+
 function buildPcx(): Uint8Array {
   const out = new Uint8Array(128 + 1 + 768);
   out[0] = 10; // manufacturer
@@ -246,4 +480,6 @@ writeFileSync(
 writeFileSync('tests/fixtures/tiny.pkz', buildPkz());
 writeFileSync('tests/fixtures/tiny.wal', buildWal());
 writeFileSync('tests/fixtures/colormap.pcx', buildPcx());
+writeFileSync('tests/fixtures/harness.wal', buildHarnessWal());
+writeFileSync('tests/fixtures/room.map', buildRoomMap());
 console.log('fixtures built');

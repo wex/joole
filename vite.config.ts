@@ -32,7 +32,7 @@ export default defineConfig({
     },
   },
   optimizeDeps: {
-    entries: ['index.html'],
+    entries: ['index.html', 'tests/e2e/harness/*.html'],
   },
   server: {
     headers: crossOriginHeaders,

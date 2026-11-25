@@ -9,6 +9,7 @@
     "tsBuildInfoFile": "./.tsbuild/test.tsbuildinfo"
   },
   "include": [
+    "src/env.d.ts",
     "tests/**/*.ts",
     "src/**/*.test.ts",
     "src/**/*.bench.ts",

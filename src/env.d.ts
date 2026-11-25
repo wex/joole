@@ -3,6 +3,9 @@ declare module '*.module.css' {
   export default classes;
 }
 
+// Plain style sheets imported for their side effect, such as tokens.css.
+declare module '*.css';
+
 declare module '*?raw' {
   const content: string;
   export default content;
