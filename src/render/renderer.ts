@@ -42,6 +42,11 @@ export interface RendererOptions {
   readonly gap?: number;
   /** Class colour lookup for point entities (0..1 rgb). */
   readonly entityColorOf?: (node: MapNode) => readonly [number, number, number] | null;
+  readonly entityWireframeOf?: (
+    node: MapNode,
+  ) =>
+    | readonly (readonly [readonly [number, number, number], readonly [number, number, number]])[]
+    | null;
 }
 
 export interface RendererStats {
@@ -176,7 +181,7 @@ export class Renderer {
     this.grid = { program: grid, uniforms: uniformLocations(gl, grid, GRID_UNIFORMS) };
     this.emptyVao = gl.createVertexArray();
 
-    this.cache = new GeometryCache(gl, options.entityColorOf);
+    this.cache = new GeometryCache(gl, options.entityColorOf, options.entityWireframeOf);
     this.textures = new TextureManager(
       gl,
       options.loadTexture ?? null,
@@ -218,6 +223,12 @@ export class Renderer {
       this.cache.setSelection(this.doc, ids);
       this.invalidate();
     }
+  }
+
+  /** Rebuilds one node's geometry, e.g. when its model finished loading. */
+  refreshNode(id: string): void {
+    if (!this.doc) return;
+    this.cache.refreshNode(this.doc, id);
   }
 
   /** Dims everything outside the entered scope (null clears the scope). */

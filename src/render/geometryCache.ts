@@ -176,6 +176,12 @@ export class GeometryCache {
     private readonly entityColorOf: (
       node: MapNode,
     ) => readonly [number, number, number] | null = () => null,
+    /** Wireframe edges in model space for point entities with an md2, injected from the app layer. */
+    private readonly entityWireframeOf: (
+      node: MapNode,
+    ) =>
+      | readonly (readonly [readonly [number, number, number], readonly [number, number, number]])[]
+      | null = () => null,
   ) {
     this.invalidIndex = this.takeIndex();
     this.state[this.invalidIndex * 4] = STATE_SELECTED | STATE_INVALID;
@@ -480,13 +486,35 @@ export class GeometryCache {
     }
     const index = this.takeIndex();
     const box = entityBox(origin);
-    const edges = boxEdges(box);
+    const wireframe = this.entityWireframeOf(node);
+    let edges: LineSegment[];
+    if (wireframe && wireframe.length > 0) {
+      // The model replaces the box, translated to the entity origin. md2 models
+      // are Z-up like the map, and frame 0 stands at the origin.
+      edges = wireframe.map(
+        ([a, b]) =>
+          [
+            [a[0] + origin[0], a[1] + origin[1], a[2] + origin[2]],
+            [b[0] + origin[0], b[1] + origin[1], b[2] + origin[2]],
+          ] as LineSegment,
+      );
+    } else {
+      edges = boxEdges(box);
+    }
     const arrow = this.entityAngleArrow(node.props, origin, box);
     const segments = arrow ? [...edges, ...arrow] : edges;
     this.lines.write(node.id, writeLines(segments, index), segments.length);
     this.records.set(node.id, { kind: 'entity', index, aabb: box, batchKeys: [] });
     this.setState(index, 'entity', this.selected.has(node.id));
     this.setEntityColor(index, this.entityColorOf(node));
+  }
+
+  /** Rebuilds one node's geometry, e.g. when its model finished loading. */
+  refreshNode(doc: Readonly<MapDocument>, id: Id): void {
+    const node = doc.nodes.get(id);
+    this.removeNode(id);
+    if (node) this.addNode(doc, node);
+    this.rebuildOverlay();
   }
 
   private removeNode(id: Id): void {

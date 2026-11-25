@@ -44,6 +44,8 @@ import type { GameFileEntry } from '@platform/index';
 import { CommandBus } from './commandBus';
 import { SelectionManager } from './selection';
 import type { PrefabStore } from '@platform/index';
+import { parseMd2, type Md2Wireframe } from '@core/formats/index';
+import { CLASS_MODELS } from '@game/q2/models';
 import { mapTextToPastePatch, removeSelectionPatch, selectionToMapText } from './clipboard';
 import { hollowSelectionPatch, intersectSelectionPatch, subtractSelectionPatch } from './csg';
 import {
@@ -1316,6 +1318,56 @@ export class EditorApp {
   }
 
   /** The renderer's lazy texture loader, over the open VFS, worker and cache. */
+  /** The parsed frame-0 wireframe of a model path, once loaded. */
+  readonly modelWireframes = new Map<string, Md2Wireframe | null>();
+
+  /**
+   * Loads an md2 model through the virtual filesystem and parses its frame-0
+   * wireframe. null entries mark failed lookups so they are not retried.
+   */
+  async loadModel(path: string): Promise<Md2Wireframe | null> {
+    if (this.modelWireframes.has(path)) return this.modelWireframes.get(path) ?? null;
+    if (!this.vfs) return null;
+    const hit = this.vfs.find(path);
+    if (!hit) {
+      this.modelWireframes.set(path, null);
+      return null;
+    }
+    try {
+      const bytes = await hit.read();
+      const wire = parseMd2(
+        bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer,
+      );
+      this.modelWireframes.set(path, wire);
+      return wire;
+    } catch {
+      this.modelWireframes.set(path, null);
+      return null;
+    }
+  }
+
+  /** The wireframe edges of a point entity's model, when one is loaded. */
+  entityWireframe(node: {
+    readonly kind: string;
+    readonly props?: [string, string][];
+  }):
+    | readonly (readonly [readonly [number, number, number], readonly [number, number, number]])[]
+    | null {
+    const classname = node.props?.find(([k]) => k === 'classname')?.[1];
+    if (!classname) return null;
+    const model = CLASS_MODELS[classname];
+    if (!model) return null;
+    const wire = this.modelWireframes.get(model);
+    if (!wire) {
+      // Trigger the asynchronous load; the caller re-asks when it arrives.
+      void this.loadModel(model).then((loaded) => {
+        if (loaded) this.emit({ type: 'document' });
+      });
+      return null;
+    }
+    return wire.edges;
+  }
+
   async loadTexture(name: string): Promise<ConvertedTexture | null> {
     if (!this.vfs || !this.palette) {
       return null;

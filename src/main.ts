@@ -108,6 +108,7 @@ const renderer = new Renderer(canvas, {
     const def = cls ? app.entityDefs().find((d) => d.className === cls) : undefined;
     return def ? def.color : null;
   },
+  entityWireframeOf: (node) => app.entityWireframe(node),
 
   colorSource: document.documentElement,
   loadTexture: (name) => app.loadTexture(name),
