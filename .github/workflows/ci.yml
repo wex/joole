@@ -61,10 +61,10 @@ jobs:
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .nvmrc
-      - name: Rebuild qbsp3
+      - name: Rebuild the compiler wasm
         run: pnpm build:tools
       - name: Verify committed WASM is reproducible
-        run: git diff --exit-code -- workers/wasm
+        run: git diff --exit-code -- public/wasm
 
   conventional-pr-title:
     if: github.event_name == 'pull_request'

@@ -20,7 +20,7 @@ export async function runQbsp3Oracle(
   mapName: string,
   textureNames: readonly string[],
 ): Promise<Qbsp3Result> {
-  const create = (await import('../../workers/wasm/qbsp3.mjs')).default as (options: {
+  const create = (await import('../../public/wasm/qbsp3.mjs')).default as (options: {
     print(text: string): void;
     printErr(text: string): void;
   }) => Promise<QbspModule>;

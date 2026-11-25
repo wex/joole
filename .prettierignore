@@ -7,4 +7,4 @@ test-results/
 .agents/
 pnpm-lock.yaml
 
-workers/wasm/*.mjs
+public/wasm/*.mjs

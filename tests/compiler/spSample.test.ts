@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { runQbsp3Oracle, expectCleanQbsp3 } from './runQbsp3';
+import { runCompilePipeline } from '../../src/app/compile';
+import { nodeRunner } from './nodeRunner';
 
 /**
  * Gate 4: the self-made single-player sample compiles without warnings.
@@ -14,6 +16,27 @@ describe('sp-sample gate compile', () => {
     mkdirSync('tests/fixtures/generated', { recursive: true });
     writeFileSync('tests/fixtures/generated/sp-sample.bsp', result.bsp);
     expect(result.bsp.byteLength).toBeGreaterThan(1024);
+  });
+
+  it('compiles through the full chain into the lit playthrough artifact', async () => {
+    // The gate's manual step is played in q2pro, so the committed artifact is
+    // the lit output of the whole chain, not the qbsp3-only intermediate.
+    const text = readFileSync('tests/fixtures/maps/sp-sample.map', 'utf8');
+    const wal = readFileSync('tests/fixtures/game/baseq2/textures/e2u1/mine10_1.wal');
+    const colormap = readFileSync('tests/fixtures/colormap.pcx');
+    const result = await runCompilePipeline(
+      nodeRunner,
+      'normal',
+      'sp-sample',
+      text,
+      [{ name: 'e2u1/mine10_1', data: new Uint8Array(wal) }],
+      new Uint8Array(colormap),
+    );
+    expect(result.leaked).toBe(false);
+    expect(result.steps).toEqual(['qbsp3', 'qvis3', 'qrad3']);
+    mkdirSync('tests/fixtures/generated', { recursive: true });
+    writeFileSync('tests/fixtures/generated/sp-sample.bsp', result.bsp);
+    expect(result.bsp.byteLength).toBeGreaterThan(10000);
   });
 
   it('contains the gate actors: start, door, button, monster', () => {

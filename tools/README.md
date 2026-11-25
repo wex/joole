@@ -16,4 +16,4 @@ Joole changes there:
 2. `common/lbmlib.c` and `lbmlib.h` were copied from the top-level Quake-2-Tools `common/` for qrad3's colormap loading.
 3. All tools build with `-fcommon` for the legacy tentative definitions, and qvis3/qrad3 build with a 4 MB stack (`-sSTACK_SIZE`), because their recursion overflows the 64 kB default.
 
-Build with `pnpm build:tools` (or `make -C tools/qbsp3` when `emcc` is installed). The output is committed in `workers/wasm/` for reproducibility and normal development without emsdk.
+Build with `pnpm build:tools` (or `make -C tools/qbsp3` when `emcc` is installed). The output is committed in `public/wasm/` for reproducibility and normal development without emsdk.

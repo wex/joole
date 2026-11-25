@@ -24,19 +24,38 @@ function respond(message: CompileResponse, transfer: Transferable[] = []): void 
   postMessage(message, { transfer });
 }
 
+/**
+ * The threaded variants use emscripten pthreads over nested web workers with
+ * a shared memory. They need cross-origin isolation (SharedArrayBuffer) and a
+ * browser with nested workers; anything else falls back to the
+ * single-threaded build, which the tools' threads.c then runs inline.
+ */
+function threadingAvailable(): boolean {
+  return (
+    typeof crossOriginIsolated !== 'undefined' &&
+    crossOriginIsolated &&
+    typeof SharedArrayBuffer !== 'undefined'
+  );
+}
+
+/**
+ * The emscripten modules load as static assets, not through the bundler: a
+ * threaded module spawns its pthread workers from its own import.meta.url,
+ * which only resolves when the file is served verbatim. Vite copies public/
+ * untouched in both dev and production.
+ */
 async function loadTool(tool: CompileRequest['tool']): Promise<{
   default: (options: {
     print(t: string): void;
     printErr(t: string): void;
   }) => Promise<CompileModule>;
 }> {
-  if (tool === 'qbsp3') {
-    return (await import('./wasm/qbsp3.mjs')) as never;
+  const base = (import.meta as { env?: { BASE_URL?: string } }).env?.BASE_URL ?? '/';
+  let file = `${tool}.mjs`;
+  if (tool !== 'qbsp3' && threadingAvailable()) {
+    file = `${tool}t.mjs`;
   }
-  if (tool === 'qvis3') {
-    return (await import('./wasm/qvis3.mjs')) as never;
-  }
-  return (await import('./wasm/qrad3.mjs')) as never;
+  return (await import(/* @vite-ignore */ `${base}wasm/${file}`)) as never;
 }
 
 onmessage = async (event: MessageEvent<CompileRequest>) => {
@@ -50,6 +69,8 @@ onmessage = async (event: MessageEvent<CompileRequest>) => {
       output += `${text}\n`;
       respond({ type: 'log', stream, text });
     };
+    const file_is_threaded = threadingAvailable();
+    const tool_uses_threads = request.tool !== 'qbsp3';
     const module = await create({
       print: capture('out'),
       printErr: capture('err'),
@@ -78,7 +99,18 @@ onmessage = async (event: MessageEvent<CompileRequest>) => {
     for (const file of request.files) {
       module.FS.writeFile(file.path, file.data);
     }
-    module.callMain([...request.args]);
+    const args = [...request.args];
+    if (tool_uses_threads && file_is_threaded) {
+      // The pool is preallocated with the module (PTHREAD_POOL_SIZE=8), and
+      // exceeding it deadlocks the nested workers, so the thread count is
+      // capped there rather than left at the machine default.
+      const cap = Math.min(
+        typeof navigator !== 'undefined' ? navigator.hardwareConcurrency || 4 : 4,
+        8,
+      );
+      args.unshift('-threads', String(cap));
+    }
+    module.callMain(args);
     const files: { path: string; data: Uint8Array }[] = [];
     const transfer: Transferable[] = [];
     for (const path of request.outputs) {
