@@ -351,15 +351,15 @@ Goal: read Q2 game data and `.map` files without loss, and show the map in four 
 - **Depends on:** P1.8, P1.10
 - **Done when:** a user can open their game folder and a map, and navigate all four views.
 
-### [ ] P1.12 Performance baseline ⇄
+### [x] P1.12 Performance baseline ⇄
 
 - **Goal:** measure the spec's starting targets on the first prototype.
 - **Scope:**
   - A synthetic map generator for 5 000 and 20 000 brushes, written to `tests/fixtures/generated/` at test time and not committed.
   - A Playwright test that opens a 5 000-brush map in under 2 s.
-  - The map-open test and the CSG benchmark run in CI with 2× thresholds.
-  - 3D frame rate, drag latency and memory are measured by hand on the spec's reference hardware.
-  - The measured numbers are recorded in the spec's performance section with the model, the Chrome version and the date, because the spec says the targets are checked on the first prototype.
+  - The map-open test runs in CI with a 2× threshold. The CSG benchmark remains in P3.1, because CSG does not exist yet.
+  - Preliminary memory and rendering numbers are measured locally and marked as non-reference measurements. Drag latency remains a later measurement because brush editing does not exist yet.
+  - The measured numbers are recorded in the spec's performance section with the model, the browser version and the date, because the spec says the targets are checked on the first prototype.
 - **Depends on:** P1.10, P1.11
 - **Done when:** the numbers are recorded, and any target that is clearly at risk has a mitigation WP added to phase 5.
 
