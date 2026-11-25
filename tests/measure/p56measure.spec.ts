@@ -123,17 +123,42 @@ test('measures drag latency on the 5000-brush map', async ({ page }, testInfo) =
   await page.evaluate(() => (window as unknown as JooleWindow).joole!.whenIdle());
 
   const views = await joole(page);
-  // Select the brush at the centre of the top view.
-  await page.mouse.click(views.top.x, views.top.y);
-  await expect
-    .poll(() => page.evaluate(() => (window as unknown as JooleWindow).joole!.selection().length), {
-      timeout: 10000,
-    })
-    .toBeGreaterThan(0);
+  // Select a brush near the centre of the top view. The exact centre of the
+  // generated lattice is a degenerate hit/miss point that pixel rounding
+  // decides differently across environments, so scan a few nearby offsets —
+  // the boxes cover most of each lattice period, so one of them hits.
+  const offsets: Array<[number, number]> = [
+    [0, 0],
+    [24, 0],
+    [-24, 0],
+    [0, 24],
+    [0, -24],
+    [24, 24],
+    [-24, -24],
+    [48, 0],
+    [0, 48],
+    [48, 48],
+  ];
+  let sx = views.top.x;
+  let sy = views.top.y;
+  let picked = false;
+  for (const [dx, dy] of offsets) {
+    await page.mouse.click(views.top.x + dx, views.top.y + dy);
+    const n = await page.evaluate(
+      () => (window as unknown as JooleWindow).joole!.selection().length,
+    );
+    if (n > 0) {
+      sx = views.top.x + dx;
+      sy = views.top.y + dy;
+      picked = true;
+      break;
+    }
+  }
+  expect(picked, 'no brush hit at any scanned offset').toBe(true);
 
   // Measure single-step input-to-frame latency: real move, then wait in-page
   // for the frame counter to advance and time that interval inside the page.
-  await page.mouse.move(views.top.x, views.top.y);
+  await page.mouse.move(sx, sy);
   await page.mouse.down();
   const samples: number[] = [];
   for (let i = 1; i <= 12; i++) {
@@ -151,7 +176,7 @@ test('measures drag latency on the 5000-brush map', async ({ page }, testInfo) =
         setTimeout(() => resolve(-1), 3000);
       });
     });
-    await page.mouse.move(views.top.x + i * 8, views.top.y + i * 8);
+    await page.mouse.move(sx + i * 8, sy + i * 8);
     const latency = await armed;
     if (latency >= 0) samples.push(latency);
   }
