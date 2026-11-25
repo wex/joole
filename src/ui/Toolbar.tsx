@@ -3,7 +3,7 @@ import type { PrimitiveKind } from '@core/geom/index';
 import { Icon } from './Icon';
 import styles from './Toolbar.module.css';
 
-export type ToolbarTool = 'select' | 'brush' | 'clip' | 'vertex' | 'face';
+export type ToolbarTool = 'select' | 'brush' | 'clip' | 'vertex' | 'face' | 'texture';
 
 export interface ToolbarProps {
   readonly gridSize: number;
@@ -21,6 +21,10 @@ export interface ToolbarProps {
   readonly onFlip: (axis: 0 | 1 | 2) => void;
   readonly onMirror: (axis: 0 | 1 | 2) => void;
   readonly onRotate90: () => void;
+  readonly onApplyTexture: () => void;
+  readonly onFitTexture: () => void;
+  readonly onResetTexture: () => void;
+  readonly onJustifyTexture: (edge: 'left' | 'right' | 'top' | 'bottom') => void;
   readonly onGridSize: (size: number) => void;
   readonly textureLock: boolean;
   readonly onToggleTheme: () => void;
@@ -45,7 +49,7 @@ const tools = [
   tool('clip', 'Clip (C)', 'clip', true),
   tool('vertex', 'Vertex/edge (V)', 'move', true),
   tool('face', 'Face (F)', 'scan', true),
-  tool('texture', 'Texture (T)', 'brush'),
+  tool('texture', 'Texture (T)', 'brush', true),
 ];
 
 const primitives: PrimitiveKind[] = ['box', 'wedge', 'cylinder', 'cone', 'sphere'];
@@ -200,6 +204,57 @@ export function Toolbar(props: ToolbarProps) {
             <li role="none">
               <button type="button" role="menuitem" onClick={() => choose(props.onRotate90)}>
                 Rotate 90°
+              </button>
+            </li>
+            <li role="none">
+              <button type="button" role="menuitem" onClick={() => choose(props.onApplyTexture)}>
+                Apply Texture
+              </button>
+            </li>
+            <li role="none">
+              <button type="button" role="menuitem" onClick={() => choose(props.onFitTexture)}>
+                Fit Texture
+              </button>
+            </li>
+            <li role="none">
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => choose(() => props.onJustifyTexture('left'))}
+              >
+                Justify Left
+              </button>
+            </li>
+            <li role="none">
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => choose(() => props.onJustifyTexture('right'))}
+              >
+                Justify Right
+              </button>
+            </li>
+            <li role="none">
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => choose(() => props.onJustifyTexture('top'))}
+              >
+                Justify Top
+              </button>
+            </li>
+            <li role="none">
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => choose(() => props.onJustifyTexture('bottom'))}
+              >
+                Justify Bottom
+              </button>
+            </li>
+            <li role="none">
+              <button type="button" role="menuitem" onClick={() => choose(props.onResetTexture)}>
+                Reset Texture
               </button>
             </li>
           </ul>

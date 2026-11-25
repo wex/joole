@@ -8,17 +8,29 @@ import type {
   Patch,
   Vec3,
 } from '@core/types/index';
-import { PALETTE_PATH } from '@game/q2/index';
+import { DEFAULT_TEXTURE, PALETTE_PATH } from '@game/q2/index';
 import type { GameFileEntry } from '@platform/index';
 import { CommandBus } from './commandBus';
 import { SelectionManager } from './selection';
 import { mapTextToPastePatch, removeSelectionPatch, selectionToMapText } from './clipboard';
 import { hollowSelectionPatch, intersectSelectionPatch, subtractSelectionPatch } from './csg';
+import {
+  allFacesOf,
+  applyTexturePatch,
+  fitTexturePatch,
+  justifyTexturePatch,
+  resetTexturePatch,
+  rotateTexturePatch,
+  shiftTexturePatch,
+  type FaceRef,
+  type JustifyEdge,
+} from './textureOps';
 import { createFlipCommand, createRotate90Command, mirrorSelectionPatch } from './mirrorCommands';
 import {
   BrushTool,
   ClipTool,
   SelectTool,
+  TextureTool,
   VertexTool,
   type ToolOutput,
   type ToolPointerEvent,
@@ -83,7 +95,7 @@ export type EditorEvent =
   | { readonly type: 'recovery' };
 
 export type EditorListener = (event: EditorEvent) => void;
-export type EditorToolMode = 'select' | 'brush' | 'clip' | 'vertex' | 'face';
+export type EditorToolMode = 'select' | 'brush' | 'clip' | 'vertex' | 'face' | 'texture';
 
 const MAX_LOG_ENTRIES = 500;
 
@@ -128,6 +140,7 @@ export class EditorApp {
   private readonly brushTool: BrushTool;
   private readonly clipTool: ClipTool;
   private readonly vertexTool: VertexTool;
+  private readonly textureTool: TextureTool;
   private toolMode: EditorToolMode = 'select';
   private map: string | null = null;
   private vfs: Awaited<ReturnType<typeof openGameVfs>> | null = null;
@@ -135,6 +148,8 @@ export class EditorApp {
   private textures = 0;
   private grid = 8;
   private textureLock = false;
+  private currentTexture = DEFAULT_TEXTURE;
+  private textureDims = new Map<string, readonly [number, number]>();
 
   constructor(options: EditorAppOptions) {
     this.inflate = options.inflate;
@@ -171,10 +186,15 @@ export class EditorApp {
       () => this.gridSize,
       () => this.selection,
     );
+    this.textureTool = new TextureTool(
+      () => this.document,
+      () => this.gridSize,
+    );
     this.bus.subscribe((event) => {
       if (event.type !== 'history') {
         this.dirty = true;
         this.selectTool.applyPatch(event.document, event.patch);
+        this.textureTool.applyPatch(event.document, event.patch);
         this.emit({ type: 'document', patch: event.patch });
       }
     });
@@ -355,6 +375,7 @@ export class EditorApp {
       this.bus.reset(doc);
       this.selectionManager.clear();
       this.selectTool.syncDocument(doc);
+      this.textureTool.syncDocument(doc);
       this.map = name;
       this.emit({ type: 'document' });
       this.log('ok', `Opened map ${name} (${plural(doc.nodes.size, 'node')}).`);
@@ -584,6 +605,7 @@ export class EditorApp {
     this.brushTool.cancel();
     this.clipTool.cancel();
     this.vertexTool.cancel();
+    this.textureTool.cancel();
     this.toolMode = mode;
     this.emit({ type: 'tool' });
   }
@@ -607,7 +629,9 @@ export class EditorApp {
           ? this.clipTool
           : this.toolMode === 'vertex' || this.toolMode === 'face'
             ? this.vertexTool
-            : this.selectTool;
+            : this.toolMode === 'texture'
+              ? this.textureTool
+              : this.selectTool;
     const output = tool.pointer(event);
     for (const command of output.commands) {
       try {
@@ -619,6 +643,14 @@ export class EditorApp {
     }
     if (output.selection) {
       this.setSelection(output.selection);
+    }
+    if (output.faces) {
+      this.emit({ type: 'tool' });
+    }
+    if (output.pickedTexture) {
+      this.currentTexture = output.pickedTexture;
+      this.log('info', `Picked texture ${output.pickedTexture}.`);
+      this.emit({ type: 'tool' });
     }
     return output;
   }
@@ -698,6 +730,113 @@ export class EditorApp {
     return saved;
   }
 
+  /** The face targets of the texture tools: picked faces, or whole selected brushes. */
+  textureTargets(): FaceRef[] {
+    const picked = this.textureTool.faceSelection;
+    if (picked.length > 0) {
+      return [...picked];
+    }
+    return allFacesOf(this.document, this.selection);
+  }
+
+  get faceSelectionCount(): number {
+    return this.textureTool.faceSelection.length;
+  }
+
+  get currentTextureName(): string {
+    return this.currentTexture;
+  }
+
+  setCurrentTexture(name: string): void {
+    if (!name) return;
+    this.currentTexture = name;
+    this.emit({ type: 'tool' });
+  }
+
+  clearFaceSelection(): void {
+    this.textureTool.clearFaceSelection();
+    this.emit({ type: 'tool' });
+  }
+
+  private textureSize(name: string): readonly [number, number] {
+    // Fit and justify need real texel dimensions; unloaded textures use the
+    // wal default of 64x64 until the renderer has converted them.
+    return this.textureDims.get(name) ?? [64, 64];
+  }
+
+  private editTextures(label: string, build: (faces: readonly FaceRef[]) => Patch | null): boolean {
+    const faces = this.textureTargets();
+    if (faces.length === 0) {
+      this.log('info', 'No faces or brushes selected.');
+      return false;
+    }
+    const patch = build(faces);
+    if (!patch) {
+      this.log('warning', 'Texture edit did not apply to the selection.');
+      return false;
+    }
+    this.executeCommand({ label, run: () => patch });
+    return true;
+  }
+
+  /** Applies the current texture to the selected faces or brushes. */
+  applyCurrentTexture(): boolean {
+    return this.editTextures('Apply Texture', (faces) =>
+      applyTexturePatch(this.document, faces, this.currentTexture),
+    );
+  }
+
+  /** Arrow-key texture shift: offsets move by the grid step in integer texels. */
+  shiftTextures(ds: number, dt: number): boolean {
+    return this.editTextures('Shift Texture', (faces) =>
+      shiftTexturePatch(this.document, faces, ds, dt),
+    );
+  }
+
+  rotateTextures(degrees: number): boolean {
+    return this.editTextures('Rotate Texture', (faces) =>
+      rotateTexturePatch(this.document, faces, degrees),
+    );
+  }
+
+  fitTextures(): boolean {
+    return this.editTextures('Fit Texture', (faces) => {
+      const [w, h] = this.textureSize(this.currentTexture);
+      return fitTexturePatch(this.document, faces, w, h);
+    });
+  }
+
+  justifyTextures(edge: JustifyEdge): boolean {
+    return this.editTextures('Justify Texture', (faces) => {
+      const [w, h] = this.textureSize(this.currentTexture);
+      return justifyTexturePatch(this.document, faces, edge, w, h);
+    });
+  }
+
+  resetTextures(): boolean {
+    return this.editTextures('Reset Texture', (faces) => resetTexturePatch(this.document, faces));
+  }
+
+  /**
+   * Arrow keys with the texture tool active. Plain arrows shift the texture
+   * by the grid step in the arrow direction (the texture follows the arrow);
+   * Shift+Left/Right rotates by the grid step in degrees.
+   */
+  textureArrow(key: string, shift: boolean): boolean {
+    const grid = this.gridSize;
+    if (shift && (key === 'ArrowLeft' || key === 'ArrowRight')) {
+      return this.rotateTextures(key === 'ArrowLeft' ? -grid : grid);
+    }
+    if (shift) return false;
+    // A positive shift moves the sampled texel forward, so the texture moves
+    // against the offset direction: right/up subtract the grid step.
+    if (key === 'ArrowLeft') return this.shiftTextures(grid, 0);
+    if (key === 'ArrowRight') return this.shiftTextures(-grid, 0);
+    if (key === 'ArrowUp') return this.shiftTextures(0, grid);
+    if (key === 'ArrowDown') return this.shiftTextures(0, -grid);
+    return false;
+  }
+
   async exportMap(): Promise<boolean> {
     if (!this.saveMapText) return false;
     const result = this.exportMapText();
@@ -712,6 +851,7 @@ export class EditorApp {
       this.bus.reset(doc);
       this.selectionManager.clear();
       this.selectTool.syncDocument(doc);
+      this.textureTool.syncDocument(doc);
       this.map = name;
       this.emit({ type: 'document' });
       this.log('ok', `Opened project ${name} (${plural(doc.nodes.size, 'node')}).`);
@@ -739,10 +879,12 @@ export class EditorApp {
     const key = `${source}:${path}:${hit.size}`;
     const cached = await this.textureCache?.get(key);
     if (cached) {
+      this.textureDims.set(name, [cached.width, cached.height]);
       return cached;
     }
     const wal = await hit.read();
     const converted = await this.textureClient.convert(copyBuffer(wal), copyBuffer(this.palette));
+    this.textureDims.set(name, [converted.width, converted.height]);
     if (this.textureCache) {
       void this.textureCache.put(key, converted).catch(() => {
         // A cache write failure only means the next open converts the texture again.

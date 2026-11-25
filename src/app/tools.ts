@@ -48,6 +48,10 @@ export interface ToolOutput {
   readonly preview?: readonly PreviewSegment[];
   /** Rejected-edit segments, drawn dashed in `vp-invalid`. */
   readonly invalid?: readonly PreviewSegment[];
+  /** Face selection reported by the texture tool (application state). */
+  readonly faces?: readonly { brush: Id; face: number }[];
+  /** Texture name picked by the eyedropper. */
+  readonly pickedTexture?: string;
 }
 
 function boxSegments(min: Vec3, max: Vec3): PreviewSegment[] {
@@ -901,4 +905,123 @@ export class SelectTool {
     }
     return out;
   }
+}
+
+/**
+ * Texture tool (T): picks faces in the 3D view. A plain click replaces the
+ * face selection, Shift adds or removes, and Ctrl is the eyedropper: it
+ * reports the clicked face's texture instead of changing the selection.
+ * The face selection itself is application state; the tool only reports it.
+ */
+export class TextureTool {
+  private readonly bvh = new BrushBvh();
+  private doc: Readonly<MapDocument>;
+  private faces: FacePick[] = [];
+  private readonly cycler = new OverlapCycler();
+
+  constructor(
+    private readonly getDocument: () => Readonly<MapDocument>,
+    private readonly gridSize: () => number = () => 8,
+  ) {
+    this.doc = getDocument();
+    this.rebuild();
+  }
+
+  syncDocument(doc: Readonly<MapDocument>): void {
+    this.doc = doc;
+    this.rebuild();
+    this.faces = this.faces.filter((ref) => this.valid(ref));
+  }
+
+  applyPatch(doc: Readonly<MapDocument>, patch: Patch): void {
+    this.doc = doc;
+    this.bvh.applyPatch(patch);
+    this.faces = this.faces.filter((ref) => this.valid(ref));
+  }
+
+  get faceSelection(): readonly FacePick[] {
+    return this.faces;
+  }
+
+  /** Replaces the face selection from the application side, validating it. */
+  setFaceSelection(faces: readonly FacePick[]): void {
+    this.faces = faces.filter((ref) => this.valid(ref));
+  }
+
+  clearFaceSelection(): void {
+    this.faces = [];
+  }
+
+  cancel(): void {
+    // The texture tool has no drag state; face picking happens on click.
+  }
+
+  pointer(event: ToolPointerEvent): ToolOutput {
+    if (event.type !== 'down' || event.button !== 0) {
+      return { commands: [] };
+    }
+    if (event.view !== '3d') {
+      // Faces are picked in 3D only (spec: texture tool section).
+      return { commands: [] };
+    }
+    this.doc = this.getDocument();
+    const hit = this.hitFace(event);
+    if (!hit) {
+      if (!event.shift && !event.ctrl) {
+        this.faces = [];
+        return { commands: [], faces: [] };
+      }
+      return { commands: [] };
+    }
+    const node = this.doc.nodes.get(hit.brush);
+    const face = node?.kind === 'brush' ? node.faces[hit.face] : undefined;
+    if (event.ctrl) {
+      return face ? { commands: [], pickedTexture: face.tex.name } : { commands: [] };
+    }
+    const existing = this.faces.findIndex(
+      (ref) => ref.brush === hit.brush && ref.face === hit.face,
+    );
+    if (event.shift) {
+      this.faces =
+        existing >= 0 ? this.faces.filter((_, i) => i !== existing) : [...this.faces, hit];
+    } else {
+      this.faces = existing >= 0 && this.faces.length === 1 ? [] : [hit];
+    }
+    return { commands: [], faces: [...this.faces] };
+  }
+
+  private rebuild(): void {
+    this.bvh.clear();
+    for (const node of this.doc.nodes.values()) {
+      if (node.kind === 'brush') {
+        this.bvh.insert(node.id, node);
+      }
+    }
+  }
+
+  private valid(ref: FacePick): boolean {
+    const node = this.doc.nodes.get(ref.brush);
+    return node?.kind === 'brush' && ref.face >= 0 && ref.face < node.faces.length;
+  }
+
+  private hitFace(event: ToolPointerEvent): FacePick | null {
+    const hits = this.bvh.rayHits(event.point, event.direction ?? [1, 0, 0]);
+    const usable = hits.filter((hit) => hit.faceIndex !== null);
+    if (usable.length === 0) {
+      return null;
+    }
+    const key = event.point.map((x) => Math.round(x / Math.max(1, this.gridSize()))).join(':');
+    const chosen = this.cycler.choose(
+      usable.map((hit) => hit.id),
+      `tex:${event.view}:${key}`,
+    );
+    const hit = usable.find((candidate) => candidate.id === chosen) ?? usable[0]!;
+    return { brush: hit.id, face: hit.faceIndex ?? 0 };
+  }
+}
+
+/** A face picked by the texture tool: the brush and its face index. */
+export interface FacePick {
+  readonly brush: Id;
+  readonly face: number;
 }

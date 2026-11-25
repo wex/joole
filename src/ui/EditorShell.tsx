@@ -514,6 +514,18 @@ export function EditorShell(props: EditorShellProps) {
         renderer.setToolPreview(output.preview ?? [], output.invalid ?? []);
         return;
       }
+      if (
+        app.activeTool === 'texture' &&
+        (event.key === 'ArrowLeft' ||
+          event.key === 'ArrowRight' ||
+          event.key === 'ArrowUp' ||
+          event.key === 'ArrowDown')
+      ) {
+        if (app.textureArrow(event.key, event.shiftKey)) {
+          event.preventDefault();
+          return;
+        }
+      }
       const action = shortcutAction({
         key: event.key,
         ctrl: event.ctrlKey || event.metaKey,
@@ -552,7 +564,8 @@ export function EditorShell(props: EditorShellProps) {
           action === 'tool-brush' ||
           action === 'tool-clip' ||
           action === 'tool-vertex-edge' ||
-          action === 'tool-face') &&
+          action === 'tool-face' ||
+          action === 'tool-texture') &&
         !(pointerLocked || rightFly)
       ) {
         event.preventDefault();
@@ -565,7 +578,9 @@ export function EditorShell(props: EditorShellProps) {
                 ? 'clip'
                 : action === 'tool-vertex-edge'
                   ? 'vertex'
-                  : 'face',
+                  : action === 'tool-face'
+                    ? 'face'
+                    : 'texture',
         );
         return;
       }
@@ -673,6 +688,10 @@ export function EditorShell(props: EditorShellProps) {
         onFlip={(axis) => app.flipSelection(axis)}
         onMirror={(axis) => app.mirrorSelection(axis)}
         onRotate90={() => app.rotate90Selection()}
+        onApplyTexture={() => app.applyCurrentTexture()}
+        onFitTexture={() => app.fitTextures()}
+        onResetTexture={() => app.resetTextures()}
+        onJustifyTexture={(edge) => app.justifyTextures(edge)}
         onGridSize={(size) => app.setGridSize(size)}
         onToggleTheme={toggleTheme}
         textureLock={textureLock()}
