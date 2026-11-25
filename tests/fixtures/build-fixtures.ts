@@ -367,15 +367,39 @@ function buildRoomMap(): string {
 }
 
 function buildPcx(): Uint8Array {
-  const out = new Uint8Array(128 + 1 + 768);
-  out[0] = 10; // manufacturer
-  out[2] = 1; // encoding
-  out[128] = 0x0c;
-  for (let i = 0; i < 256; i++) {
-    out[129 + i * 3] = i;
-    out[129 + i * 3 + 1] = 255 - i;
-    out[129 + i * 3 + 2] = 0;
+  // A valid 64x64 8-bit PCX, strict enough for qrad3's lbmlib decoder:
+  // manufacturer 0x0a, version 5, RLE encoding, the dimension fields set,
+  // real pixel data and the 768-byte palette trailer. The pixels are a
+  // palette-index ramp; the palette is the same red-green gradient as before.
+  const w = 64;
+  const h = 64;
+  const header = new Uint8Array(128);
+  const view = new DataView(header.buffer);
+  header[0] = 10; // manufacturer
+  header[1] = 5; // version
+  header[2] = 1; // encoding
+  header[3] = 8; // bits per pixel
+  view.setUint16(8, w - 1, true); // xmax
+  view.setUint16(10, h - 1, true); // ymax
+  view.setUint16(12, w, true); // hres
+  view.setUint16(14, h, true); // vres
+  view.setUint16(66, w, true); // bytes per line
+  view.setUint16(68, 1, true); // palette type
+  // Pixel rows: ramp 0..63 cycling, all below 0xc0 so literals are safe.
+  const pixels: number[] = [];
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      pixels.push((x + y) % 64);
+    }
   }
+  const palette: number[] = [0x0c];
+  for (let i = 0; i < 256; i++) {
+    palette.push(i, 255 - i, 0);
+  }
+  const out = new Uint8Array(128 + pixels.length + palette.length);
+  out.set(header, 0);
+  out.set(pixels, 128);
+  out.set(palette, 128 + pixels.length);
   return out;
 }
 
