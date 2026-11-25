@@ -12,3 +12,19 @@ declare module '*?url' {
   const url: string;
   export default url;
 }
+
+// File System Access API types missing from the DOM library (24.11.2026)
+interface FileSystemPermissionDescriptor {
+  mode?: 'read' | 'readwrite';
+}
+
+interface FileSystemDirectoryHandle {
+  queryPermission(descriptor?: FileSystemPermissionDescriptor): Promise<PermissionState>;
+  requestPermission(descriptor?: FileSystemPermissionDescriptor): Promise<PermissionState>;
+}
+
+interface Window {
+  showDirectoryPicker(options?: {
+    mode?: 'read' | 'readwrite';
+  }): Promise<FileSystemDirectoryHandle>;
+}
