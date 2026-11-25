@@ -7,3 +7,4 @@ export * from './mapParse';
 export * from './mapWrite';
 export * from './walRgba';
 export * from './project';
+export * from './quaked';
