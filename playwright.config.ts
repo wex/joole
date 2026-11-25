@@ -1,7 +1,6 @@
 import { defineConfig, devices } from '@playwright/test';
 
 const chromiumArgs = ['--use-angle=swiftshader'];
-const disabledUntilP55 = /a^/;
 
 export default defineConfig({
   testDir: 'tests/e2e',
@@ -38,12 +37,19 @@ export default defineConfig({
     // Firefox and WebKit are defined here but disabled until P5.5.
     {
       name: 'firefox',
-      grep: disabledUntilP55,
-      use: { ...devices['Desktop Firefox'] },
+      use: {
+        ...devices['Desktop Firefox'],
+        launchOptions: {
+          firefoxUserPrefs: {
+            // CI hosts have no GPU; force the software WebGL path.
+            'webgl.force-enabled': true,
+            'webgl.out-of-process': false,
+          },
+        },
+      },
     },
     {
       name: 'webkit',
-      grep: disabledUntilP55,
       use: { ...devices['Desktop Safari'] },
     },
   ],

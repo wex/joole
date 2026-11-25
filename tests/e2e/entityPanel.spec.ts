@@ -111,7 +111,10 @@ test('edits entity keys, spawnflags and class through the panel', async ({ page 
   expect(props).toContainEqual(['targetname', 'sold1']);
   expect(props).toContainEqual(['angle', '180']);
 
-  // Undo chain reaches back over the edits.
+  // Undo chain reaches back over the edits. Focus must leave the form
+  // controls first: Firefox keeps the select focused and would consume
+  // Ctrl+Z as native text undo instead of the editor's shortcut.
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
   for (let i = 0; i < 5; i++) await page.keyboard.press('Control+z');
   expect(await monsterProps(page)).not.toContainEqual(['spawnflags', '1']);
 });

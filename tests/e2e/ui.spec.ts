@@ -254,7 +254,10 @@ test('the brush tool creates a primitive in a 2D view and undo removes it', asyn
 
 test('copy, paste, cut and duplicate operate on the selection', async ({ page, context }) => {
   const errors = consoleErrors(page);
-  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  // Firefox has no clipboard permission names; the copy paths do not need
+  // them for the node-count assertions either, so an unsupported grant is
+  // simply skipped.
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']).catch(() => {});
   await openFixtureMap(page);
   const nodesBefore = await page.evaluate(
     () => (window as unknown as JooleWindow).joole!.stats().nodes,

@@ -1,6 +1,6 @@
 {
   "name": "joole",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
   "license": "GPL-2.0-or-later",
@@ -24,13 +24,16 @@
     "e2e": "playwright test",
     "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build",
     "build:tools": "sh tools/build.sh",
-    "gen:entities": "vite-node scripts/gen-entities.ts"
+    "gen:entities": "vite-node scripts/gen-entities.ts",
+    "e2e:production": "playwright test --config playwright.production.config.ts",
+    "measure": "playwright test --config playwright.measure.config.ts"
   },
   "dependencies": {
     "@solidjs/web": "^2.0.0",
     "lucide-static": "^1.74.0",
     "nanoid": "^6.0.2",
-    "solid-js": "^2.0.0"
+    "solid-js": "^2.0.0",
+    "workbox-window": "7.4.1"
   },
   "devDependencies": {
     "@playwright/test": "^1.65.1",

@@ -24,9 +24,9 @@ if (!root) {
   throw new Error('missing #app element');
 }
 
-const textureCache = await TextureCache.openOpfs().catch(() => null);
-const projectStore = await ProjectStore.openOpfs().catch(() => null);
-const prefabStore = await PrefabStore.openOpfs().catch(() => null);
+const textureCache = await TextureCache.openLocal().catch(() => null);
+const projectStore = await ProjectStore.openLocal().catch(() => null);
+const prefabStore = await PrefabStore.openLocal().catch(() => null);
 const settings = (await projectStore?.loadSettings()) ?? null;
 const textureClient = new TextureClient();
 
