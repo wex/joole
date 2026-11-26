@@ -112,3 +112,30 @@ export function subtreeIds(doc: Readonly<MapDocument>, id: Id): Id[] {
   walk(id);
   return out;
 }
+
+/**
+ * The outermost group containing `id` that lies below the scope (T1.13), or
+ * null when the node is not in any visible group. A group inside the scope
+ * group itself does not count: inside a group's scope its members are edited
+ * as individuals. Locked or hidden groups make the hit unselectable.
+ */
+export function outermostGroupInScope(
+  doc: Readonly<MapDocument>,
+  id: Id,
+  scopeId: Id | null,
+): Id | null | 'locked' {
+  const chain: Id[] = [];
+  let at: Id | undefined = doc.parent.get(id);
+  while (at !== undefined) {
+    const node = doc.nodes.get(at);
+    if (!node) break;
+    if (at === scopeId) break;
+    if (node.kind === 'group') chain.push(at);
+    at = doc.parent.get(at);
+  }
+  if (chain.length === 0) return null;
+  const outermost = chain[chain.length - 1]!;
+  return effectiveGroupState(doc, outermost).locked || effectiveGroupState(doc, outermost).hidden
+    ? 'locked'
+    : outermost;
+}

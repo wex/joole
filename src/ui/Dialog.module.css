@@ -1,0 +1,53 @@
+/* The modal dialog (T1.15): the design system's floating window. */
+.scrim {
+  position: fixed;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgb(16 18 20 / 60%);
+  inset: 0;
+}
+
+.body {
+  min-width: 320px;
+  max-width: min(480px, 90vw);
+  max-height: 85vh;
+  overflow-y: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface-1);
+  box-shadow: var(--shadow-float);
+  color: var(--ink);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-lg) var(--space-lg) 0;
+}
+
+.title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.close {
+  padding: var(--space-2xs) var(--space-xs);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.close:hover {
+  border-color: var(--line-strong);
+}
+
+.content {
+  padding: var(--space-lg);
+}

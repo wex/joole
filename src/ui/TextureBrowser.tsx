@@ -10,6 +10,8 @@ export interface TextureBrowserProps {
   readonly entries: readonly TextureEntry[];
   readonly inUse: () => ReadonlySet<string>;
   readonly selected: () => string;
+  /** The thumbnail size in CSS pixels (T1.12); the cells are derived from it. */
+  readonly thumbSize?: () => number;
   readonly onSelect: (name: string) => void;
   /** Loads and converts a texture, returning its rgba bitmap and size. */
   readonly load: (
@@ -17,9 +19,9 @@ export interface TextureBrowserProps {
   ) => Promise<{ width: number; height: number; rgba: Uint8Array } | null>;
 }
 
-const cellWidth = 92;
-const cellHeight = 96;
-const thumbSize = 64;
+// The cell metrics follow the thumbnail slider: the label row adds 32 px.
+const cellPaddingX = 28;
+const cellLabelHeight = 32;
 const overscanRows = 2;
 
 function folderOf(name: string): string {
@@ -79,12 +81,15 @@ export function TextureBrowser(props: TextureBrowserProps) {
     });
   };
 
-  const columns = () => Math.max(1, Math.floor(viewport().width / cellWidth));
+  const thumbPixels = () => props.thumbSize?.() ?? 64;
+  const cellWidth = () => thumbPixels() + cellPaddingX;
+  const cellHeight = () => thumbPixels() + cellLabelHeight;
+  const columns = () => Math.max(1, Math.floor(viewport().width / cellWidth()));
   const rows = () => Math.ceil(filtered().length / columns());
-  const gridHeight = () => rows() * cellHeight;
-  const firstRow = () => Math.max(0, Math.floor(scrollTop() / cellHeight) - overscanRows);
+  const gridHeight = () => rows() * cellHeight();
+  const firstRow = () => Math.max(0, Math.floor(scrollTop() / cellHeight()) - overscanRows);
   const lastRow = () =>
-    Math.min(rows(), Math.ceil((scrollTop() + viewport().height) / cellHeight) + overscanRows);
+    Math.min(rows(), Math.ceil((scrollTop() + viewport().height) / cellHeight()) + overscanRows);
 
   const visible = () => {
     const out: { entry: TextureEntry; index: number }[] = [];
@@ -199,15 +204,20 @@ export function TextureBrowser(props: TextureBrowserProps) {
                   ]}
 
                   ref={(el) => {
-                    el.style.left = `${staticCol * cellWidth}px`;
-                    el.style.top = `${staticRow * cellHeight}px`;
-                    el.style.width = `${cellWidth}px`;
-                    el.style.height = `${cellHeight}px`;
+                    el.style.left = `${staticCol * cellWidth()}px`;
+                    el.style.top = `${staticRow * cellHeight()}px`;
+                    el.style.width = `${cellWidth()}px`;
+                    el.style.height = `${cellHeight()}px`;
                   }}
                   title={entry.name}
                   onClick={() => props.onSelect(entry.name)}
                 >
-                  <ThumbCanvas name={entry.name} request={request} version={version} />
+                  <ThumbCanvas
+                    name={entry.name}
+                    request={request}
+                    version={version}
+                    size={thumbPixels}
+                  />
                   <span class={styles.name}>{baseName(entry.name)}</span>
                 </button>
               );
@@ -238,28 +248,30 @@ function ThumbCanvas(props: {
   readonly name: string;
   readonly request: (name: string) => void;
   readonly version: () => number;
+  readonly size: () => number;
 }) {
   let canvas: HTMLCanvasElement | undefined;
   createEffect(
-    () => props.version(),
+    () => [props.version(), props.size()] as const,
     () => {
       const context = canvas?.getContext('2d');
       if (!canvas || !context) return;
-      const thumb = thumbCache.get(props.name);
-      context.clearRect(0, 0, thumbSize, thumbSize);
-      if (thumb?.bitmap) {
-        const scale = Math.min(thumbSize / thumb.width, thumbSize / thumb.height, 1);
-        const w = thumb.width * scale;
-        const h = thumb.height * scale;
+      const cached = thumbCache.get(props.name);
+      const size = props.size();
+      context.clearRect(0, 0, size, size);
+      if (cached?.bitmap) {
+        const scale = Math.min(size / cached.width, size / cached.height, 1);
+        const w = cached.width * scale;
+        const h = cached.height * scale;
         context.imageSmoothingEnabled = false;
-        context.drawImage(thumb.bitmap, (thumbSize - w) / 2, (thumbSize - h) / 2, w, h);
+        context.drawImage(cached.bitmap, (size - w) / 2, (size - h) / 2, w, h);
       }
     },
   );
   return (
     <canvas
-      width={thumbSize}
-      height={thumbSize}
+      width={props.size()}
+      height={props.size()}
       class={styles.thumb}
       ref={(el) => {
         canvas = el;

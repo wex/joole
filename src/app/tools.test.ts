@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createEmptyDocument, addNodePatch, applyPatch } from '@core/doc/index';
-import { analyzeBrush, validateBrush } from '@core/geom/index';
+import { analyzeBrush, extractWireframe, validateBrush } from '@core/geom/index';
 import type { BrushNode, Command, MapDocument } from '@core/types/index';
 import { makeBox } from '../core/geom/__tests__/helpers';
 import { BrushTool, ClipTool, SelectTool, VertexTool, type ToolPointerEvent } from './tools';
@@ -320,11 +320,23 @@ describe('VertexTool event scripts', () => {
     tool.pointer(up(10, 10));
   });
 
-  it('shows handle crosses while idle', () => {
+  it('shows handle dots while idle and marks the hovered one (T1.8)', () => {
     const doc = vertexDocument();
     const tool = makeVertexTool(doc);
-    const output = tool.pointer(move(200, 200));
-    expect(output.preview!.length).toBeGreaterThan(0);
+    // Far from every handle: all dots are idle.
+    const idle = tool.pointer(move(200, 200));
+    expect(idle.handles!.length).toBe(8);
+    expect(idle.handles!.every((h) => h.state === 0)).toBe(true);
+    // Near the corner vertex at (0, 0, 64)-ish in the top view: one hover dot.
+    const hovered = tool.pointer({ ...move(2, 2), tolerance: 4 });
+    expect(hovered.handles!.filter((h) => h.state === 1)).toHaveLength(1);
+    // In edge mode the hovered edge is also a vp-select preview segment.
+    tool.toggleVertexEdge();
+    const edge = tool.pointer({ ...move(32, 0), point: [32, 0, 64], tolerance: 4 });
+    expect(edge.handles!.length).toBe(12);
+    if (edge.handles!.some((h) => h.state === 1)) {
+      expect(edge.preview!.length).toBe(1);
+    }
   });
 
   it('a rejected drag produces no command and dashed invalid segments', () => {
@@ -346,5 +358,255 @@ describe('VertexTool event scripts', () => {
     tool.pointer({ ...down(32, 0), point: [32, 0, 64] });
     const moved = tool.pointer({ ...move(32, 8), point: [32, 8, 64] });
     expect(moved.commands).toHaveLength(1);
+  });
+});
+
+describe('BrushTool grid lock and feedback (T1.2)', () => {
+  function makeTool(grid: number) {
+    const doc = createEmptyDocument();
+    return {
+      doc,
+      tool: new BrushTool(
+        () => doc,
+        () => grid,
+      ),
+    };
+  }
+
+  it('reports the snapped cursor on idle moves in a 2D view', () => {
+    const { tool } = makeTool(8);
+    const out = tool.pointer({ ...move(5, 13), point: [5, 13, 0] });
+    expect(out.cursor).toEqual([8, 16, 0]);
+  });
+
+  it('reports no cursor in the 3D view', () => {
+    const { tool } = makeTool(8);
+    const out = tool.pointer({ ...move(5, 13), view: '3d', point: [5, 13, 0] });
+    expect(out.cursor ?? null).toBeNull();
+  });
+
+  it('reports the measure box while drawing', () => {
+    const { tool } = makeTool(8);
+    tool.pointer(down(0, 0));
+    const out = tool.pointer({ ...move(70, 40), point: [70, 40, 0] });
+    expect(out.measure).toEqual({ min: [0, 0, -32], max: [72, 40, 32] });
+  });
+
+  it('every bound of a painted brush is a grid multiple at large grid sizes', () => {
+    for (const grid of [8, 64, 128]) {
+      const { doc, tool } = makeTool(grid);
+      // Deliberately off-grid pointer positions.
+      const commands = runScript(tool, [
+        { ...down(3, 3), point: [3, 3, 0] },
+        { ...move(101, 69), point: [101, 69, 0] },
+        { ...up(101, 69), point: [101, 69, 0] },
+      ]);
+      expect(commands).toHaveLength(1);
+      const patched = applyPatch(doc, commands[0]!.run(doc));
+      const created = [...patched.nodes.values()].find((node) => node.kind === 'brush');
+      expect(created?.kind).toBe('brush');
+      if (created?.kind === 'brush') {
+        const box = analyzeBrush(created).aabb!;
+        for (const axis of [0, 1, 2] as const) {
+          expect((box.min[axis]! / grid) % 1, `min axis ${axis} grid ${grid}`).toBeCloseTo(0, 9);
+          expect((box.max[axis]! / grid) % 1, `max axis ${axis} grid ${grid}`).toBeCloseTo(0, 9);
+        }
+        // The depth is at least 64 even at large grids.
+        expect(box.max[2]! - box.min[2]!).toBeGreaterThanOrEqual(64);
+      }
+    }
+  });
+
+  it('clears cursor and measure when the tool is cancelled', () => {
+    const { tool } = makeTool(8);
+    tool.pointer(down(0, 0));
+    tool.pointer({ ...move(64, 64), point: [64, 64, 0] });
+    tool.cancel();
+    const out = tool.pointer({ ...move(64, 64), view: '3d', point: [64, 64, 0] });
+    expect(out.measure ?? null).toBeNull();
+  });
+});
+
+describe('editing feedback (T1.7)', () => {
+  it('a select move drag reports the dragged brushes from down to up', () => {
+    const doc = documentWithBrushes();
+    const tool = new SelectTool(() => doc, 8);
+    const downOut = tool.pointer(down(32, 32));
+    expect(downOut.editing?.has('a')).toBe(true);
+    const upOut = tool.pointer(up(32, 32));
+    expect(upOut.editing?.size).toBe(0);
+  });
+
+  it('a scale drag reports the selection and clears on up', () => {
+    const doc = documentWithBrushes();
+    const tool = new SelectTool(() => doc, 8);
+    tool.setSelection(['a']);
+    const downOut = tool.pointer(down(64, 64));
+    expect(downOut.editing?.has('a')).toBe(true);
+    expect(tool.pointer(up(64, 64)).editing?.size).toBe(0);
+  });
+
+  it('a box-select drag reports no editing', () => {
+    const doc = documentWithBrushes();
+    const tool = new SelectTool(() => doc, 8);
+    const downOut = tool.pointer(down(-10, -10));
+    expect(downOut.editing).toBeUndefined();
+  });
+
+  it('a vertex drag reports the edited brush and clears on up', () => {
+    let doc = createEmptyDocument();
+    doc = applyPatch(
+      doc,
+      addNodePatch(doc, doc.worldspawn, brush('target', [0, 0, 0], [64, 64, 64])),
+    );
+    const tool = new VertexTool(
+      () => doc,
+      () => 8,
+      () => new Set(['target']),
+    );
+    const downOut = tool.pointer(down(2, 2));
+    expect(downOut.editing?.has('target')).toBe(true);
+    const upOut = tool.pointer(up(2, 2));
+    expect(upOut.editing?.size).toBe(0);
+  });
+
+  it('a vertex down on empty space reports no editing', () => {
+    let doc = createEmptyDocument();
+    doc = applyPatch(
+      doc,
+      addNodePatch(doc, doc.worldspawn, brush('target', [0, 0, 0], [64, 64, 64])),
+    );
+    const tool = new VertexTool(
+      () => doc,
+      () => 8,
+      () => new Set(['target']),
+    );
+    const downOut = tool.pointer(down(400, 400));
+    expect(downOut.editing).toBeUndefined();
+  });
+});
+
+describe('resize grid snapping (T1.10)', () => {
+  function scaleDrag(grid: number, from: [number, number], to: [number, number], steps = 1) {
+    const doc = documentWithBrushes();
+    const tool = new SelectTool(() => doc, grid);
+    tool.setSelection(['a']);
+    tool.pointer(down(64, 64));
+    const commands: Command[] = [];
+    for (let i = 1; i <= steps; i++) {
+      const x = from[0] + ((to[0] - from[0]) * i) / steps;
+      const y = from[1] + ((to[1] - from[1]) * i) / steps;
+      const out = tool.pointer(move(x, y));
+      commands.push(...out.commands);
+    }
+    tool.pointer(up(to[0], to[1]));
+    let next = doc;
+    for (const command of commands) next = applyPatch(next, command.run(next));
+    return analyzeBrush(next.nodes.get('a') as BrushNode).aabb!;
+  }
+
+  it('the moved corner lands on grid multiples for several grid sizes', () => {
+    for (const grid of [1, 8, 32, 64]) {
+      // Dragging off-grid snaps: (100, 100) at grid 64 becomes (128, 128)
+      // only if 100 rounds to 128 — snap rounds to nearest, so 64 or 128.
+      const box = scaleDrag(grid, [64, 64], [100, 100]);
+      const onGrid = (x: number) => {
+        const rest = Math.abs(x % grid);
+        return rest < 1e-6 || grid - rest < 1e-6;
+      };
+      expect(onGrid(box.max[0]!)).toBe(true);
+      expect(onGrid(box.max[1]!)).toBe(true);
+      // The anchored corner never moves.
+      expect(box.min[0]! + 0).toBe(0);
+      expect(box.min[1]! + 0).toBe(0);
+    }
+  });
+
+  it('the size never shrinks below one grid step and never crosses the anchor', () => {
+    const box = scaleDrag(32, [64, 64], [-500, -500]);
+    expect(box.max[0]! - box.min[0]!).toBeGreaterThanOrEqual(32);
+    expect(box.max[1]! - box.min[1]!).toBeGreaterThanOrEqual(32);
+    expect(box.min[0]! + 0).toBe(0);
+    expect(box.min[1]! + 0).toBe(0);
+  });
+
+  it('a long drag ends within a tolerance of the direct step', () => {
+    const direct = scaleDrag(8, [64, 64], [128, 128], 1);
+    const long = scaleDrag(8, [64, 64], [128, 128], 16);
+    for (const axis of [0, 1, 2]) {
+      expect(Math.abs(long.max[axis]! - direct.max[axis]!)).toBeLessThan(1e-6);
+      expect(Math.abs(long.min[axis]! - direct.min[axis]!)).toBeLessThan(1e-6);
+    }
+  });
+});
+
+describe('vertex/edge/face absolute grid snapping (T1.11)', () => {
+  function vertexDocAt(min: [number, number, number], max: [number, number, number]) {
+    let doc = createEmptyDocument();
+    doc = applyPatch(doc, addNodePatch(doc, doc.worldspawn, brush('target', min, max)));
+    return doc;
+  }
+
+  // The editor executes each command right away, so the document the tool
+  // reads stays in sync with the drag; the harness does the same.
+  function makeToolHolder(start: MapDocument) {
+    const holder = { doc: start };
+    const tool = new VertexTool(
+      () => holder.doc,
+      () => 8,
+      () => new Set(['target']),
+    );
+    const apply = (commands: readonly Command[]) => {
+      for (const command of commands) {
+        holder.doc = applyPatch(holder.doc, command.run(holder.doc));
+      }
+    };
+    return { tool, apply, holder };
+  }
+
+  it('an off-grid vertex lands on the grid with its first step', () => {
+    // The box corner (3, 5) is off the grid-8 lines. Dragging it toward
+    // x = 11 snaps the reference point to x = 8, not x = 11.
+    const { tool, apply, holder } = makeToolHolder(vertexDocAt([3, 5, 0], [67, 69, 64]));
+    const downOut = tool.pointer({ ...down(3, 5), tolerance: 4 });
+    expect(downOut.editing?.has('target')).toBe(true);
+    // The snapped cursor sits on the grid line x = 8.
+    const moved = tool.pointer(move(11, 5));
+    expect(moved.cursor![0]).toBe(8);
+    expect(moved.commands).toHaveLength(1);
+    apply(moved.commands);
+    const analysis = analyzeBrush(holder.doc.nodes.get('target') as BrushNode);
+    const xs = extractWireframe(analysis.polygons).vertices.map((v) => v[0]!);
+    // The grabbed vertex joined the grid at x = 8; nothing sits at x = 11.
+    expect(xs.some((x) => Math.abs(x - 8) < 1e-6)).toBe(true);
+    expect(xs.every((x) => Math.abs(x - 11) > 1e-6)).toBe(true);
+  });
+
+  it('reports the snapped cursor and the measure box during a drag', () => {
+    const { tool } = makeToolHolder(vertexDocAt([0, 0, 0], [64, 64, 64]));
+    // Face mode: the whole x = 0 face moves, so the size box follows.
+    tool.submode = 'face';
+    tool.pointer({ ...down(2, 32), tolerance: 6 });
+    const moved = tool.pointer(move(18, 32));
+    expect(moved.cursor).toBeDefined();
+    // The face vertex nearest the cursor dragged towards x=18 snaps to x=16.
+    expect(moved.cursor![0]).toBe(16);
+    expect(moved.measure).not.toBeNull();
+    expect(moved.measure!.min[0]!).toBeCloseTo(16, 4);
+    expect(moved.measure!.max[0]! - moved.measure!.min[0]!).toBeCloseTo(64 - 16, 4);
+  });
+
+  it('a rejected step keeps the last valid measure and up clears both', () => {
+    const { tool, apply } = makeToolHolder(vertexDocAt([0, 0, 0], [64, 64, 64]));
+    tool.pointer(down(2, 2));
+    const valid = tool.pointer(move(10, 10));
+    expect(valid.measure).not.toBeNull();
+    apply(valid.commands);
+    const rejected = tool.pointer(move(200, 200));
+    expect(rejected.invalid!.length).toBeGreaterThan(0);
+    expect(rejected.measure).toEqual(valid.measure);
+    const upOut = tool.pointer(up(200, 200));
+    expect(upOut.cursor).toBeNull();
+    expect(upOut.measure).toBeNull();
   });
 });

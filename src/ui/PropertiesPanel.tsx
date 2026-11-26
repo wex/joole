@@ -36,6 +36,19 @@ export function PropertiesPanel(props: PropertiesPanelProps) {
     return app.surfaceState();
   };
 
+  // The texture tool's brush/face navigation (T1.6).
+  const focus = () => {
+    props.version();
+    return app.activeTool === 'texture' ? app.textureFocus() : null;
+  };
+
+  const focusLabel = () => {
+    const f = focus();
+    if (!f || !f.brush) return null;
+    const total = f.faces.length;
+    return f.position === 0 ? `Brush (${total} faces)` : `Face ${f.position} of ${total}`;
+  };
+
   const singleTexture = () => {
     const names = textureNames();
     return names.length === 1 ? names[0]! : null;
@@ -122,9 +135,29 @@ export function PropertiesPanel(props: PropertiesPanelProps) {
 
   return (
     <aside class={styles.panel} aria-label="Properties" data-testid="properties-panel">
-      <header class={styles.titlebar}>Properties</header>
       <div class={styles.body}>
         <EntityPanel app={app} version={props.version} />
+        <Show when={focus()?.brush}>
+          <div class={styles.focusRow} data-testid="texture-focus">
+            <button
+              type="button"
+              class={styles.focusButton}
+              aria-label="Previous face"
+              onClick={() => app.stepTextureFocus(-1)}
+            >
+              ◀
+            </button>
+            <span class={styles.focusLabel}>{focusLabel()}</span>
+            <button
+              type="button"
+              class={styles.focusButton}
+              aria-label="Next face"
+              onClick={() => app.stepTextureFocus(1)}
+            >
+              ▶
+            </button>
+          </div>
+        </Show>
         <span class={styles.groupLabel}>Selection</span>
         <Show
           when={textureNames().length > 0}

@@ -68,25 +68,26 @@ Press the key again to restore the four-view grid. The view buttons are repeated
 
 ### View navigation
 
-| Action                            | Effect                                                               |
-| --------------------------------- | -------------------------------------------------------------------- |
-| Middle-drag in Top, Front or Side | pan the orthographic view                                            |
-| Mouse wheel in Top, Front or Side | zoom around the cursor; one notch multiplies or divides zoom by 1.32 |
-| Middle-click in 3D                | toggle pointer lock for mouse look                                   |
-| Hold right mouse button in 3D     | temporary fly/mouse-look mode                                        |
-| Move mouse while flying           | look around                                                          |
-| `W` / `A` / `D` while flying      | move forward, left and right at 256 units/s                          |
-| Left mouse button                 | use the active tool                                                  |
-| Right-click in Top, Front or Side | open the view context menu                                           |
+| Action                               | Effect                                                               |
+| ------------------------------------ | -------------------------------------------------------------------- |
+| Middle-drag in Top, Front or Side    | pan the orthographic view                                            |
+| Mouse wheel in Top, Front or Side    | zoom around the cursor; one notch multiplies or divides zoom by 1.32 |
+| Mouse wheel in 3D                    | move forward or backward, one notch is 64 units                      |
+| Middle-click in 3D                   | toggle pointer lock for mouse look                                   |
+| Move mouse in pointer-lock mode      | look around                                                          |
+| `W` / `A` / `D` in pointer-lock mode | move forward, left and right at 256 units/s                          |
+| Left mouse button                    | use the active tool                                                  |
+| Right-click in Top, Front or Side    | open the view context menu                                           |
 
 Fly mode is intended to own `W`, `A`, `S` and `D`, and tool shortcuts are ignored while it is active. In the current implementation `S` is still intercepted by the Select-tool shortcut path before movement is recorded, so backward movement does not work; `W`, `A` and `D` do.
 
 ### Panels and splitters
 
-- The **properties panel** on the right shows entity properties, the selection texture, per-face surface attributes and file status.
-- The **bottom panel** has four tabs: **Textures**, **Tree**, **Prefabs** and **Log**.
+- The **right dock** has two collapsible sections: **Properties** on top — entity properties, the selection texture, per-face surface attributes and file status — and **Textures** below. A section collapses to its header with the disclosure button, and the horizontal splitter between the sections moves with the mouse or the arrow keys.
+- The **bottom panel** has three tabs: **Tree**, **Prefabs** and **Log**.
 - Drag the vertical or horizontal splitter to resize a panel. A focused splitter can also be moved with the arrow keys in 8-pixel steps.
 - The bottom panel can be enlarged when reading long compile logs or a deep document tree.
+- The panel sizes, the dock's splitter position, the collapsed sections, the thumbnail size, the grid size and the theme are remembered between sessions.
 
 ![The light UI theme](images/overview-light.png)
 
@@ -104,6 +105,7 @@ _The light theme changes the window chrome. Viewport colors deliberately remain 
 | **Open pak0.pak…**    | Uses one picked `pak0.pak` as the whole game-data source. This is the most reliable fallback when directory picking is unavailable.            |
 | **Open Map…**         | Opens a `.map` file or a `.joole.json` project. Opening replaces the current document.                                                         |
 | **Export .map…**      | Writes the current document in Quake 2 `.map` format for other editors and external compilers.                                                 |
+| **Settings…**         | Opens the settings dialog (`Ctrl+,`).                                                                                                          |
 
 In Chromium the game-directory handle is remembered locally and permission is requested again on later starts. The native open picker initially filters for `.map`; use its all-files choice to open a `.joole.json` project.
 
@@ -131,11 +133,29 @@ After the first unsaved document change, Joole autosaves the project to OPFS eve
 
 Choose **Recover** to load the autosave as `recovered.joole.json`, or **Discard** to delete the recovery copy. Saving a project explicitly clears the dirty autosave state.
 
+### Settings
+
+**File → Settings…** (`Ctrl+,`) opens the settings dialog. Every change applies immediately and is remembered between sessions; there is no OK or Cancel step. **Reset to Defaults** restores every setting at once. Escape closes the dialog.
+
+| Setting                    | Effect                                                                            |
+| -------------------------- | --------------------------------------------------------------------------------- |
+| **Theme**                  | Dark or light window chrome. The viewport colors stay the editing colors in both. |
+| **3D wheel step**          | How far one mouse-wheel notch moves the 3D camera, in units.                      |
+| **Mouse-look sensitivity** | Degrees of turn per pixel of mouse movement in fly mode.                          |
+| **Grid size at start-up**  | The snap grid a new session starts with.                                          |
+| **Thumbnail size**         | The texture thumbnail size, the same slider as in the Textures section.           |
+| **Show tool overlay**      | Whether the tool overlay is drawn.                                                |
+| **Group CSG results**      | Whether Hollow and CSG Subtract group their fragments automatically.              |
+
+The panel sizes, the collapsed sections and the splitter positions are remembered too, but they do not appear in the dialog.
+
 ## Toolbar reference
 
 ![The complete toolbar](images/toolbar.png)
 
 The toolbar is arranged left to right in functional groups.
+
+Picking a tool — from the toolbar, with its shortcut or from a view's context menu — shows a translucent overlay at the bottom centre of the views for a few seconds: the tool's icon, name, shortcut and a one-line description. The overlay never blocks the views, it hides while fly mode is on, and **Settings → Show tool overlay** turns it off.
 
 ### File and Edit menus
 
@@ -164,6 +184,7 @@ Their exact behavior is described in [Brush editing commands](#brush-editing-com
 The Save, Undo and Redo toolbar icons are present as disabled placeholders in the current build. Use the implemented keyboard commands instead:
 
 - `Ctrl+S` / `Cmd+S` — save project
+- `Delete` / `Backspace` — delete the selection right away, with no confirmation; undo restores it
 - `Ctrl+Z` / `Cmd+Z` — undo
 - `Ctrl+Shift+Z`, `Ctrl+Y` / macOS equivalents — redo
 
@@ -199,7 +220,7 @@ The next two icon buttons are shortcuts for common geometry operations:
 - **CSG Subtract** — identical to **Edit → CSG Subtract**.
 - **Hollow** — identical to **Edit → Hollow Inward**. Outward hollowing is available only in the Edit menu.
 
-Both require a suitable brush selection; otherwise they write an explanatory warning to the log.
+Both require a suitable brush selection; otherwise they write an explanatory warning to the log. When an operation splits a brush into two or more fragments, the fragments are put into one group named `subtract` or `hollow` — one undo step covers both the cut and the grouping. Fragments produced inside an existing group stay in that group instead of nesting a new one, so repeated cuts on the same wall keep a flat structure.
 
 ### Grid control
 
@@ -241,9 +262,9 @@ The Select tool picks and transforms whole brushes.
 
 **Transforms:**
 
-- Drag a selected brush to move it in the two axes of the orthographic view. Movement snaps to the grid.
+- Drag a selected brush to move it in the two axes of the orthographic view. Movement snaps to the grid. While a drag moves, rotates, resizes or reshapes brushes, they stay highlighted in red in every view, the 3D view included, so you can see exactly what the edit is changing.
 - `Ctrl+drag` (`Cmd+drag` on macOS) rotates around the selection center in that view's plane.
-- Drag close to a projected selection bounding-box corner to scale around the opposite corner.
+- Drag close to a projected selection bounding-box corner to scale around the opposite corner. The dragged corner snaps to the grid: the resized brush's moved faces always land on grid lines, the size never drops below one grid step and the corner cannot cross its anchor — use Mirror to flip a brush instead.
 - Multi-brush selections move and rotate as one unit.
 
 A drag is merged into one undo step even though intermediate positions are applied continuously. Texture lock affects move and rotate operations when enabled.
@@ -261,7 +282,7 @@ The Brush tool creates new convex primitives.
 3. Drag a rectangle in Top, Front or Side.
 4. Release to create the brush. It becomes the selection.
 
-The two dragged axes snap to the grid. In the current implementation the axis perpendicular to the view receives a fixed 64-unit depth centered on the view plane; resize or clip the brush in another orthographic view afterwards. Brush creation is not available in the 3D view.
+The two dragged axes snap to the grid, and a small cross marks the snapped point under the cursor before the button is pressed. While dragging, a red box shows the brush in every orthographic view, with its in-plane extents labelled next to the edges and the full `W × D × H` size in the active view's title bar. The axis perpendicular to the view receives a depth of at least 64 units — the smallest multiple of the grid that reaches 64 — placed so that both faces lie on grid lines. Every bound of a painted brush is therefore a grid multiple at any grid size. Brush creation is not available in the 3D view.
 
 New brushes are created with Qoole's default texture, `e2u1/mine10_1`; choosing another texture in the browser does not change brushes that are already drawn.
 
@@ -327,7 +348,8 @@ The Vertex/edge tool edits the derived geometry of selected brushes without chan
 
 - Press `V` for vertex/edge editing. The tool restores its last vertex or edge submode.
 - Press `V` again while already in the tool to switch between vertex and edge handles. Returning from Face mode starts again in vertex mode.
-- Drag a handle in an orthographic view. Movement snaps to the grid.
+- Every handle is a fixed-size square dot: yellow when idle, red when hovered or dragged. Vertices sit on the corners, edge dots sit at the edge midpoints and face dots at the face centres. The dots show in the 3D view too, but dragging works in the orthographic views.
+- Drag a handle in an orthographic view. The grabbed point snaps onto the grid, so a vertex that started off the grid joins it with the first step. A small cross marks the snapped target and the brush's current size shows in the view's title bar while you drag.
 - Connected planes are recomputed so the brush remains convex.
 
 Edits are validated. A move that would create invalid or non-convex geometry is not applied; the rejected movement is shown as a dashed orange line. This is feedback, not a partial edit.
@@ -353,6 +375,8 @@ The same grid snapping, convexity checking and dashed-orange rejection feedback 
 The Texture tool selects individual faces in the 3D view.
 
 - Click a visible face to select it. Clicking the same single selected face again clears it.
+  The picked faces are highlighted: a translucent red fill in the 3D view and red outlines in the orthographic views. The ◀ ▶ row at the top of the Properties panel steps through the brush as a whole and each of its faces in turn, wrapping around at both ends: stepping onto `Face n` picks just that face, and stepping back to `Brush` targets the whole brush again. The highlight disappears with the face selection when you leave the tool.
+
 - `Shift+click` adds or removes faces in a multi-face selection.
 - `Ctrl+click` (`Cmd+click`) is the eyedropper: it copies the face's texture name to the current texture without changing the face selection.
 - Click empty space without a modifier to clear the face selection.
@@ -366,12 +390,15 @@ The texture operations target the picked faces. If no faces are picked, they tar
 
 ### Clipboard and duplication
 
-| Command   | Shortcut           | Behavior                                                                               |
-| --------- | ------------------ | -------------------------------------------------------------------------------------- |
-| Cut       | `Ctrl+X` / `Cmd+X` | copies the selected brushes as `.map` text and removes them                            |
-| Copy      | `Ctrl+C` / `Cmd+C` | copies the selected brushes as canonical `.map` text                                   |
-| Paste     | `Ctrl+V` / `Cmd+V` | parses `.map` text from the clipboard or Joole's in-app clipboard mirror               |
-| Duplicate | `Ctrl+D` / `Cmd+D` | copies and pastes the selected brushes in one step, offset by one grid unit in X and Y |
+| Command            | Shortcut                                                                               | Behavior                                                                      |
+| ------------------ | -------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| Cut                | `Ctrl+X` / `Cmd+X`                                                                     | copies the selected brushes as `.map` text and removes them                   |
+| Copy               | `Ctrl+C` / `Cmd+C`                                                                     | copies the selected brushes as canonical `.map` text                          |
+| Paste              | `Ctrl+V` / `Cmd+V`                                                                     | parses `.map` text from the clipboard or Joole's in-app clipboard mirror      |
+| Duplicate          | `G`                                                                                    | toggle group-pick mode: clicks select whole groups, shown dashed in the views |
+| `Ctrl+G`           | group the selection                                                                    |
+| `Shift+G`          | ungroup every selected group                                                           |
+| `Ctrl+D` / `Cmd+D` | copies and pastes the selected brushes in one step, offset by one grid unit in X and Y |
 
 Because the clipboard payload is ordinary `.map` text, it can be exchanged with other editors that accept that format. Pasted brushes receive fresh ids. Clipboard and prefab copies keep full precision rather than forcing compile-oriented integer plane points. In the current implementation these clipboard commands operate on brushes only, not on point entities, entity containers or groups.
 
@@ -418,23 +445,23 @@ The point order of faces is corrected so face normals continue to point outward.
 
 ![The texture browser](images/texture-browser.png)
 
-The **Textures** tab appears after game data is opened. It provides:
+The **Textures** section of the right dock fills with thumbnails after game data is opened. It provides:
 
 - a folder/source filter;
 - substring search;
 - an **In use** filter that keeps only textures referenced by the current document;
 - a virtualised thumbnail grid;
+- a **Thumbnail size** slider, from 32 to 128 pixels;
 - a footer with the full texture name, pixel dimensions and source package or directory.
 
-Clicking a thumbnail sets the **current texture**. It does not by itself change the map. Use **Apply Texture** or the eyedropper workflow described below.
+Clicking a thumbnail sets the **current texture** and applies it immediately: to the picked faces when the Texture tool has a face selection, or to every face of the selected brushes otherwise. Brushes inside a selected group or brush entity are textured as a whole. The change is one undo step. With nothing selected, clicking only sets the current texture. **Edit → Apply Texture** applies the current texture again without browsing.
 
 Textures are converted lazily in a worker and cached in browser storage. Missing or not-yet-loaded textures use a checker fallback in views.
 
 ### Applying and adjusting textures
 
 1. Pick individual faces with the Texture tool, or select whole brushes with the Select tool.
-2. Pick a texture in the browser, or use `Ctrl+click` on an already textured face as the eyedropper.
-3. Choose **Edit → Apply Texture**.
+2. Click a texture in the browser. The texture is applied in the same step. Alternatively, use `Ctrl+click` on an already textured face as the eyedropper and choose **Edit → Apply Texture**.
 
 The remaining texture commands act on the same target faces:
 
@@ -645,6 +672,7 @@ This example builds and tests a simple room using the features described above.
 
 | Shortcut       | Action                                                         |
 | -------------- | -------------------------------------------------------------- |
+| `Delete`       | delete the selection, no confirmation                          |
 | `Ctrl+Z`       | undo                                                           |
 | `Ctrl+Shift+Z` | redo                                                           |
 | `Ctrl+Y`       | redo                                                           |
@@ -690,9 +718,9 @@ This example builds and tests a simple room using the features described above.
 | Left-drag selection corner | Select tool, orthographic | scale selection               |
 | Middle-drag                | orthographic              | pan                           |
 | Mouse wheel                | orthographic              | zoom around cursor            |
+| Mouse wheel                | 3D                        | move forward/backward         |
 | Middle-click               | 3D                        | toggle pointer lock           |
-| Right-hold                 | 3D                        | fly mode                      |
-| `W/A/D`                    | while flying              | move in 3D                    |
+| `W/A/D`                    | in pointer-lock mode      | move in 3D                    |
 | Right-click                | orthographic              | view context menu             |
 | `Shift+click`              | Texture tool in 3D        | add/remove face               |
 | `Ctrl+click`               | Texture tool in 3D        | texture eyedropper            |
@@ -728,9 +756,7 @@ Quake texture axes cannot represent every transformed orientation exactly. A war
 ### Current UI gaps to be aware of
 
 - Save, Undo and Redo toolbar icons are disabled placeholders; the keyboard shortcuts work.
-- The Entity and Texture toolbar icons do not currently activate their tools when clicked; use `E` and `T`.
 - `Ctrl+H` and `Ctrl+L` are reserved but currently do not invoke hide/lock commands.
-- Brush creation always starts with a 64-unit depth perpendicular to the drawing view.
 - Entity placement is intended for orthographic views; 3D placement does not project onto a ground plane.
 - `S` does not currently move the 3D fly camera backward because the key is intercepted before fly movement is recorded.
 - There is no group rename field in the current Tree UI.

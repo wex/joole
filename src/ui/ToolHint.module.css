@@ -1,0 +1,47 @@
+/* The tool overlay chip (T1.16): bottom-centre over the views. */
+.holder {
+  position: absolute;
+  bottom: var(--space-lg);
+  left: 50%;
+  z-index: 20;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.chip {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-xs) var(--space-md);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  box-shadow: var(--shadow-float);
+  color: var(--ink);
+  opacity: 0.85;
+}
+
+.icon {
+  display: flex;
+  width: 16px;
+  height: 16px;
+}
+
+.name {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.keycap {
+  padding: 0 var(--space-xs);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface-1);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.description {
+  color: var(--ink-muted);
+  font-size: 12px;
+}

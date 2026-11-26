@@ -1,6 +1,7 @@
 import type { Id, MapDocument, MapNode, Patch, Vec3 } from '@core/types/index';
 import { RangeAllocator } from './allocator';
 import {
+  HANDLE_STRIDE,
   boxEdges,
   buildBrushMesh,
   entityBox,
@@ -20,11 +21,40 @@ import {
 import { unionAabb, type Aabb } from './camera';
 
 /** Bits of a node's byte in the state texture, read by the shaders. */
+function sameSegments(a: readonly LineSegment[], b: readonly LineSegment[]): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    const [a0, a1] = a[i]!;
+    const [b0, b1] = b[i]!;
+    for (let k = 0; k < 3; k++) {
+      if (a0[k] !== b0[k] || a1[k] !== b1[k]) return false;
+    }
+  }
+  return true;
+}
+
+function samePolygons(a: readonly (readonly Vec3[])[], b: readonly (readonly Vec3[])[]): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    const pa = a[i]!;
+    const pb = b[i]!;
+    if (pa.length !== pb.length) return false;
+    for (let j = 0; j < pa.length; j++) {
+      if (pa[j]![0] !== pb[j]![0] || pa[j]![1] !== pb[j]![1] || pa[j]![2] !== pb[j]![2]) {
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
 export const STATE_SELECTED = 1;
 export const STATE_ENTITY = 2;
 export const STATE_INVALID = 4;
 export const STATE_DIMMED = 8;
 export const STATE_LEAK = 16;
+export const STATE_HANDLE = 64;
+export const STATE_EDITING = 32;
 
 /** The state texture is this many texels wide, one byte per node index. */
 const STATE_WIDTH = 1024;
@@ -166,12 +196,25 @@ export class GeometryCache {
   private readonly freeIndices: number[] = [];
   private nextIndex = 1;
   private selected = new Set<Id>();
+  private editing = new Set<Id>();
   private toolSegments: readonly LineSegment[] = [];
   private linkSegments: readonly LineSegment[] = [];
   private invalidSegments: readonly LineSegment[] = [];
   private readonly invalidIndex: number;
   private readonly leakIndex: number;
+  private readonly cursorIndex: number;
+  private readonly groupIndex: number;
+  private readonly groupHoverIndex: number;
+  private groupSegments: readonly LineSegment[] = [];
+  private groupHoverSegments: readonly LineSegment[] = [];
   private leakSegments: readonly LineSegment[] = [];
+  private cursorPoint: readonly [number, number, number] | null = null;
+  readonly handles: GpuStore;
+  private readonly handleCornerBuffer: WebGLBuffer;
+  private handleKey = '';
+  private readonly faceHighlightIndex: number;
+  private facePolygons: readonly (readonly Vec3[])[] = [];
+  readonly faceHighlight: GpuStore;
 
   constructor(
     private readonly gl: WebGL2RenderingContext,
@@ -190,10 +233,22 @@ export class GeometryCache {
     this.state[this.invalidIndex * 4] = STATE_SELECTED | STATE_INVALID;
     this.leakIndex = this.takeIndex();
     this.state[this.leakIndex * 4] = STATE_SELECTED | STATE_LEAK;
+    this.cursorIndex = this.takeIndex();
+    this.state[this.cursorIndex * 4] = STATE_SELECTED | STATE_HANDLE;
+    this.groupIndex = this.takeIndex();
+    this.state[this.groupIndex * 4] = STATE_HANDLE;
+    this.groupHoverIndex = this.takeIndex();
+    this.state[this.groupHoverIndex * 4] = STATE_SELECTED;
+    this.faceHighlightIndex = this.takeIndex();
+    this.faceHighlight = new GpuStore(gl, FACE_STRIDE, (buffer) => this.bindFaceAttributes(buffer));
     this.cornerBuffer = gl.createBuffer();
+    this.handleCornerBuffer = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, this.cornerBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([0, -1, 0, 1, 1, -1, 1, 1]), gl.STATIC_DRAW);
     this.lines = new GpuStore(gl, LINE_STRIDE, (buffer) => this.bindLineAttributes(buffer));
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.handleCornerBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, -1, 1, 1, -1, 1, 1]), gl.STATIC_DRAW);
+    this.handles = new GpuStore(gl, HANDLE_STRIDE, (buffer) => this.bindHandleAttributes(buffer));
     this.stateTexture = gl.createTexture();
   }
 
@@ -270,7 +325,7 @@ export class GeometryCache {
   private refreshStates(): void {
     for (const [id, record] of this.records) {
       const dimmed = this.scopeId !== null && !this.scopeMembers.has(id);
-      this.setState(record.index, record.kind, this.selected.has(id), dimmed);
+      this.setState(record.index, record.kind, this.selected.has(id), dimmed, this.editing.has(id));
     }
     this.stateDirty = true;
   }
@@ -294,18 +349,151 @@ export class GeometryCache {
       const record = this.records.get(id);
       if (record) {
         const dimmed = this.scopeId !== null && !this.scopeMembers.has(id);
-        this.setState(record.index, record.kind, selected.has(id), dimmed);
+        this.setState(record.index, record.kind, selected.has(id), dimmed, this.editing.has(id));
       }
     }
     this.selected = selected;
     this.rebuildOverlay();
   }
 
+  /**
+   * The brushes a drag is currently editing (T1.7): their lines and faces
+   * draw in the selection style in every view. Returns false when nothing
+   * changed. Editing is transient and never affects the document.
+   */
+  setEditing(ids: ReadonlySet<Id>): boolean {
+    let same = ids.size === this.editing.size;
+    if (same) {
+      for (const id of ids) {
+        if (!this.editing.has(id)) {
+          same = false;
+          break;
+        }
+      }
+    }
+    if (same) {
+      return false;
+    }
+    for (const id of new Set([...this.editing, ...ids])) {
+      const record = this.records.get(id);
+      if (record) {
+        const dimmed = this.scopeId !== null && !this.scopeMembers.has(id);
+        this.setState(record.index, record.kind, this.selected.has(id), dimmed, ids.has(id));
+      }
+    }
+    this.editing = new Set(ids);
+    return true;
+  }
+
   /** Replaces the transient editing preview: brush ghosts and drag rectangles. */
-  setToolPreview(segments: readonly LineSegment[], invalid: readonly LineSegment[] = []): void {
+  setToolPreview(segments: readonly LineSegment[], invalid: readonly LineSegment[] = []): boolean {
+    if (sameSegments(segments, this.toolSegments) && sameSegments(invalid, this.invalidSegments)) {
+      return false;
+    }
     this.toolSegments = segments;
     this.invalidSegments = invalid;
     this.rebuildOverlay();
+    return true;
+  }
+
+  /**
+   * The vertex/edge/face handle dots (T1.8), drawn as screen-space squares
+   * after everything else in every view. Returns false when nothing changed.
+   */
+  setHandles(handles: readonly { point: Vec3; state: 0 | 1 | 2 }[]): boolean {
+    let key = '';
+    for (const handle of handles) {
+      key += `${handle.point[0]},${handle.point[1]},${handle.point[2]},${handle.state};`;
+    }
+    if (key === this.handleKey) {
+      return false;
+    }
+    this.handleKey = key;
+    if (handles.length === 0) {
+      this.handles.remove('__handles');
+      return true;
+    }
+    const data = new ArrayBuffer(handles.length * HANDLE_STRIDE);
+    const f32 = new Float32Array(data);
+    const u32 = new Uint32Array(data);
+    handles.forEach((handle, i) => {
+      const base = (i * HANDLE_STRIDE) / 4;
+      f32[base] = handle.point[0];
+      f32[base + 1] = handle.point[1];
+      f32[base + 2] = handle.point[2];
+      u32[base + 3] = handle.state;
+    });
+    this.handles.write('__handles', data, handles.length);
+    return true;
+  }
+
+  /**
+   * The texture tool's picked faces: a translucent fill in 3D and a
+   * vp-select outline in every view. Returns false when nothing changed.
+   */
+  setFaceHighlight(polygons: readonly (readonly Vec3[])[]): boolean {
+    if (samePolygons(polygons, this.facePolygons)) {
+      return false;
+    }
+    this.facePolygons = polygons;
+    // Fan-triangulated fill in the face vertex format.
+    let vertexCount = 0;
+    for (const polygon of polygons) {
+      vertexCount += Math.max(0, polygon.length - 2) * 3;
+    }
+    if (vertexCount === 0) {
+      this.faceHighlight.remove('__faceHighlight');
+    } else {
+      const data = new ArrayBuffer(vertexCount * FACE_STRIDE);
+      const f32 = new Float32Array(data);
+      const u32 = new Uint32Array(data);
+      let v = 0;
+      const put = (point: Vec3) => {
+        const base = (v * FACE_STRIDE) / 4;
+        f32[base] = point[0];
+        f32[base + 1] = point[1];
+        f32[base + 2] = point[2];
+        // uv zeros at +12, normal zeros at +20: shading is off for the fill.
+        u32[(v * FACE_STRIDE + 24) / 4] = this.faceHighlightIndex;
+        v++;
+      };
+      for (const polygon of polygons) {
+        for (let i = 1; i + 1 < polygon.length; i++) {
+          put(polygon[0]!);
+          put(polygon[i]!);
+          put(polygon[i + 1]!);
+        }
+      }
+      this.faceHighlight.write('__faceHighlight', data, vertexCount);
+    }
+    // Outlines in the selected-line pass of every view.
+    const segments: LineSegment[] = [];
+    for (const polygon of polygons) {
+      for (let i = 0; i < polygon.length; i++) {
+        segments.push([polygon[i]!, polygon[(i + 1) % polygon.length]!]);
+      }
+    }
+    if (segments.length === 0) {
+      this.lines.remove('__overlayFaces');
+    } else {
+      this.lines.write('__overlayFaces', writeLines(segments, 0), segments.length);
+    }
+    return true;
+  }
+
+  /** The snapped-cursor cross of the creation tools (null hides it). */
+  setCursor(point: readonly [number, number, number] | null): boolean {
+    const same =
+      (point === null && this.cursorPoint === null) ||
+      (point !== null &&
+        this.cursorPoint !== null &&
+        point[0] === this.cursorPoint[0] &&
+        point[1] === this.cursorPoint[1] &&
+        point[2] === this.cursorPoint[2]);
+    if (same) return false;
+    this.cursorPoint = point;
+    this.rebuildOverlay();
+    return true;
   }
 
   /** Persistent target–targetname link lines, recomputed by the app on document changes. */
@@ -317,6 +505,13 @@ export class GeometryCache {
   /** The leak polyline from a qbsp3 pointfile, drawn in the leak colour. */
   setLeakPath(segments: readonly LineSegment[]): void {
     this.leakSegments = segments;
+    this.rebuildOverlay();
+  }
+
+  /** Group-pick mode boxes (T1.13): every group in scope in the handle colour, the hovered one in the selection colour. */
+  setGroupOverlay(segments: readonly LineSegment[], hover: readonly LineSegment[]): void {
+    this.groupSegments = segments;
+    this.groupHoverSegments = hover;
     this.rebuildOverlay();
   }
 
@@ -368,6 +563,45 @@ export class GeometryCache {
         '__overlayLeak',
         writeLines(this.leakSegments, this.leakIndex),
         this.leakSegments.length,
+      );
+    }
+    if (this.cursorPoint === null) {
+      this.lines.remove('__overlayCursor');
+    } else {
+      const [cx, cy, cz] = this.cursorPoint;
+      const arm = 4;
+      const cross: LineSegment[] = [
+        [
+          [cx - arm, cy, cz],
+          [cx + arm, cy, cz],
+        ],
+        [
+          [cx, cy - arm, cz],
+          [cx, cy + arm, cz],
+        ],
+        [
+          [cx, cy, cz - arm],
+          [cx, cy, cz + arm],
+        ],
+      ];
+      this.lines.write('__overlayCursor', writeLines(cross, this.cursorIndex), cross.length);
+    }
+    if (this.groupSegments.length === 0) {
+      this.lines.remove('__overlayGroup');
+    } else {
+      this.lines.write(
+        '__overlayGroup',
+        writeLines(this.groupSegments, this.groupIndex),
+        this.groupSegments.length,
+      );
+    }
+    if (this.groupHoverSegments.length === 0) {
+      this.lines.remove('__overlayGroupHover');
+    } else {
+      this.lines.write(
+        '__overlayGroupHover',
+        writeLines(this.groupHoverSegments, this.groupHoverIndex),
+        this.groupHoverSegments.length,
       );
     }
     this.state[0] = STATE_SELECTED;
@@ -424,6 +658,8 @@ export class GeometryCache {
     for (const batch of this.batches.values()) {
       batch.store.dispose();
     }
+    this.faceHighlight.dispose();
+    this.handles.dispose();
     this.batches.clear();
     this.records.clear();
     this.lines.dispose();
@@ -503,7 +739,7 @@ export class GeometryCache {
         aabb: mesh.aabb,
         batchKeys: mesh.parts.map((part) => part.key),
       });
-      this.setState(index, 'brush', this.selected.has(node.id));
+      this.setState(index, 'brush', this.selected.has(node.id), false, this.editing.has(node.id));
       return;
     }
     // A point entity: an entity without brushes, drawn as a box at its origin.
@@ -535,7 +771,7 @@ export class GeometryCache {
     const segments = arrow ? [...edges, ...arrow] : edges;
     this.lines.write(node.id, writeLines(segments, index), segments.length);
     this.records.set(node.id, { kind: 'entity', index, aabb: box, batchKeys: [] });
-    this.setState(index, 'entity', this.selected.has(node.id));
+    this.setState(index, 'entity', this.selected.has(node.id), false, this.editing.has(node.id));
     this.setEntityColor(index, this.entityColorOf(node));
   }
 
@@ -590,11 +826,13 @@ export class GeometryCache {
     kind: NodeRecord['kind'],
     selected: boolean,
     dimmed = false,
+    editing = false,
   ): void {
     this.state[index * 4] =
       (kind === 'entity' ? STATE_ENTITY : 0) |
       (selected ? STATE_SELECTED : 0) |
-      (dimmed ? STATE_DIMMED : 0);
+      (dimmed ? STATE_DIMMED : 0) |
+      (editing ? STATE_EDITING : 0);
     this.stateDirty = true;
   }
 
@@ -642,5 +880,20 @@ export class GeometryCache {
     gl.enableVertexAttribArray(3);
     gl.vertexAttribIPointer(3, 1, gl.UNSIGNED_INT, LINE_STRIDE, LINE_OFFSET_INDEX);
     gl.vertexAttribDivisor(3, 1);
+  }
+
+  private bindHandleAttributes(buffer: WebGLBuffer): void {
+    const gl = this.gl;
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.handleCornerBuffer);
+    gl.enableVertexAttribArray(0);
+    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+    gl.vertexAttribDivisor(0, 0);
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+    gl.enableVertexAttribArray(1);
+    gl.vertexAttribPointer(1, 3, gl.FLOAT, false, HANDLE_STRIDE, 0);
+    gl.vertexAttribDivisor(1, 1);
+    gl.enableVertexAttribArray(2);
+    gl.vertexAttribIPointer(2, 1, gl.UNSIGNED_INT, HANDLE_STRIDE, 12);
+    gl.vertexAttribDivisor(2, 1);
   }
 }

@@ -1,6 +1,7 @@
 import { createSignal, For, onSettled, Show } from 'solid-js';
 import type { PrimitiveKind } from '@core/geom/index';
 import { Icon } from './Icon';
+import { toolInfo } from '@app/toolInfo';
 import styles from './Toolbar.module.css';
 
 export type ToolbarTool = 'select' | 'brush' | 'clip' | 'vertex' | 'face' | 'texture' | 'entity';
@@ -14,7 +15,13 @@ export interface ToolbarProps {
   readonly onOpenGameFolder: () => void;
   readonly onOpenSinglePak: () => void;
   readonly onOpenMap: () => void;
+  readonly onOpenSettings: () => void;
   readonly onExportMap: () => void;
+  readonly onDelete: () => void;
+  readonly onGroup: () => void;
+  readonly onUngroup: () => void;
+  readonly onToggleGroupPick: () => void;
+  readonly groupPick: () => boolean;
   readonly onCsgSubtract: () => void;
   readonly onCsgIntersect: () => void;
   readonly onHollow: (direction: 'inward' | 'outward') => void;
@@ -36,7 +43,7 @@ export interface ToolbarProps {
 }
 
 function tool(
-  id: string,
+  id: ToolbarTool,
   label: string,
   icon: Parameters<typeof Icon>[0]['name'],
   enabled = false,
@@ -44,14 +51,20 @@ function tool(
   return { id, label, icon, enabled };
 }
 
+// The titles come from the one tool-metadata table (T1.16).
 const tools = [
-  tool('select', 'Select (S)', 'mousePointer', true),
-  tool('brush', 'Brush (B)', 'box', true),
-  tool('entity', 'Entity (E)', 'circleUser', true),
-  tool('clip', 'Clip (C)', 'clip', true),
-  tool('vertex', 'Vertex/edge (V)', 'move', true),
-  tool('face', 'Face (F)', 'scan', true),
-  tool('texture', 'Texture (T)', 'brush', true),
+  tool(
+    'select',
+    `${toolInfo('select').name} (${toolInfo('select').shortcut})`,
+    'mousePointer',
+    true,
+  ),
+  tool('brush', `${toolInfo('brush').name} (${toolInfo('brush').shortcut})`, 'box', true),
+  tool('entity', `${toolInfo('entity').name} (${toolInfo('entity').shortcut})`, 'circleUser', true),
+  tool('clip', `${toolInfo('clip').name} (${toolInfo('clip').shortcut})`, 'clip', true),
+  tool('vertex', `Vertex/edge (${toolInfo('vertex').shortcut})`, 'move', true),
+  tool('face', `${toolInfo('face').name} (${toolInfo('face').shortcut})`, 'scan', true),
+  tool('texture', `${toolInfo('texture').name} (${toolInfo('texture').shortcut})`, 'brush', true),
 ];
 
 const primitives: PrimitiveKind[] = ['box', 'wedge', 'cylinder', 'cone', 'sphere'];
@@ -127,6 +140,11 @@ export function Toolbar(props: ToolbarProps) {
                 Export .map…
               </button>
             </li>
+            <li role="none">
+              <button type="button" role="menuitem" onClick={() => choose(props.onOpenSettings)}>
+                Settings… <span class={styles.shortcut}>Ctrl+,</span>
+              </button>
+            </li>
           </ul>
         </Show>
       </div>
@@ -145,6 +163,31 @@ export function Toolbar(props: ToolbarProps) {
         </button>
         <Show when={editOpen()}>
           <ul class={styles.menu} role="menu">
+            <li role="none">
+              <button type="button" role="menuitem" onClick={() => choose(props.onDelete)}>
+                Delete <span class={styles.shortcut}>Del</span>
+              </button>
+            </li>
+            <li role="none">
+              <button type="button" role="menuitem" onClick={() => choose(props.onGroup)}>
+                Group <span class={styles.shortcut}>Ctrl+G</span>
+              </button>
+            </li>
+            <li role="none">
+              <button type="button" role="menuitem" onClick={() => choose(props.onUngroup)}>
+                Ungroup <span class={styles.shortcut}>Shift+G</span>
+              </button>
+            </li>
+            <li role="none">
+              <button
+                type="button"
+                role="menuitemcheckbox"
+                aria-checked={props.groupPick() ? 'true' : 'false'}
+                onClick={() => choose(props.onToggleGroupPick)}
+              >
+                Group Pick Mode <span class={styles.shortcut}>G</span>
+              </button>
+            </li>
             <li role="none">
               <button type="button" role="menuitem" onClick={() => choose(props.onCsgSubtract)}>
                 CSG Subtract
@@ -283,14 +326,7 @@ export function Toolbar(props: ToolbarProps) {
             aria-pressed={props.activeTool === item.id ? 'true' : 'false'}
             disabled={!item.enabled}
             onClick={() => {
-              if (
-                item.id === 'select' ||
-                item.id === 'brush' ||
-                item.id === 'clip' ||
-                item.id === 'vertex' ||
-                item.id === 'face'
-              )
-                props.onTool(item.id);
+              props.onTool(item.id);
             }}
           >
             <Icon name={item.icon} />

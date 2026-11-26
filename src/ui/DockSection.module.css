@@ -1,0 +1,39 @@
+/* A collapsible right-dock section (T1.12). */
+.section {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+}
+
+.titlebar {
+  display: flex;
+  height: var(--size-titlebar);
+  flex: none;
+  align-items: center;
+  gap: var(--space-2xs);
+  padding: 0 var(--space-xs);
+  background: var(--surface-2);
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.disclosure {
+  display: flex;
+  width: 20px;
+  height: 20px;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.body {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  overflow: hidden;
+}

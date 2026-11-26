@@ -244,3 +244,62 @@
   border-radius: 3px;
   box-shadow: 0 4px 12px rgb(0 0 0 / 40%);
 }
+
+/* The right dock (T1.12): two collapsible sections split vertically. */
+.dock {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--surface-1);
+}
+
+.dockProperties,
+.dockTextures {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+}
+
+.dockProperties {
+  flex: none;
+}
+
+.dockTextures {
+  flex: 1;
+  border-top: 1px solid var(--line);
+}
+
+.textureControls {
+  display: flex;
+  flex: none;
+  align-items: center;
+  padding: var(--space-2xs) var(--space-xs);
+  border-bottom: 1px solid var(--line);
+}
+
+.textureSliderLabel {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: var(--space-xs);
+  color: var(--ink);
+  font-size: var(--font-size-s);
+}
+
+.textureSliderLabel input[type='range'] {
+  flex: 1;
+}
+
+/* The group-pick mode chip in each view's title bar (T1.13). */
+.groupChip {
+  margin-left: var(--space-xs);
+  padding: 0 var(--space-xs);
+  border-radius: 2px;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: var(--font-size-s);
+  font-weight: 600;
+  line-height: 1.4;
+}

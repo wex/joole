@@ -1,0 +1,56 @@
+<!doctype html>
+<html data-theme="dark">
+  <head>
+    <meta charset="utf-8" />
+    <title>Dialog preview</title>
+    <link rel="stylesheet" href="../../tokens.css" />
+    <style>
+      body {
+        margin: 0;
+        font-family: sans-serif;
+      }
+      .scrim {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgb(16 18 20 / 60%);
+      }
+      .q2-dialog {
+        min-width: 320px;
+        max-width: min(480px, 90vw);
+        border: 1px solid var(--line);
+        border-radius: var(--radius-md);
+        background: var(--surface-1);
+        box-shadow: var(--shadow-float);
+        color: var(--ink);
+      }
+      .q2-dialog header {
+        display: flex;
+        justify-content: space-between;
+        padding: var(--space-lg) var(--space-lg) 0;
+      }
+      .q2-dialog h2 {
+        margin: 0;
+        font-size: 13px;
+        font-weight: 600;
+      }
+      .q2-dialog .content {
+        padding: var(--space-lg);
+        font-size: 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="scrim">
+      <div class="q2-dialog" role="dialog" aria-modal="true" aria-label="Settings">
+        <header>
+          <h2>Settings</h2>
+          <button aria-label="Close">×</button>
+        </header>
+        <div class="content">The dialog body. Changes apply immediately.</div>
+      </div>
+    </div>
+  </body>
+</html>

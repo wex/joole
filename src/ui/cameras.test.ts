@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { Vec3 } from '@core/types/index';
 import { VIEW_ORDER, type Camera, type OrthoCamera, type ViewId } from '@render/index';
 import {
+  dollyPerspective,
   CameraController,
   lookPerspective,
   MAX_ORTHO_ZOOM_CSS,
@@ -118,5 +119,25 @@ describe('CameraController', () => {
     expect(changes).toEqual([...VIEW_ORDER]);
     expect(controller.get('top').kind).toBe('ortho');
     expect(controller.get('3d').kind).toBe('perspective');
+  });
+});
+
+describe('dollyPerspective (T1.5)', () => {
+  it('moves along the forward axis, positive forward', () => {
+    const camera = {
+      kind: 'perspective' as const,
+      position: [0, 0, 0] as Vec3,
+      yaw: 0,
+      pitch: 0,
+      fovY: 90,
+      near: 1,
+      far: 65536,
+    };
+    const moved = dollyPerspective(camera, 64);
+    const d = Math.hypot(moved.position[0], moved.position[1], moved.position[2]);
+    expect(d).toBeCloseTo(64, 6);
+    const back = dollyPerspective(camera, -64);
+    expect(back.position[0]).toBeCloseTo(-moved.position[0], 6);
+    expect(dollyPerspective(camera, 0)).toBe(camera);
   });
 });

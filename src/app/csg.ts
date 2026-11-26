@@ -7,12 +7,15 @@ import {
   subtractBrush,
 } from '@core/geom/index';
 import { PLANE_EPS } from '@core/geom/constants';
+import { groupNodesPatch } from './groups';
 import type { BrushNode, Id, MapDocument, MapNode, Patch, Plane } from '@core/types/index';
 
 export interface CsgSubtractResult {
   readonly patch: Patch;
   readonly ids: Id[];
   readonly targets: number;
+  /** Per-target fragment lists with their parent, for CSG grouping (T1.14). */
+  readonly fragments: readonly { readonly parent: Id; readonly ids: readonly Id[] }[];
 }
 
 function aabbOverlap(a: BrushNode, b: BrushNode): boolean {
@@ -54,6 +57,7 @@ export function subtractSelectionPatch(
   let patch: Patch | null = null;
   let working = doc;
   const fragmentIds: Id[] = [];
+  const fragments: { parent: Id; ids: Id[] }[] = [];
   let changedTargets = 0;
 
   for (const target of targets) {
@@ -95,9 +99,10 @@ export function subtractSelectionPatch(
     patch = patch ? mergePatches(patch, effective) : effective;
     working = applyPatch(working, effective);
     fragmentIds.push(...ids);
+    fragments.push({ parent: parentId, ids });
     changedTargets++;
   }
-  return patch ? { patch, ids: fragmentIds, targets: changedTargets } : null;
+  return patch ? { patch, ids: fragmentIds, targets: changedTargets, fragments } : null;
 }
 
 /**
@@ -136,7 +141,7 @@ export function intersectSelectionPatch(
     ...parent,
     children: parent.children.filter((child) => !removed.has(child)),
   });
-  return { patch: effective, ids: [keepId], targets: brushes.length };
+  return { patch: effective, ids: [keepId], targets: brushes.length, fragments: [] };
 }
 
 /** Replaces one selected brush with its hollowed shell fragments. */
@@ -171,7 +176,7 @@ export function hollowSelectionPatch(
     ...parent,
     children: parent.children.flatMap((child) => (child === target.id ? ids : [child])),
   });
-  return { patch: effective, ids, targets: 1 };
+  return { patch: effective, ids, targets: 1, fragments: [{ parent: parentId, ids }] };
 }
 
 /** Clips every selected brush with a plane, replacing each brush by its kept fragment(s). */
@@ -227,5 +232,42 @@ export function clipSelectionPatch(
     fragmentIds.push(...ids);
     changedTargets++;
   }
-  return patch ? { patch, ids: fragmentIds, targets: changedTargets } : null;
+  return patch ? { patch, ids: fragmentIds, targets: changedTargets, fragments: [] } : null;
+}
+
+/**
+ * Groups the fragments of a Hollow or Subtract operation (T1.14): every
+ * target that split into two or more fragments is put into one new group,
+ * unless its parent cannot hold one — brush entities hold brushes but not
+ * groups — or the parent already is a group, because repeated cuts on the
+ * same wall must not build nested chains. The group patches merge into the
+ * operation's patch, so the whole operation stays one undo step.
+ */
+export function withCsgGrouping(
+  doc: Readonly<MapDocument>,
+  result: CsgSubtractResult,
+  name: 'hollow' | 'subtract',
+): CsgSubtractResult & { readonly groups: Id[] } {
+  const groups: Id[] = [];
+  let patch = result.patch;
+  let working = applyPatch(doc, result.patch);
+  for (const target of result.fragments) {
+    if (target.ids.length < 2) continue;
+    const parent = working.nodes.get(target.parent);
+    if (!parent || parent.kind === 'brush') continue;
+    // Only worldspawn holds a new auto-group: a brush entity cannot hold a
+    // group, and inside an existing group the fragments stay where they are.
+    if (parent.kind === 'group') continue;
+    const classname = parent.props.find(([key]) => key === 'classname')?.[1];
+    if (classname !== 'worldspawn') continue;
+    try {
+      const step = groupNodesPatch(working, [...target.ids], createId, name);
+      patch = mergePatches(patch, step.patch);
+      working = applyPatch(working, step.patch);
+      groups.push(step.id);
+    } catch {
+      // A parent that refuses the group is not an error: no group is created.
+    }
+  }
+  return { ...result, patch, groups };
 }

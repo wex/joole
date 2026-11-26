@@ -24,6 +24,8 @@ import gridFragment from './shaders/grid.frag.glsl?raw';
 import gridVertex from './shaders/grid.vert.glsl?raw';
 import lineFragment from './shaders/line.frag.glsl?raw';
 import lineVertex from './shaders/line.vert.glsl?raw';
+import handleVertex from './shaders/handle.vert.glsl?raw';
+import handleFragment from './shaders/handle.frag.glsl?raw';
 
 /** The draw modes of the 3D view. */
 export type Mode3d = 'wireframe' | 'flat' | 'textured';
@@ -88,13 +90,24 @@ const LINE_UNIFORMS = [
   'uWidth',
   'uPass',
   'uEntitiesOnly',
+  'uSelectedOnly',
   'uState',
   'uBrushColor',
   'uEntityColor',
   'uSelectColor',
   'uInvalidColor',
   'uLeakColor',
+  'uHandleColor',
 ] as const;
+const HANDLE_UNIFORMS = [
+  'uViewProjection',
+  'uViewportSize',
+  'uScale',
+  'uIdleColor',
+  'uHoverColor',
+  'uBorderColor',
+] as const;
+
 const GRID_UNIFORMS = [
   'uViewportOrigin',
   'uWorldOrigin',
@@ -132,6 +145,7 @@ export class Renderer {
   private readonly textures: TextureManager;
   private readonly face: Program<(typeof FACE_UNIFORMS)[number]>;
   private readonly line: Program<(typeof LINE_UNIFORMS)[number]>;
+  private readonly handle: Program<(typeof HANDLE_UNIFORMS)[number]>;
   private readonly grid: Program<(typeof GRID_UNIFORMS)[number]>;
   private readonly emptyVao: WebGLVertexArrayObject;
   private readonly multiDraw: WEBGL_multi_draw | null;
@@ -177,9 +191,11 @@ export class Renderer {
     const face = createProgram(gl, faceVertex, faceFragment);
     const line = createProgram(gl, lineVertex, lineFragment);
     const grid = createProgram(gl, gridVertex, gridFragment);
+    const handle = createProgram(gl, handleVertex, handleFragment);
     this.face = { program: face, uniforms: uniformLocations(gl, face, FACE_UNIFORMS) };
     this.line = { program: line, uniforms: uniformLocations(gl, line, LINE_UNIFORMS) };
     this.grid = { program: grid, uniforms: uniformLocations(gl, grid, GRID_UNIFORMS) };
+    this.handle = { program: handle, uniforms: uniformLocations(gl, handle, HANDLE_UNIFORMS) };
     this.emptyVao = gl.createVertexArray();
 
     this.cache = new GeometryCache(gl, options.entityColorOf, options.entityWireframeOf);
@@ -248,13 +264,50 @@ export class Renderer {
     segments: readonly (readonly [Vec3, Vec3])[],
     invalid: readonly (readonly [Vec3, Vec3])[] = [],
   ): void {
-    this.cache.setToolPreview(segments, invalid);
-    this.invalidate();
+    if (this.cache.setToolPreview(segments, invalid)) {
+      this.invalidate();
+    }
+  }
+
+  /** The snapped-cursor cross of the creation tools (null hides it). */
+  setCursor(point: Vec3 | null): void {
+    if (this.cache.setCursor(point)) {
+      this.invalidate();
+    }
+  }
+
+  /** The brushes a drag is currently editing, drawn in the selection style. */
+  setEditing(ids: ReadonlySet<Id>): void {
+    if (this.cache.setEditing(ids)) {
+      this.invalidate();
+    }
+  }
+
+  /** The vertex/edge/face handle dots, drawn as screen-space squares. */
+  setHandles(handles: readonly { point: Vec3; state: 0 | 1 | 2 }[]): void {
+    if (this.cache.setHandles(handles)) {
+      this.invalidate();
+    }
+  }
+
+  /** The texture tool's picked faces: a translucent fill in 3D, outlines in 2D. */
+  setFaceHighlight(polygons: readonly (readonly Vec3[])[]): void {
+    if (this.cache.setFaceHighlight(polygons)) {
+      this.invalidate();
+    }
   }
 
   /** Persistent target–targetname link lines in the 2D views. */
   setTargetLinks(segments: readonly (readonly [Vec3, Vec3])[]): void {
     this.cache.setTargetLinks(segments);
+  }
+
+  /** Group-pick mode overlay boxes (T1.13). */
+  setGroupOverlay(
+    segments: readonly (readonly [Vec3, Vec3])[],
+    hover: readonly (readonly [Vec3, Vec3])[],
+  ): void {
+    this.cache.setGroupOverlay(segments, hover);
   }
 
   setCamera(view: ViewId, camera: Camera): void {
@@ -364,6 +417,7 @@ export class Renderer {
     const gl = this.gl;
     gl.deleteProgram(this.face.program);
     gl.deleteProgram(this.line.program);
+    gl.deleteProgram(this.handle.program);
     gl.deleteProgram(this.grid.program);
     gl.deleteVertexArray(this.emptyVao);
   }
@@ -415,6 +469,7 @@ export class Renderer {
       if (camera.kind === 'ortho') {
         this.drawGrid(camera, x, y, w, h);
         this.drawLines(vp, w, h, false);
+        this.drawHandles(vp, w, h);
       } else {
         this.draw3d(vp, w, h);
       }
@@ -449,7 +504,31 @@ export class Renderer {
     gl.drawArrays(gl.TRIANGLES, 0, 3);
   }
 
-  private drawLines(vp: Mat4, w: number, h: number, entitiesOnly: boolean): void {
+  private drawHandles(vp: Mat4, w: number, h: number): void {
+    const count = this.cache.handles.drawCount;
+    if (count === 0) {
+      return;
+    }
+    const gl = this.gl;
+    const { program, uniforms: u } = this.handle;
+    gl.useProgram(program);
+    gl.uniformMatrix4fv(u.uViewProjection, false, toGlMatrix(vp, this.matrix));
+    gl.uniform2f(u.uViewportSize, w, h);
+    gl.uniform1f(u.uScale, this.backingRatio());
+    gl.uniform4fv(u.uIdleColor, this.colors['vp-handle']);
+    gl.uniform4fv(u.uHoverColor, this.colors['vp-select']);
+    gl.uniform4fv(u.uBorderColor, this.colors['vp-bg']);
+    gl.bindVertexArray(this.cache.handles.vao);
+    gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, count);
+  }
+
+  private drawLines(
+    vp: Mat4,
+    w: number,
+    h: number,
+    entitiesOnly: boolean,
+    selectedOnly = false,
+  ): void {
     const count = this.cache.lines.drawCount;
     if (count === 0) {
       return;
@@ -461,11 +540,13 @@ export class Renderer {
     gl.uniform2f(u.uViewportSize, w, h);
     gl.uniform1f(u.uWidth, this.lineWidth * this.backingRatio());
     gl.uniform1i(u.uEntitiesOnly, entitiesOnly ? 1 : 0);
+    gl.uniform1i(u.uSelectedOnly, selectedOnly ? 1 : 0);
     gl.uniform1i(u.uState, STATE_UNIT);
     gl.uniform4fv(u.uBrushColor, this.colors['vp-brush']);
     gl.uniform4fv(u.uEntityColor, this.colors['vp-entity']);
     gl.uniform4fv(u.uSelectColor, this.colors['vp-select']);
     gl.uniform4fv(u.uInvalidColor, this.colors['vp-invalid']);
+    gl.uniform4fv(u.uHandleColor, this.colors['vp-handle']);
     gl.uniform4fv(u.uLeakColor, this.colors['vp-leak']);
     gl.bindVertexArray(this.cache.lines.vao);
     for (const pass of [0, 1]) {
@@ -516,12 +597,31 @@ export class Renderer {
         this.drawBatch(batch, visible);
       }
     }
+    // The texture tool's picked faces: a translucent vp-select fill over
+    // the faces themselves, depth-tested but not writing depth.
+    const highlightCount = this.cache.faceHighlight.drawCount;
+    if (highlightCount > 0) {
+      const select = this.colors['vp-select'];
+      gl.uniform1i(u.uTextured, 0);
+      gl.uniform1i(u.uShaded, 0);
+      gl.uniform4f(u.uColor, select[0], select[1], select[2], 0.35);
+      gl.enable(gl.POLYGON_OFFSET_FILL);
+      gl.polygonOffset(-1, -1);
+      gl.bindVertexArray(this.cache.faceHighlight.vao);
+      gl.drawArrays(gl.TRIANGLES, 0, highlightCount);
+      gl.disable(gl.POLYGON_OFFSET_FILL);
+    }
     gl.depthMask(true);
     gl.disable(gl.BLEND);
     gl.disable(gl.CULL_FACE);
-    // Point entity boxes, hidden behind the walls in front of them.
-    this.drawLines(vp, w, h, true);
+    // Lines in the textured view: pass 0 keeps only the point entity boxes,
+    // pass 1 draws every selected line — selected and editing brush
+    // outlines, the paint ghost, the clip line, handles and the cursor —
+    // depth-tested so walls in front still hide them.
+    this.drawLines(vp, w, h, false, true);
     gl.disable(gl.DEPTH_TEST);
+    // The handle dots float over everything, in the textured view too.
+    this.drawHandles(vp, w, h);
   }
 
   private drawBatch(batch: FaceBatch, visible: ReadonlySet<Id>): void {

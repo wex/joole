@@ -13,11 +13,13 @@ uniform float uWidth;
 // 0 draws the unselected lines and 1 the selected ones, so selection is on top.
 uniform int uPass;
 uniform bool uEntitiesOnly;
+uniform bool uSelectedOnly;
 uniform highp usampler2D uState;
 uniform vec4 uBrushColor;
 uniform vec4 uEntityColor;
 uniform vec4 uSelectColor;
 uniform vec4 uInvalidColor;
+uniform vec4 uHandleColor;
 uniform vec4 uLeakColor;
 
 out vec4 vColor;
@@ -30,16 +32,17 @@ void main() {
   int i = int(aIndex);
   uvec4 texel = texelFetch(uState, ivec2(i % size.x, i / size.x), 0);
   uint state = texel.r;
-  bool selected = (state & 1u) != 0u;
+  bool selected = (state & 33u) != 0u; // bit 1 selected, bit 32 editing
   bool entity = (state & 2u) != 0u;
   bool invalid = (state & 4u) != 0u;
   bool dimmed = (state & 8u) != 0u;
   bool leak = (state & 16u) != 0u;
+  bool handle = (state & 64u) != 0u;
   vec4 a = uViewProjection * vec4(aA, 1.0);
   vec4 b = uViewProjection * vec4(aB, 1.0);
   vec4 classColor = vec4(vec3(texel.gba) / 255.0, 1.0);
   bool hasClassColor = entity && (texel.g + texel.b + texel.a) > 0u;
-  vColor = invalid ? uInvalidColor : selected ? uSelectColor : entity ? (hasClassColor ? classColor : uEntityColor) : uBrushColor;
+  vColor = handle ? uHandleColor : invalid ? uInvalidColor : selected ? uSelectColor : entity ? (hasClassColor ? classColor : uEntityColor) : uBrushColor;
   if (dimmed) {
     vColor = vec4(vColor.rgb * 0.35, vColor.a);
   }
@@ -48,6 +51,7 @@ void main() {
   }
   // Freed instances are zeroed, so a == b; they and filtered lines collapse.
   if (aA == aB || selected != (uPass == 1) || (uEntitiesOnly && !entity) ||
+      (uSelectedOnly && !selected && !entity) ||
       (a.w < NEAR_W && b.w < NEAR_W)) {
     gl_Position = OUTSIDE;
     return;

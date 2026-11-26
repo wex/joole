@@ -1,4 +1,13 @@
-import { reparentNodePatch, addNodePatch, createEmptyDocument, createId } from '@core/doc/index';
+import { analyzeBrush } from '@core/geom/index';
+import { stepTextureFocus as stepFocus, textureFocus as resolveFocus } from './textureFocus';
+import {
+  reparentNodePatch,
+  addNodePatch,
+  createEmptyDocument,
+  createId,
+  applyPatch,
+  mergePatches,
+} from '@core/doc/index';
 import {
   mergeEntityDefs,
   parseQuakedBlocks,
@@ -23,8 +32,10 @@ import {
   effectiveGroupState,
   groupNodesPatch,
   setGroupFlagPatch,
+  subtreeIds,
   ungroupNodesPatch,
 } from './groups';
+import { boxSegments, dashedSegment } from './tools';
 import { runCompilePipeline, type CompileProfile, type CompileRunner } from './compile';
 import type { EntityClassDef } from '@core/formats/index';
 import type {
@@ -48,7 +59,12 @@ import type { PrefabStore } from '@platform/index';
 import { parseMd2, parsePts, type Md2Wireframe } from '@core/formats/index';
 import { CLASS_MODELS } from '@game/q2/models';
 import { mapTextToPastePatch, removeSelectionPatch, selectionToMapText } from './clipboard';
-import { hollowSelectionPatch, intersectSelectionPatch, subtractSelectionPatch } from './csg';
+import {
+  hollowSelectionPatch,
+  intersectSelectionPatch,
+  subtractSelectionPatch,
+  withCsgGrouping,
+} from './csg';
 import {
   readSurfaceState,
   toggleBitPatch,
@@ -58,6 +74,7 @@ import {
 import {
   allFacesOf,
   applyTexturePatch,
+  expandBrushIds,
   fitTexturePatch,
   justifyTexturePatch,
   resetTexturePatch,
@@ -133,7 +150,7 @@ export type EditorEvent =
   | { readonly type: 'log' }
   | { readonly type: 'grid' }
   | { readonly type: 'selection' }
-  | { readonly type: 'tool' }
+  | { readonly type: 'tool'; readonly source?: 'user' | 'internal' }
   | { readonly type: 'recovery' };
 
 export type EditorListener = (event: EditorEvent) => void;
@@ -217,6 +234,8 @@ export class EditorApp {
           'warning',
           `Texture lock error ${errorTexels.toFixed(2)} texels exceeds the 0.5-texel limit on a face.`,
         ),
+      () => this.groupPick,
+      () => this.scopeId,
     );
     this.brushTool = new BrushTool(
       () => this.document,
@@ -397,6 +416,75 @@ export class EditorApp {
     return this.scopeId;
   }
 
+  /** Group-pick mode (T1.13): clicks in the views select whole groups. */
+  get groupPick(): boolean {
+    return this.groupPickMode;
+  }
+
+  private groupPickMode = false;
+
+  /** Toggles group-pick mode. It is session state and is not persisted. */
+  toggleGroupPick(): boolean {
+    this.groupPickMode = !this.groupPickMode;
+    this.emit({ type: 'selection' });
+    return this.groupPickMode;
+  }
+
+  /** The group under the cursor in group-pick mode, reported by the Select tool. */
+  setGroupHover(id: string | null): void {
+    if (this.groupHoverId === id) return;
+    this.groupHoverId = id;
+    this.emit({ type: 'tool' });
+  }
+
+  private groupHoverId: string | null = null;
+
+  /**
+   * The group-pick overlay (T1.13): the dashed bounding box of every visible
+   * group in scope, plus the hovered group's box undashed. Empty when the
+   * mode is off.
+   */
+  groupOverlay(): {
+    segments: (readonly [[number, number, number], [number, number, number]])[];
+    hover: (readonly [[number, number, number], [number, number, number]])[];
+  } {
+    const segments: (readonly [[number, number, number], [number, number, number]])[] = [];
+    const hover: (readonly [[number, number, number], [number, number, number]])[] = [];
+    if (!this.groupPickMode) return { segments, hover };
+    for (const node of this.document.nodes.values()) {
+      if (node.kind !== 'group') continue;
+      if (!this.inScope(node.id)) continue;
+      const state = effectiveGroupState(this.document, node.id);
+      if (state.hidden) continue;
+      // The union of the descendant brushes' bounds.
+      let min: [number, number, number] | null = null;
+      let max: [number, number, number] | null = null;
+      for (const id of subtreeIds(this.document, node.id)) {
+        const child = this.document.nodes.get(id);
+        if (child?.kind !== 'brush') continue;
+        const box = analyzeBrush(child).aabb;
+        if (!box) continue;
+        if (!min) {
+          min = [...box.min] as [number, number, number];
+          max = [...box.max] as [number, number, number];
+        } else {
+          for (let axis = 0; axis < 3; axis++) {
+            min[axis] = Math.min(min[axis]!, box.min[axis]!);
+            max![axis] = Math.max(max![axis]!, box.max[axis]!);
+          }
+        }
+      }
+      if (!min || !max) continue;
+      const edges = boxSegments(min, max);
+      if (node.id === this.groupHoverId) {
+        hover.push(...edges);
+      } else {
+        for (const [a, b] of edges) segments.push(...dashedSegment(a, b));
+      }
+    }
+    return { segments, hover };
+  }
+
   private scopeId: string | null = null;
 
   /** A node is inside the scope when it is the scope or one of its descendants. */
@@ -455,19 +543,37 @@ export class EditorApp {
     }
   }
 
-  /** Dissolves the selected group, moving its children to its parent. */
+  /** Dissolves every selected group in one undo step (T1.13), deepest first. */
   ungroupSelection(): boolean {
-    const groupId = [...this.selection].find((id) => this.document.nodes.get(id)?.kind === 'group');
-    if (!groupId) {
+    const groupIds = [...this.selection].filter(
+      (id) => this.document.nodes.get(id)?.kind === 'group',
+    );
+    if (groupIds.length === 0) {
       this.log('warning', 'Ungroup needs a selected group.');
       return false;
     }
     try {
-      const patch = ungroupNodesPatch(this.document, groupId);
-      const children = (this.document.nodes.get(groupId) as { children: string[] }).children;
-      this.executeCommand({ label: 'Ungroup', run: () => patch });
-      this.setSelection(children);
-      this.log('ok', 'Ungrouped.');
+      // Deepest groups first, so a nested selection dissolves inside-out.
+      const depth = (id: string): number => {
+        let n = 0;
+        let at: string | undefined = id;
+        while ((at = this.document.parent.get(at)) !== undefined) n++;
+        return n;
+      };
+      const ordered = [...groupIds].sort((a, b) => depth(b) - depth(a));
+      const children: string[] = [];
+      let patch: Patch | null = null;
+      let doc = this.document;
+      for (const groupId of ordered) {
+        if (!doc.nodes.has(groupId)) continue;
+        const next = ungroupNodesPatch(doc, groupId);
+        children.push(...(doc.nodes.get(groupId) as { children: string[] }).children);
+        patch = patch ? mergePatches(patch, next) : next;
+        doc = applyPatch(doc, next);
+      }
+      this.executeCommand({ label: 'Ungroup', run: () => patch! });
+      this.setSelection(children.filter((id) => this.document.nodes.has(id)));
+      this.log('ok', ordered.length > 1 ? `Ungrouped ${ordered.length} groups.` : 'Ungrouped.');
       return true;
     } catch (error) {
       this.log('warning', `Ungroup failed: ${errorText(error)}`);
@@ -710,6 +816,17 @@ export class EditorApp {
   }
 
   /** Qoole semantics: selected brushes are cutters; overlapping unselected brushes are targets. */
+  /** Whether Hollow and Subtract group their fragments (T1.14/T1.15). */
+  get csgGrouping(): boolean {
+    return this.csgGroupingEnabled;
+  }
+
+  private csgGroupingEnabled = true;
+
+  setCsgGrouping(value: boolean): void {
+    this.csgGroupingEnabled = value;
+  }
+
   csgSubtract(): boolean {
     const result = subtractSelectionPatch(this.document, this.selection);
     if (!result) {
@@ -717,11 +834,17 @@ export class EditorApp {
       return false;
     }
     try {
-      this.executeCommand({ label: 'CSG Subtract', run: () => result.patch });
-      this.setSelection(result.ids);
+      const grouped = this.csgGroupingEnabled
+        ? withCsgGrouping(this.document, result, 'subtract')
+        : { ...result, groups: [] as string[] };
+      this.executeCommand({ label: 'CSG Subtract', run: () => grouped.patch });
+      // With group-pick mode on, the new groups are the natural selection.
+      this.setSelection(
+        this.groupPickMode && grouped.groups.length > 0 ? grouped.groups : result.ids,
+      );
       this.log(
         'ok',
-        `CSG Subtract cut ${plural(result.targets, 'target')} into ${plural(result.ids.length, 'fragment')}.`,
+        `CSG Subtract cut ${plural(result.targets, 'target')} into ${plural(result.ids.length, 'fragment')}${grouped.groups.length > 0 ? ' (grouped)' : ''}.`,
       );
       return true;
     } catch (error) {
@@ -805,11 +928,15 @@ export class EditorApp {
       return false;
     }
     try {
-      this.executeCommand({ label: `Hollow ${direction}`, run: () => result.patch });
-      this.setSelection(result.ids);
+      const grouped = this.csgGroupingEnabled
+        ? withCsgGrouping(this.document, result, 'hollow')
+        : { ...result, groups: [] as string[] };
+      this.executeCommand({ label: `Hollow ${direction}`, run: () => grouped.patch });
+      // Hollow selects the new group so the shell can move as one piece.
+      this.setSelection(grouped.groups.length > 0 ? grouped.groups : result.ids);
       this.log(
         'ok',
-        `Hollowed one brush ${direction} into ${plural(result.ids.length, 'fragment')}.`,
+        `Hollowed one brush ${direction} into ${plural(result.ids.length, 'fragment')}${grouped.groups.length > 0 ? ' (grouped)' : ''}.`,
       );
       return true;
     } catch (error) {
@@ -843,6 +970,21 @@ export class EditorApp {
     const patch = removeSelectionPatch(this.document, this.selection);
     if (!patch) return false;
     this.executeCommand({ label: 'Cut selection', run: () => patch });
+    this.setSelection([]);
+    return true;
+  }
+
+  /**
+   * Deletes the whole selection in one undoable step, with no confirmation:
+   * brushes, point entities, groups and brush entities, together with their
+   * subtrees (T1.9). Returns false when there is nothing to delete — faces
+   * picked in the texture tool are not nodes and are left alone.
+   */
+  deleteSelection(): boolean {
+    if (this.selection.size === 0) return false;
+    const patch = removeSelectionPatch(this.document, this.selection);
+    if (!patch) return false;
+    this.executeCommand({ label: 'Delete', run: () => patch });
     this.setSelection([]);
     return true;
   }
@@ -930,12 +1072,12 @@ export class EditorApp {
     return text ? this.pasteMapText(text, [this.gridSize, this.gridSize, 0]) : false;
   }
 
-  setToolMode(mode: EditorToolMode): void {
+  setToolMode(mode: EditorToolMode, source: 'user' | 'internal' = 'user'): void {
     if (mode === this.toolMode) {
       // Pressing V again in vertex mode switches between vertex and edge editing.
       if (mode === 'vertex') {
         this.vertexTool.toggleVertexEdge();
-        this.emit({ type: 'tool' });
+        this.emit({ type: 'tool', source });
       }
       return;
     }
@@ -951,7 +1093,12 @@ export class EditorApp {
     this.textureTool.cancel();
     this.entityTool.cancel();
     this.toolMode = mode;
-    this.emit({ type: 'tool' });
+    if (mode !== 'texture') {
+      // Face picks belong to the texture tool; outside it the texture
+      // operations target whole brushes.
+      this.textureTool.clearFaceSelection();
+    }
+    this.emit({ type: 'tool', source });
   }
 
   setBrushPrimitive(kind: PrimitiveKind, sides = this.brushTool.sides): boolean {
@@ -1278,7 +1425,7 @@ export class EditorApp {
     if (picked.length > 0) {
       return [...picked];
     }
-    return allFacesOf(this.document, this.selection);
+    return allFacesOf(this.document, expandBrushIds(this.document, this.selection));
   }
 
   get faceSelectionCount(): number {
@@ -1293,6 +1440,70 @@ export class EditorApp {
     if (!name) return;
     this.currentTexture = name;
     this.emit({ type: 'tool' });
+  }
+
+  /**
+   * The texture browser's click: sets the current texture and applies it to
+   * the targets — the picked faces in the texture tool, or every face of the
+   * selected brushes including groups and brush entities. Targets that
+   * already carry the texture are skipped, so clicking the active texture
+   * again adds no undo step.
+   */
+  chooseTexture(name: string): void {
+    if (!name) return;
+    this.currentTexture = name;
+    const faces = this.textureTargets().filter((ref) => {
+      const node = this.document.nodes.get(ref.brush);
+      return node?.kind === 'brush' && node.faces[ref.face]?.tex.name !== name;
+    });
+    if (faces.length > 0) {
+      const patch = applyTexturePatch(this.document, faces, name);
+      if (patch) {
+        try {
+          this.executeCommand({ label: 'Apply Texture', run: () => patch });
+        } catch (error) {
+          this.log('warning', errorText(error));
+        }
+      }
+    }
+    this.emit({ type: 'tool' });
+  }
+
+  /** The texture tool's focus navigation state (T1.6), for the Properties row. */
+  textureFocus() {
+    return resolveFocus(
+      this.document,
+      this.selection,
+      this.textureTool.faceSelection.map((ref) => ({ brush: ref.brush, face: ref.face })),
+    );
+  }
+
+  /** Steps the texture focus one face forward or back, wrapping around. */
+  stepTextureFocus(direction: 1 | -1): void {
+    const focus = this.textureFocus();
+    if (!focus.brush) {
+      return;
+    }
+    const target = stepFocus(focus, direction);
+    this.textureTool.setFaceSelection(target === -1 ? [] : [{ brush: focus.brush, face: target }]);
+    this.emit({ type: 'tool' });
+  }
+
+  /** The polygons of the texture tool's picked faces, for the renderer highlight. */
+  faceHighlightPolygons(): readonly (readonly Vec3[])[] {
+    if (this.toolMode !== 'texture') {
+      return [];
+    }
+    const out: (readonly Vec3[])[] = [];
+    for (const ref of this.textureTool.faceSelection) {
+      const node = this.document.nodes.get(ref.brush);
+      if (node?.kind !== 'brush') continue;
+      const polygon = analyzeBrush(node).polygons[ref.face];
+      if (polygon && polygon.length >= 3) {
+        out.push(polygon);
+      }
+    }
+    return out;
   }
 
   clearFaceSelection(): void {

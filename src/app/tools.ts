@@ -20,10 +20,12 @@ import { addNodePatch } from '@core/doc/commands';
 import { DEFAULT_TEXTURE } from '@game/q2/index';
 import { createTransformCommand } from './transformCommands';
 import { clipSelectionPatch } from './csg';
+import { outermostGroupInScope } from './groups';
 import { clipPlaneFromPoints } from '@core/geom/csg';
 import { moveVertices } from '@core/geom/vertexEdit';
 import { createPointEntityPatch } from './entities';
 import { extractWireframe } from '@core/geom/brush';
+import { snap, snapAxes, snapDepthExtent } from './snap';
 
 export type ToolView = PickAxis | '3d';
 
@@ -53,9 +55,19 @@ export interface ToolOutput {
   readonly faces?: readonly { brush: Id; face: number }[];
   /** Texture name picked by the eyedropper. */
   readonly pickedTexture?: string;
+  /** The snapped world point under the cursor, when the tool tracks it. */
+  readonly cursor?: Vec3 | null;
+  /** The brushes this drag is editing (T1.7), drawn in the selection style. */
+  readonly editing?: ReadonlySet<Id>;
+  /** The vertex/edge/face handle dots (T1.8): state 0 idle, 1 hover, 2 active. */
+  readonly handles?: readonly { point: Vec3; state: 0 | 1 | 2 }[];
+  /** The size box of the in-progress edit, when the tool has one. */
+  readonly measure?: { readonly min: Vec3; readonly max: Vec3 } | null;
+  /** The group under the cursor in group-pick mode (T1.13), null when none. */
+  readonly hover?: Id | null;
 }
 
-function boxSegments(min: Vec3, max: Vec3): PreviewSegment[] {
+export function boxSegments(min: Vec3, max: Vec3): PreviewSegment[] {
   const v: Vec3[] = [];
   for (const x of [min[0], max[0]])
     for (const y of [min[1], max[1]]) for (const z of [min[2], max[2]]) v.push([x, y, z]);
@@ -65,6 +77,29 @@ function boxSegments(min: Vec3, max: Vec3): PreviewSegment[] {
   for (const x of [0, 1]) for (const z of [0, 1]) out.push([v[at(x, 0, z)]!, v[at(x, 1, z)]!]);
   for (const y of [0, 1]) for (const z of [0, 1]) out.push([v[at(0, y, z)]!, v[at(1, y, z)]!]);
   return out;
+}
+
+/** The four edges of a 2D drag rectangle in its view plane. */
+function rectSegments(start: Vec3, current: Vec3, view: ToolView): PreviewSegment[] {
+  const [axis0, axis1] = planeAxes(view);
+  const depth = depthAxis(view);
+  const at = (a: number, b: number): Vec3 => {
+    const point = [...start] as Vec3;
+    point[axis0] = a;
+    point[axis1] = b;
+    point[depth] = start[depth]!;
+    return point;
+  };
+  const x0 = Math.min(start[axis0]!, current[axis0]!);
+  const x1 = Math.max(start[axis0]!, current[axis0]!);
+  const y0 = Math.min(start[axis1]!, current[axis1]!);
+  const y1 = Math.max(start[axis1]!, current[axis1]!);
+  return [
+    [at(x0, y0), at(x1, y0)],
+    [at(x1, y0), at(x1, y1)],
+    [at(x1, y1), at(x0, y1)],
+    [at(x0, y1), at(x0, y0)],
+  ];
 }
 
 export interface BoxPreview {
@@ -81,7 +116,7 @@ type Mode =
   | { kind: 'box'; start: Vec3; view: PickAxis }
   | { kind: 'move'; last: Vec3; view: ToolView; key: string }
   | { kind: 'rotate'; last: Vec3; center: Vec3; view: ToolView; key: string }
-  | { kind: 'scale'; anchor: Vec3; start: Vec3; view: ToolView; key: string };
+  | { kind: 'scale'; anchor: Vec3; start: Vec3; current: Vec3; view: ToolView; key: string };
 
 function planeAxes(view: ToolView): [0 | 1 | 2, 0 | 1 | 2] {
   return view === 'xy' ? [0, 1] : view === 'xz' ? [0, 2] : view === 'yz' ? [1, 2] : [0, 1];
@@ -89,11 +124,6 @@ function planeAxes(view: ToolView): [0 | 1 | 2, 0 | 1 | 2] {
 
 function depthAxis(view: ToolView): 0 | 1 | 2 {
   return view === 'xy' ? 2 : view === 'xz' ? 1 : view === 'yz' ? 0 : 2;
-}
-
-function snap(value: number, grid: number): number {
-  const snapped = Math.round(value / grid) * grid;
-  return snapped === 0 ? 0 : snapped;
 }
 
 function boundsOf(doc: Readonly<MapDocument>, ids: ReadonlySet<Id>): Aabb | null {
@@ -179,50 +209,45 @@ export class BrushTool {
   ) {}
 
   pointer(event: ToolPointerEvent): ToolOutput {
-    if (event.button !== 0 || event.view === '3d') {
+    if (event.view === '3d') {
+      return { commands: [], cursor: null };
+    }
+    // Move events carry button -1 in the browser; the drag state lives in
+    // this.mode, so only the down event is filtered by button.
+    if (event.type === 'down' && event.button !== 0) {
       return { commands: [] };
     }
     const grid = this.getGridSize();
     const [axis0, axis1] = planeAxes(event.view);
-    const depth = depthAxis(event.view);
     const point = [...event.point] as Vec3;
     point[axis0] = snap(point[axis0], grid);
     point[axis1] = snap(point[axis1], grid);
 
     if (event.type === 'down') {
       this.mode = { kind: 'draw', start: point, view: event.view };
-      return { commands: [] };
+      return { commands: [], cursor: point };
     }
     if (event.type === 'move') {
-      if (this.mode.kind !== 'draw') return { commands: [] };
-      const start = this.mode.start;
-      const min: Vec3 = [...point] as Vec3;
-      const max: Vec3 = [...point] as Vec3;
-      for (const axis of [axis0, axis1]) {
-        min[axis] = Math.min(start[axis], point[axis]);
-        max[axis] = Math.max(start[axis], point[axis]);
-      }
-      min[depth] = snap(start[depth], grid) - 32;
-      max[depth] = snap(start[depth], grid) + 32;
-      return { commands: [], preview: boxSegments(min, max) };
+      if (this.mode.kind !== 'draw') return { commands: [], cursor: point, measure: null };
+      const [min, max] = this.box(point);
+      return {
+        commands: [],
+        preview: boxSegments(min, max),
+        measure: { min, max },
+        cursor: point,
+      };
     }
     if (event.type !== 'up' || this.mode.kind !== 'draw') {
       return { commands: [] };
     }
 
-    const start = this.mode.start;
+    const [min, max] = this.box(point);
     this.mode = { kind: 'idle' };
-    const min: Vec3 = [...point] as Vec3;
-    const max: Vec3 = [...point] as Vec3;
     for (const axis of [axis0, axis1]) {
-      min[axis] = Math.min(start[axis], point[axis]);
-      max[axis] = Math.max(start[axis], point[axis]);
       if (min[axis] === max[axis]) {
-        return { commands: [] };
+        return { commands: [], measure: null, cursor: point };
       }
     }
-    min[depth] = snap(start[depth], grid) - 32;
-    max[depth] = snap(start[depth], grid) + 32;
 
     const result = createPrimitiveBrush(this.primitive, {
       id: createId(),
@@ -243,7 +268,28 @@ export class BrushTool {
         },
       ],
       selection: new Set([brush.id]),
+      measure: null,
+      cursor: point,
     };
+  }
+
+  /** The box of the in-progress draw: in-plane snapped, depth on the grid. */
+  private box(point: Vec3): [Vec3, Vec3] {
+    if (this.mode.kind !== 'draw') return [point, point];
+    const grid = this.getGridSize();
+    const start = this.mode.start;
+    const [axis0, axis1] = planeAxes(this.mode.view);
+    const depth = depthAxis(this.mode.view);
+    const min: Vec3 = [...point] as Vec3;
+    const max: Vec3 = [...point] as Vec3;
+    for (const axis of [axis0, axis1]) {
+      min[axis] = Math.min(start[axis], point[axis]);
+      max[axis] = Math.max(start[axis], point[axis]);
+    }
+    const [depthMin, depthMax] = snapDepthExtent(snap(start[depth], grid), grid);
+    min[depth] = depthMin;
+    max[depth] = depthMax;
+    return [min, max];
   }
 
   cancel(): void {
@@ -279,10 +325,7 @@ export class ClipTool {
   }
 
   private snapped(point: Vec3, view: PickAxis): Vec3 {
-    const out = [...point] as Vec3;
-    const grid = this.gridSize();
-    for (const axis of planeAxes(view)) out[axis] = snap(out[axis], grid);
-    return out;
+    return snapAxes(point, planeAxes(view), this.gridSize());
   }
 
   private previewSegments(): PreviewSegment[] {
@@ -292,7 +335,9 @@ export class ClipTool {
   }
 
   pointer(event: ToolPointerEvent): ToolOutput {
-    if (event.button !== 0 || event.view === '3d') return { commands: [] };
+    if (event.view === '3d' || (event.type === 'down' && event.button !== 0)) {
+      return { commands: [] };
+    }
     const point = this.snapped(event.point, event.view);
     if (event.type === 'down') {
       if (this.mode.kind === 'first') {
@@ -363,6 +408,14 @@ type VertexDrag = {
   readonly key: string;
   last: Vec3;
   view: ToolView;
+  /** The grabbed point: the vertex, or the edge/face point nearest the cursor. */
+  readonly reference: Vec3;
+  /** The pointer position where the drag started. */
+  readonly down: Vec3;
+  /** The total snapped step applied so far, so each move is absolute. */
+  applied: Vec3;
+  /** The edited brush's AABB after the last valid step, for the size overlay. */
+  measure: { min: Vec3; max: Vec3 } | null;
 };
 
 /** Splits a segment into dash-length pieces for the invalid-edit preview. */
@@ -382,29 +435,18 @@ export function dashedSegment(a: Vec3, b: Vec3, dash = 4): PreviewSegment[] {
   return out;
 }
 
-function segmentDistance(point: Vec3, a: Vec3, b: Vec3, axes: readonly [number, number]): number {
-  const pa = [point[axes[0]]! - a[axes[0]]!, point[axes[1]]! - a[axes[1]]!];
-  const ba = [b[axes[0]]! - a[axes[0]]!, b[axes[1]]! - a[axes[1]]!];
-  const len2 = ba[0]! * ba[0]! + ba[1]! * ba[1]!;
-  const t = len2 < 1e-12 ? 0 : Math.max(0, Math.min(1, (pa[0]! * ba[0]! + pa[1]! * ba[1]!) / len2));
-  return Math.hypot(pa[0]! - ba[0]! * t, pa[1]! - ba[1]! * t);
-}
-
-function cross3(center: Vec3, size: number): PreviewSegment[] {
-  return [
-    [
-      [center[0] - size, center[1], center[2]],
-      [center[0] + size, center[1], center[2]],
-    ],
-    [
-      [center[0], center[1] - size, center[2]],
-      [center[0], center[1] + size, center[2]],
-    ],
-    [
-      [center[0], center[1], center[2] - size],
-      [center[0], center[1], center[2] + size],
-    ],
-  ];
+/** The dot position of a vertex/edge/face handle (T1.8): the vertex itself, the edge midpoint or the face centroid. */
+function handlePoint(handle: { positions: Vec3[] }): Vec3 {
+  if (handle.positions.length === 1) {
+    return handle.positions[0]!;
+  }
+  const center: Vec3 = [0, 0, 0];
+  for (const p of handle.positions) {
+    center[0] += p[0] / handle.positions.length;
+    center[1] += p[1] / handle.positions.length;
+    center[2] += p[2] / handle.positions.length;
+  }
+  return center;
 }
 
 /**
@@ -469,19 +511,46 @@ export class VertexTool {
     return out;
   }
 
-  /** Small crosses at every handle, drawn while the tool is idle. */
-  handlePreview(size: number): PreviewSegment[] {
-    const out: PreviewSegment[] = [];
-    for (const handle of this.handles()) {
-      const center: Vec3 = [0, 0, 0];
-      for (const p of handle.positions) {
-        center[0] += p[0] / handle.positions.length;
-        center[1] += p[1] / handle.positions.length;
-        center[2] += p[2] / handle.positions.length;
+  /**
+   * The handle dots for the renderer (T1.8): every handle of the selection,
+   * with the hovered or dragged one marked. The drag's positions track the
+   * same delta the commands apply, so they still match the recomputed
+   * handles of the moved brush.
+   */
+  handleDots(hover: { brush: Id; positions: Vec3[]; kind: VertexSubmode } | null = null): readonly {
+    point: Vec3;
+    state: 0 | 1 | 2;
+  }[] {
+    const sameHandle = (
+      a: { brush: Id; positions: Vec3[]; kind: VertexSubmode },
+      b: { brush: Id; positions: Vec3[]; kind: VertexSubmode },
+    ) =>
+      a.brush === b.brush &&
+      a.kind === b.kind &&
+      a.positions.length === b.positions.length &&
+      a.positions.every((p) =>
+        b.positions.some(
+          (q) =>
+            Math.abs(q[0] - p[0]) < 1e-6 &&
+            Math.abs(q[1] - p[1]) < 1e-6 &&
+            Math.abs(q[2] - p[2]) < 1e-6,
+        ),
+      );
+    return this.handles().map((handle) => {
+      let state: 0 | 1 | 2 = 0;
+      if (
+        this.drag &&
+        sameHandle(
+          { brush: this.drag.brush, positions: this.drag.positions, kind: this.drag.kind },
+          handle,
+        )
+      ) {
+        state = 2;
+      } else if (hover && sameHandle(hover, handle)) {
+        state = 1;
       }
-      out.push(...cross3(center, size));
-    }
-    return out;
+      return { point: handlePoint(handle), state };
+    });
   }
 
   private pickHandle(
@@ -492,24 +561,13 @@ export class VertexTool {
     let best: { brush: Id; positions: Vec3[]; kind: VertexSubmode } | null = null;
     let bestDistance = Infinity;
     for (const handle of this.handles()) {
-      let d: number;
-      if (handle.kind === 'vertex') {
-        const v = handle.positions[0]!;
-        d = Math.hypot(v[axes[0]]! - event.point[axes[0]]!, v[axes[1]]! - event.point[axes[1]]!);
-      } else if (handle.kind === 'edge') {
-        d = segmentDistance(event.point, handle.positions[0]!, handle.positions[1]!, axes);
-      } else {
-        const center: Vec3 = [0, 0, 0];
-        for (const p of handle.positions) {
-          center[0] += p[0] / handle.positions.length;
-          center[1] += p[1] / handle.positions.length;
-          center[2] += p[2] / handle.positions.length;
-        }
-        d = Math.hypot(
-          center[axes[0]]! - event.point[axes[0]]!,
-          center[axes[1]]! - event.point[axes[1]]!,
-        );
-      }
+      // Every hit target is the fixed-size dot (T1.8): the vertex itself,
+      // the edge midpoint or the face centroid.
+      const dot = handlePoint(handle);
+      const d = Math.hypot(
+        dot[axes[0]]! - event.point[axes[0]]!,
+        dot[axes[1]]! - event.point[axes[1]]!,
+      );
       if (d < bestDistance) {
         bestDistance = d;
         best = handle;
@@ -522,7 +580,23 @@ export class VertexTool {
     if (event.button !== 0 && event.type === 'down') return { commands: [] };
     if (event.type === 'down') {
       const handle = this.pickHandle(event);
-      if (!handle) return { commands: [], preview: this.handlePreview(event.tolerance) };
+      if (!handle) return { commands: [], handles: this.handleDots() };
+      // The reference point (T1.11): the vertex itself in vertex mode, the
+      // edge endpoint or face vertex nearest the cursor otherwise. It is the
+      // point that lands on grid lines.
+      const axes2 = planeAxes(event.view) as readonly [number, number];
+      let reference: Vec3 = handle.positions[0]!;
+      let bestD = Infinity;
+      for (const p of handle.positions) {
+        const d = Math.hypot(
+          p[axes2[0]]! - event.point[axes2[0]]!,
+          p[axes2[1]]! - event.point[axes2[1]]!,
+        );
+        if (d < bestD) {
+          bestD = d;
+          reference = p;
+        }
+      }
       this.drag = {
         brush: handle.brush,
         positions: handle.positions.map((p) => [...p] as Vec3),
@@ -530,22 +604,50 @@ export class VertexTool {
         key: `vertex-${++this.serial}`,
         last: event.point,
         view: event.view,
+        reference: [...reference] as Vec3,
+        down: [...event.point] as Vec3,
+        applied: [0, 0, 0],
+        measure: null,
       };
-      return { commands: [] };
+      return { commands: [], editing: new Set([handle.brush]), handles: this.handleDots() };
     }
     if (event.type === 'move') {
-      if (!this.drag) return { commands: [], preview: this.handlePreview(event.tolerance) };
+      if (!this.drag) {
+        // Idle hover: the dot under the cursor is marked, and in edge mode
+        // the edge itself is highlighted as a vp-select segment.
+        const hover = this.pickHandle(event);
+        const preview: PreviewSegment[] = [];
+        if (hover && hover.kind === 'edge') {
+          preview.push([hover.positions[0]!, hover.positions[1]!]);
+        }
+        const cursor: Vec3 = [...event.point] as Vec3;
+        for (const axis of planeAxes(event.view) as readonly [number, number]) {
+          cursor[axis] = snap(cursor[axis]!, this.gridSize());
+        }
+        return { commands: [], handles: this.handleDots(hover), preview, cursor };
+      }
       if (event.view !== this.drag.view) return { commands: [] };
       const axes = planeAxes(this.drag.view);
       const grid = this.gridSize();
+      // Absolute snapping (T1.11): the total step snaps the reference point
+      // onto a grid line, so an off-grid element joins the grid with its
+      // first step instead of keeping its offset forever.
+      const total: Vec3 = [0, 0, 0];
+      for (const axis of axes) {
+        const raw = this.drag.reference[axis]! + (event.point[axis]! - this.drag.down[axis]!);
+        total[axis] = snap(raw, grid) - this.drag.reference[axis]!;
+      }
+      const cursor: Vec3 = [...event.point] as Vec3;
+      for (const axis of axes) {
+        cursor[axis] = this.drag.reference[axis]! + total[axis]!;
+      }
       const delta: Vec3 = [0, 0, 0];
       let nonzero = false;
       for (const axis of axes) {
-        const amount = snap(event.point[axis]! - this.drag.last[axis]!, grid);
-        delta[axis] = amount;
-        nonzero ||= amount !== 0;
+        delta[axis] = total[axis]! - this.drag.applied[axis]!;
+        nonzero ||= delta[axis] !== 0;
       }
-      if (!nonzero) return { commands: [] };
+      if (!nonzero) return { commands: [], cursor };
       const brush = this.brushAt(this.drag.brush);
       if (!brush) {
         this.drag = null;
@@ -553,15 +655,17 @@ export class VertexTool {
       }
       const result = moveVertices(brush, this.drag.positions, delta);
       if (!result.ok) {
-        // Rejected: nothing is applied; the drag is shown dashed instead.
+        // Rejected: nothing is applied; the drag is shown dashed instead,
+        // with the last valid size next to it.
         const preview: PreviewSegment[] = [];
         for (const pos of this.drag.positions) {
           preview.push(
             ...dashedSegment(pos, [pos[0] + delta[0], pos[1] + delta[1], pos[2] + delta[2]]),
           );
         }
-        return { commands: [], invalid: preview };
+        return { commands: [], invalid: preview, cursor, measure: this.drag.measure };
       }
+      this.drag.applied = [...total] as Vec3;
       this.drag.last = [
         this.drag.last[0] + delta[0],
         this.drag.last[1] + delta[1],
@@ -574,7 +678,15 @@ export class VertexTool {
       const before = positions.map(
         (p) => [p[0] - delta[0], p[1] - delta[1], p[2] - delta[2]] as Vec3,
       );
+      const measure = analyzeBrush(result.value).aabb;
+      this.drag.measure = measure
+        ? { min: [...measure.min] as Vec3, max: [...measure.max] as Vec3 }
+        : null;
       return {
+        invalid: [],
+        handles: this.handleDots(),
+        cursor,
+        measure: this.drag.measure,
         commands: [
           {
             label: `Move ${this.drag.kind}`,
@@ -596,8 +708,18 @@ export class VertexTool {
         ],
       };
     }
+    const hadDrag = this.drag !== null;
     this.drag = null;
-    return { commands: [] };
+    return hadDrag
+      ? {
+          commands: [],
+          invalid: [],
+          editing: new Set(),
+          handles: this.handleDots(),
+          cursor: null,
+          measure: null,
+        }
+      : { commands: [] };
   }
 }
 
@@ -621,10 +743,24 @@ export class SelectTool {
     gridSize: number | (() => number) = 8,
     private readonly textureLock: () => boolean = () => false,
     private readonly onLockWarning: (errorTexels: number) => void = () => {},
+    private readonly groupPick: () => boolean = () => false,
+    private readonly scope: () => Id | null = () => null,
   ) {
     this.gridSize = typeof gridSize === 'function' ? gridSize : () => gridSize;
     this.doc = getDocument();
     this.rebuild();
+  }
+
+  /**
+   * In group-pick mode (T1.13) a brush hit resolves to the outermost group
+   * below the scope. Locked or hidden groups make the hit unselectable, and
+   * several brushes of one group resolve to the same id.
+   */
+  private resolveHit(id: Id): Id | null {
+    if (!this.groupPick()) return id;
+    const resolved = outermostGroupInScope(this.doc, id, this.scope());
+    if (resolved === 'locked') return null;
+    return resolved ?? id;
   }
 
   /** Rebuilds after a wholesale document open. */
@@ -683,12 +819,17 @@ export class SelectTool {
       event.view === '3d'
         ? this.bvh.rayHits(event.point, event.direction ?? [1, 0, 0]).map((hit) => hit.id)
         : this.bvh.pick2D(event.point, event.view, event.tolerance).map((hit) => hit.id);
-    const selectedHit = hits.find((id) => this.selected.has(id));
+    const resolved: Id[] = [];
+    for (const id of hits) {
+      const mapped = this.resolveHit(id);
+      if (mapped !== null && !resolved.includes(mapped)) resolved.push(mapped);
+    }
+    const selectedHit = resolved.find((id) => this.selected.has(id));
     if (selectedHit !== undefined) {
       return selectedHit;
     }
     const key = event.point.map((x) => Math.round(x / Math.max(1, this.gridSize()))).join(':');
-    return this.cycler.choose(hits, `${event.view}:${key}`);
+    return this.cycler.choose(resolved, `${event.view}:${key}`);
   }
 
   private pointerDown(event: ToolPointerEvent): ToolOutput {
@@ -703,8 +844,8 @@ export class SelectTool {
         corner[1] === bounds.min[1] ? bounds.max[1] : bounds.min[1],
         corner[2] === bounds.min[2] ? bounds.max[2] : bounds.min[2],
       ];
-      this.mode = { kind: 'scale', anchor, start: corner, view: event.view, key };
-      return { commands: [] };
+      this.mode = { kind: 'scale', anchor, start: corner, current: corner, view: event.view, key };
+      return { commands: [], editing: new Set(this.selected) };
     }
     if (!hit) {
       if (event.view !== '3d') {
@@ -745,7 +886,11 @@ export class SelectTool {
         this.mode = { kind: 'move', last: event.point, view: event.view, key };
       }
     }
-    return { commands: [], ...(selectionChanged ? { selection: this.selected } : {}) };
+    return {
+      commands: [],
+      ...(selectionChanged ? { selection: this.selected } : {}),
+      editing: new Set(this.selected),
+    };
   }
 
   private nearCorner(event: ToolPointerEvent, bounds: Aabb): Vec3 | null {
@@ -782,7 +927,7 @@ export class SelectTool {
         start: this.mode.start,
         current: event.point,
       };
-      return { commands: [] };
+      return { commands: [], preview: rectSegments(this.mode.start, event.point, this.mode.view) };
     }
     if (this.mode.kind === 'move') {
       const axes = planeAxes(this.mode.view);
@@ -844,29 +989,49 @@ export class SelectTool {
       };
     }
     if (this.mode.kind === 'scale') {
-      const factors: Vec3 = [1, 1, 1];
+      // The dragged corner moves only to grid positions (T1.10): the target
+      // is computed from the original corner every step, and the command
+      // scales from the current corner to the target, so float error does
+      // not build up over a long drag. The corner can neither cross the
+      // anchor nor come closer to it than one grid step.
       const axes = planeAxes(this.mode.view);
+      const grid = this.gridSize();
+      const anchor = this.mode.anchor;
+      const target: Vec3 = [...this.mode.start] as Vec3;
+      for (const axis of axes) {
+        const snapped = snap(event.point[axis]!, grid);
+        const sign = this.mode.start[axis]! >= anchor[axis]! ? 1 : -1;
+        const minimum = anchor[axis]! + sign * grid;
+        target[axis] = sign > 0 ? Math.max(snapped, minimum) : Math.min(snapped, minimum);
+      }
+      const factors: Vec3 = [1, 1, 1];
       let valid = false;
       for (const axis of axes) {
-        const start = this.mode.start[axis]! - this.mode.anchor[axis]!;
-        const now = event.point[axis]! - this.mode.anchor[axis]!;
-        factors[axis] = Math.abs(start) < 1e-9 ? 1 : now / start;
-        valid ||= Math.abs(factors[axis]! - 1) > 1e-9;
+        const current = this.mode.current[axis]! - anchor[axis]!;
+        const next = target[axis]! - anchor[axis]!;
+        factors[axis] = Math.abs(current) < 1e-9 ? 1 : next / current;
+        valid ||= Math.abs(target[axis]! - this.mode.current[axis]!) > 1e-9;
       }
-      if (!valid || factors.some((factor) => Math.abs(factor) < 1e-9)) {
+      if (!valid || factors.some((factor) => !Number.isFinite(factor) || Math.abs(factor) < 1e-9)) {
         return { commands: [] };
       }
-      this.mode.start = event.point;
+      this.mode.current = target;
       return {
         commands: [
           createTransformCommand(
             'Scale selection',
             [...this.selected],
-            around(this.mode.anchor, mat4Scaling(factors)),
+            around(anchor, mat4Scaling(factors)),
             { mergeKey: this.mode.key },
           ),
         ],
       };
+    }
+    if (this.mode.kind === 'idle' && this.groupPick()) {
+      // Group-pick hover (T1.13): the box of the group under the cursor is
+      // drawn in the selection colour.
+      this.doc = this.getDocument();
+      return { commands: [], hover: this.hit(event) };
     }
     return { commands: [] };
   }
@@ -877,10 +1042,10 @@ export class SelectTool {
       this.selected = selection;
       this.mode = { kind: 'idle' };
       this.preview = null;
-      return { commands: [], selection };
+      return { commands: [], selection, preview: [] };
     }
     this.mode = { kind: 'idle' };
-    return { commands: [] };
+    return { commands: [], editing: new Set() };
   }
 
   private boxSelection(start: Vec3, end: Vec3, view: PickAxis): Set<Id> {
@@ -902,7 +1067,8 @@ export class SelectTool {
         box.max[axes[1]]! >= minB &&
         box.min[axes[1]]! <= maxB
       ) {
-        out.add(node.id);
+        const mapped = this.resolveHit(node.id);
+        if (mapped !== null) out.add(mapped);
       }
     }
     return out;
@@ -1065,7 +1231,7 @@ export class EntityTool {
     const classname = this.currentClass();
     if (!classname) return { commands: [] };
     const grid = this.gridSize();
-    const snapped = event.point.map((value) => Math.round(value / grid) * grid) as Vec3;
+    const snapped = event.point.map((value) => snap(value, grid)) as Vec3;
     const doc = this.getDocument();
     let placement: { patch: Patch; id: Id };
     try {

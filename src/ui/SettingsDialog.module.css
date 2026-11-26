@@ -1,0 +1,56 @@
+/* The Settings dialog's form layout (T1.15). */
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.heading {
+  margin: 0;
+  padding-bottom: var(--space-2xs);
+  border-bottom: 1px solid var(--line);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  font-size: 12px;
+}
+
+.label {
+  color: var(--ink);
+}
+
+.row input[type='number'],
+.row select {
+  width: 96px;
+  padding: var(--space-2xs) var(--space-xs);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--ink);
+}
+
+.footer {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.reset {
+  padding: var(--space-xs) var(--space-md);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--ink);
+  cursor: pointer;
+}

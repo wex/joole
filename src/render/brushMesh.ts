@@ -56,6 +56,14 @@ export const FACE_OFFSET_UV = 12;
 export const FACE_OFFSET_NORMAL = 20;
 export const FACE_OFFSET_INDEX = 24;
 
+/**
+ * A handle dot instance (T1.8): the world-space centre as 3×f32 and the state
+ * u32 — 0 idle, 1 hover, 2 active. The size and colour come from the state.
+ */
+export const HANDLE_STRIDE = 16;
+export const HANDLE_OFFSET_CENTER = 0;
+export const HANDLE_OFFSET_STATE = 12;
+
 /** A wireframe line instance: endpoints a and b as 3×f32 and the index u32. */
 export const LINE_STRIDE = 28;
 export const LINE_OFFSET_A = 0;

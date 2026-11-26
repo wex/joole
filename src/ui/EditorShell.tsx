@@ -1,10 +1,11 @@
 import { createSignal, For, onSettled, Show, untrack } from 'solid-js';
-import type { EditorApp, LogEntry, ToolPointerEvent } from '@app/index';
+import type { EditorApp, LogEntry, ToolOutput, ToolPointerEvent } from '@app/index';
 import { shortcutAction } from '@app/index';
 import type { OrthoCamera, PerspectiveCamera, Renderer, ViewId, ViewRect } from '@render/index';
 import { VIEW_ORDER } from '@render/index';
 import {
   CameraController,
+  dollyPerspective,
   lookPerspective,
   movePerspective,
   orthoCoordinates,
@@ -15,11 +16,18 @@ import {
   zoomOrthoAt,
 } from './cameras';
 import { Icon } from './Icon';
+import type { IconName } from './icons';
 import { LogPanel } from './LogPanel';
+import { MeasureOverlay, type MeasureBox } from './MeasureOverlay';
 import { PanelTabs, type BottomTab } from './PanelTabs';
 import { TreeView } from './TreeView';
 import { PrefabBrowser } from './PrefabBrowser';
 import { PropertiesPanel } from './PropertiesPanel';
+import { DockSection } from './DockSection';
+import { SettingsDialog } from './SettingsDialog';
+import { ToolHint } from './ToolHint';
+import { DEFAULT_SETTINGS } from '@app/settings';
+import { toolInfo } from '@app/toolInfo';
 import { TextureBrowser } from './TextureBrowser';
 import { Toolbar } from './Toolbar';
 import styles from './EditorShell.module.css';
@@ -35,6 +43,21 @@ export interface EditorShellProps {
   readonly renderer: Renderer;
   readonly canvas: HTMLCanvasElement;
   readonly pwa?: PwaUpdateFlow;
+  /** The persisted settings, loaded at startup; the shell reports changes back. */
+  readonly settings?: {
+    readonly rightWidth: number;
+    readonly bottomHeight: number;
+    readonly dockSplit: number;
+    readonly propertiesCollapsed: boolean;
+    readonly texturesCollapsed: boolean;
+    readonly thumbSize: number;
+    readonly theme: 'dark' | 'light';
+    readonly wheelStep: number;
+    readonly mouseLookSensitivity: number;
+    readonly showToolOverlay: boolean;
+    readonly groupCsgResults: boolean;
+  };
+  readonly onSettingsChange?: (partial: Record<string, unknown>) => void;
 }
 
 const viewLabels: Record<ViewId, string> = {
@@ -55,10 +78,10 @@ const functionKeys: Record<string, ViewId> = {
   F4: 'side',
 };
 
-const initialRightWidth = 224;
+const initialRightWidth = 320;
 const initialBottomHeight = 160;
 const minRightWidth = 168;
-const maxRightWidth = 480;
+const maxRightWidth = 640;
 const minBottomHeight = 88;
 const maxBottomHeight = 420;
 
@@ -97,6 +120,8 @@ interface HitView {
 
 export function EditorShell(props: EditorShellProps) {
   const app = untrack(() => props.app);
+  // The persisted settings are the initial values only; the shell owns them afterwards.
+  const initialSettings = untrack(() => props.settings);
   const renderer = untrack(() => props.renderer);
   const canvasElement = untrack(() => props.canvas);
   const [mapName, setMapName] = createSignal(app.mapName);
@@ -108,11 +133,73 @@ export function EditorShell(props: EditorShellProps) {
   const [activeView, setActiveView] = createSignal<ViewId>('3d');
   const [maximizedView, setMaximizedView] = createSignal<ViewId | null>(null);
   const [compileMenuOpen, setCompileMenuOpen] = createSignal(false);
-  const [bottomTab, setBottomTab] = createSignal<BottomTab>('textures');
-  const [theme, setTheme] = createSignal<'dark' | 'light'>('dark');
+  const [bottomTab, setBottomTab] = createSignal<BottomTab>('tree');
+  const [theme, setTheme] = createSignal<'dark' | 'light'>(initialSettings?.theme ?? 'dark');
   const [coordinates, setCoordinates] = createSignal(coordinateDefaults(false));
-  const [rightWidth, setRightWidth] = createSignal(initialRightWidth);
-  const [bottomHeight, setBottomHeight] = createSignal(initialBottomHeight);
+  const [flyActive, setFlyActive] = createSignal(false);
+  const [rightWidth, setRightWidth] = createSignal(
+    initialSettings?.rightWidth ?? initialRightWidth,
+  );
+  const [bottomHeight, setBottomHeight] = createSignal(
+    initialSettings?.bottomHeight ?? initialBottomHeight,
+  );
+  // The right dock (T1.12): two collapsible sections split vertically.
+  const [dockSplit, setDockSplit] = createSignal(initialSettings?.dockSplit ?? 0.5);
+  const [propertiesCollapsed, setPropertiesCollapsed] = createSignal(
+    initialSettings?.propertiesCollapsed ?? false,
+  );
+  const [texturesCollapsed, setTexturesCollapsed] = createSignal(
+    initialSettings?.texturesCollapsed ?? false,
+  );
+  const [thumbSize, setThumbSize] = createSignal(initialSettings?.thumbSize ?? 64);
+  // The dialog settings (T1.15).
+  const [settingsOpen, setSettingsOpen] = createSignal(false);
+  const [wheelStep, setWheelStep] = createSignal(initialSettings?.wheelStep ?? 64);
+  const [mouseLook, setMouseLook] = createSignal(initialSettings?.mouseLookSensitivity ?? 0.15);
+  const [showToolOverlay, setShowToolOverlay] = createSignal(
+    initialSettings?.showToolOverlay ?? true,
+  );
+  const [groupCsgResults, setGroupCsgResults] = createSignal(
+    initialSettings?.groupCsgResults ?? true,
+  );
+  /** Applies one dialog change immediately: signals, side effects, persistence. */
+  const applySettingsChange = (partial: Record<string, unknown>) => {
+    if (typeof partial['theme'] === 'string') {
+      const next = partial['theme'] as 'dark' | 'light';
+      setTheme(next);
+      document.documentElement.dataset.theme = next;
+      renderer.refreshColors();
+    }
+    if (typeof partial['thumbSize'] === 'number') setThumbSize(partial['thumbSize']);
+    if (typeof partial['wheelStep'] === 'number') setWheelStep(partial['wheelStep']);
+    if (typeof partial['mouseLookSensitivity'] === 'number') {
+      setMouseLook(partial['mouseLookSensitivity']);
+    }
+    if (typeof partial['showToolOverlay'] === 'boolean')
+      setShowToolOverlay(partial['showToolOverlay']);
+    if (typeof partial['groupCsgResults'] === 'boolean') {
+      setGroupCsgResults(partial['groupCsgResults']);
+      app.setCsgGrouping(partial['groupCsgResults']);
+    }
+    if (typeof partial['gridSize'] === 'number') app.setGridSize(partial['gridSize']);
+    if (typeof partial['rightWidth'] === 'number') {
+      setRightWidth(partial['rightWidth'] as number);
+      mainElement?.style.setProperty('--right-panel-width', `${partial['rightWidth']}px`);
+    }
+    if (typeof partial['bottomHeight'] === 'number') {
+      setBottomHeight(partial['bottomHeight'] as number);
+      centerElement?.style.setProperty('--bottom-panel-height', `${partial['bottomHeight']}px`);
+    }
+    if (typeof partial['dockSplit'] === 'number') setDockSplit(partial['dockSplit']);
+    if (typeof partial['propertiesCollapsed'] === 'boolean') {
+      setPropertiesCollapsed(partial['propertiesCollapsed']);
+    }
+    if (typeof partial['texturesCollapsed'] === 'boolean') {
+      setTexturesCollapsed(partial['texturesCollapsed']);
+    }
+    props.onSettingsChange?.(partial);
+  };
+  const reportSetting = (key: string, value: unknown) => props.onSettingsChange?.({ [key]: value });
   const [viewMenu, setViewMenu] = createSignal<{
     x: number;
     y: number;
@@ -145,8 +232,51 @@ export function EditorShell(props: EditorShellProps) {
   const [textureLock, setTextureLock] = createSignal(app.textureLockEnabled);
   const [recoveryAvailable, setRecoveryAvailable] = createSignal(app.recoveryProject !== null);
   const [panelVersion, setPanelVersion] = createSignal(0);
+  const [measure, setMeasure] = createSignal<MeasureBox | null>(null);
+  const [cursor, setCursor] = createSignal<readonly number[] | null>(null);
+  const [groupPick, setGroupPick] = createSignal(app.groupPick);
+
+  // The tool overlay (T1.16): shown for 2.5 s after a user tool change.
+  const [toolHint, setToolHint] = createSignal<{
+    name: string;
+    shortcut: string;
+    description: string;
+    icon: IconName;
+  } | null>(null);
+  let toolHintTimer: ReturnType<typeof setTimeout> | null = null;
+  const toolIcons: Record<string, IconName> = {
+    select: 'mousePointer',
+    brush: 'box',
+    entity: 'circleUser',
+    clip: 'clip',
+    vertex: 'move',
+    edge: 'move',
+    face: 'scan',
+    texture: 'brush',
+  };
+  const showToolHint = () => {
+    // Event-time reads, not a subscription: the overlay never re-fires.
+    if (!untrack(showToolOverlay) || untrack(flyActive)) return;
+    // The vertex tool shows its submode: V toggles vertex and edge editing.
+    const id =
+      app.activeTool === 'vertex' && app.vertexSubmode === 'edge' ? 'edge' : app.activeTool;
+    const info = toolInfo(id);
+    if (!info) return;
+    if (toolHintTimer !== null) clearTimeout(toolHintTimer);
+    setToolHint({
+      name: info.name,
+      shortcut: info.shortcut,
+      description: info.description,
+      icon: toolIcons[id] ?? 'box',
+    });
+    toolHintTimer = setTimeout(() => {
+      toolHintTimer = null;
+      setToolHint(null);
+    }, 2500);
+  };
 
   let viewportElement: HTMLDivElement | undefined;
+  let dockElement: HTMLElement | undefined;
   let mainElement: HTMLDivElement | undefined;
   let centerElement: HTMLDivElement | undefined;
   let gameInput: HTMLInputElement | undefined;
@@ -161,11 +291,13 @@ export function EditorShell(props: EditorShellProps) {
     const next = clamp(Math.round(width), minRightWidth, maxRightWidth);
     setRightWidth(next);
     mainElement?.style.setProperty('--right-panel-width', `${next}px`);
+    reportSetting('rightWidth', next);
   };
   const setPanelHeight = (height: number) => {
     const next = clamp(Math.round(height), minBottomHeight, maxBottomHeight);
     setBottomHeight(next);
     centerElement?.style.setProperty('--bottom-panel-height', `${next}px`);
+    reportSetting('bottomHeight', next);
   };
 
   const hitView = (clientX: number, clientY: number): HitView | null => {
@@ -223,6 +355,7 @@ export function EditorShell(props: EditorShellProps) {
     setTheme(next);
     document.documentElement.dataset.theme = next;
     renderer.refreshColors();
+    reportSetting('theme', next);
   };
 
   const stepGrid = (direction: -1 | 1) => {
@@ -270,6 +403,36 @@ export function EditorShell(props: EditorShellProps) {
     }
   };
 
+  // The dock's inner splitter stores a fraction of the dock's height (T1.12).
+  const setDockFraction = (fraction: number) => {
+    const next = clamp(fraction, 0.15, 0.85);
+    setDockSplit(next);
+    reportSetting('dockSplit', next);
+  };
+  const beginDockSplitterDrag = (event: PointerEvent): void => {
+    if (event.button !== 0 || !dockElement) return;
+    event.preventDefault();
+    const target = event.currentTarget as HTMLElement;
+    target.setPointerCapture(event.pointerId);
+    const bounds = dockElement.getBoundingClientRect();
+    const move = (moveEvent: PointerEvent) => {
+      setDockFraction((moveEvent.clientY - bounds.top) / bounds.height);
+    };
+    const up = () => {
+      target.removeEventListener('pointermove', move);
+      target.removeEventListener('pointerup', up);
+      target.removeEventListener('pointercancel', up);
+    };
+    target.addEventListener('pointermove', move);
+    target.addEventListener('pointerup', up);
+    target.addEventListener('pointercancel', up);
+  };
+  const dockSplitterKey = (event: KeyboardEvent): void => {
+    if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
+    event.preventDefault();
+    setDockFraction(dockSplit() + (event.key === 'ArrowDown' ? 0.05 : -0.05));
+  };
+
   onSettled(() => {
     const viewport = viewportElement;
     if (!viewport) {
@@ -283,7 +446,6 @@ export function EditorShell(props: EditorShellProps) {
       lastY: number;
     } | null = null;
     let toolPointer: { readonly pointerId: number; readonly view: ViewId } | null = null;
-    let rightFly = false;
     let pointerLocked = false;
     let frame: number | null = null;
     let lastFrameTime = 0;
@@ -291,7 +453,7 @@ export function EditorShell(props: EditorShellProps) {
 
     const updateCursor = (clientX: number, clientY: number) => {
       const hit = hitView(clientX, clientY);
-      const next = coordinateDefaults(pointerLocked || rightFly);
+      const next = coordinateDefaults(pointerLocked);
       if (hit && hit.view !== '3d') {
         const camera = orthoCamera(hit.view);
         if (camera) {
@@ -312,7 +474,7 @@ export function EditorShell(props: EditorShellProps) {
     const tick = (now: number) => {
       frame = null;
       const camera = perspectiveCamera();
-      if (!camera || (!pointerLocked && !rightFly) || flyKeys.size === 0) {
+      if (!camera || !pointerLocked || flyKeys.size === 0) {
         return;
       }
       const seconds = Math.min(0.05, Math.max(0, (now - lastFrameTime) / 1000));
@@ -324,13 +486,14 @@ export function EditorShell(props: EditorShellProps) {
       frame = requestAnimationFrame(tick);
     };
     const ensureMovement = () => {
-      if (frame === null && flyKeys.size > 0 && (pointerLocked || rightFly)) {
+      if (frame === null && flyKeys.size > 0 && pointerLocked) {
         lastFrameTime = performance.now();
         frame = requestAnimationFrame(tick);
       }
     };
     const updateFlyState = () => {
-      const active = pointerLocked || rightFly;
+      const active = pointerLocked;
+      setFlyActive(active);
       setCoordinates(coordinateDefaults(active));
       if (!active) {
         flyKeys.clear();
@@ -376,13 +539,59 @@ export function EditorShell(props: EditorShellProps) {
       };
     };
 
+    const sameVec = (a: readonly number[] | null, b: readonly number[] | null) =>
+      (a === null && b === null) ||
+      (a !== null && b !== null && a[0] === b[0] && a[1] === b[1] && a[2] === b[2]);
+    const sameBox = (a: MeasureBox | null, b: MeasureBox | null) =>
+      (a === null && b === null) ||
+      (a !== null && b !== null && sameVec(a.min, b.min) && sameVec(a.max, b.max));
+
+    const applyToolFeedback = (output: ToolOutput) => {
+      // undefined means the tool said nothing; [] and null are explicit clears.
+      if (output.preview !== undefined || output.invalid !== undefined) {
+        renderer.setToolPreview(output.preview ?? [], output.invalid ?? []);
+      }
+      if (output.cursor !== undefined) {
+        const next = output.cursor ?? null;
+        if (!sameVec(cursor(), next)) {
+          setCursor(next);
+          renderer.setCursor(next as [number, number, number] | null);
+        }
+      }
+      if (output.editing !== undefined) {
+        renderer.setEditing(output.editing);
+      }
+      if (output.handles !== undefined) {
+        renderer.setHandles(output.handles);
+      }
+      if (output.hover !== undefined) {
+        app.setGroupHover(output.hover ?? null);
+      }
+      if (output.measure !== undefined) {
+        const next = output.measure ?? null;
+        if (!sameBox(measure(), next)) {
+          setMeasure(next);
+        }
+      }
+    };
+
+    const clearToolFeedback = () => {
+      setMeasure(null);
+      setCursor((previous) => {
+        if (previous !== null) {
+          renderer.setCursor(null);
+        }
+        return null;
+      });
+    };
+
     const sendToolEvent = (type: 'down' | 'move' | 'up', event: PointerEvent) => {
       const hit = hitView(event.clientX, event.clientY);
       if (!hit || (toolPointer && hit.view !== toolPointer.view)) {
         return false;
       }
       const output = app.selectPointer(toolEvent(hit, type, event));
-      renderer.setToolPreview(output.preview ?? [], output.invalid ?? []);
+      applyToolFeedback(output);
       return true;
     };
 
@@ -422,20 +631,17 @@ export function EditorShell(props: EditorShellProps) {
             void request?.catch(() => {
               app.log(
                 'warning',
-                'Pointer lock failed. Hold the right mouse button to fly instead.',
+                'Pointer lock failed. The 3D camera can only be inspected from its current position.',
               );
             });
           } catch {
-            app.log('warning', 'Pointer lock failed. Hold the right mouse button to fly instead.');
+            app.log(
+              'warning',
+              'Pointer lock failed. The 3D camera can only be inspected from its current position.',
+            );
           }
         }
         return;
-      }
-      if (hit.view === '3d' && event.button === 2) {
-        rightFly = true;
-        viewport.setPointerCapture(event.pointerId);
-        updateFlyState();
-        event.preventDefault();
       }
     };
 
@@ -444,6 +650,11 @@ export function EditorShell(props: EditorShellProps) {
         sendToolEvent('move', event);
         event.preventDefault();
         return;
+      }
+      // Hover tracking: with no buttons held the tools still see the move,
+      // so the creation tools can show the snapped cursor and the clip line.
+      if (!pan && !pointerLocked && event.buttons === 0) {
+        sendToolEvent('move', event);
       }
       if (pan && event.pointerId === pan.pointerId) {
         const camera = orthoCamera(pan.view);
@@ -460,10 +671,13 @@ export function EditorShell(props: EditorShellProps) {
         }
         pan = { ...pan, lastX: event.clientX, lastY: event.clientY };
       }
-      if ((pointerLocked || rightFly) && (event.movementX !== 0 || event.movementY !== 0)) {
+      if (pointerLocked && (event.movementX !== 0 || event.movementY !== 0)) {
         const camera = perspectiveCamera();
         if (camera) {
-          controller.setCamera('3d', lookPerspective(camera, event.movementX, event.movementY));
+          controller.setCamera(
+            '3d',
+            lookPerspective(camera, event.movementX, event.movementY, mouseLook()),
+          );
         }
       }
       if (!pointerLocked) {
@@ -481,15 +695,22 @@ export function EditorShell(props: EditorShellProps) {
       if (pan && event.pointerId === pan.pointerId) {
         pan = null;
       }
-      if (event.button === 2 && rightFly) {
-        rightFly = false;
-        updateFlyState();
-      }
     };
 
     const wheel = (event: WheelEvent) => {
       const hit = hitView(event.clientX, event.clientY);
-      if (!hit || hit.view === '3d') {
+      if (!hit) {
+        return;
+      }
+      if (hit.view === '3d') {
+        const camera = perspectiveCamera();
+        if (!camera) {
+          return;
+        }
+        event.preventDefault();
+        // One wheel notch moves the step chosen in the Settings dialog (T1.15).
+        const distance = (-event.deltaY / 120) * wheelStep();
+        controller.setCamera('3d', dollyPerspective(camera, distance));
         return;
       }
       const camera = orthoCamera(hit.view);
@@ -541,7 +762,7 @@ export function EditorShell(props: EditorShellProps) {
       if (
         app.activeTool === 'clip' &&
         (event.key === 'Enter' || event.key === 'Tab' || event.key === 'Escape') &&
-        !(pointerLocked || rightFly)
+        !pointerLocked
       ) {
         event.preventDefault();
         const output = app.clipKey(event.key);
@@ -594,6 +815,11 @@ export function EditorShell(props: EditorShellProps) {
         void app.saveProject();
         return;
       }
+      if (action === 'delete') {
+        event.preventDefault();
+        app.deleteSelection();
+        return;
+      }
       if (action === 'copy' || action === 'cut' || action === 'paste' || action === 'duplicate') {
         event.preventDefault();
         if (action === 'copy') void app.copySelection();
@@ -607,6 +833,27 @@ export function EditorShell(props: EditorShellProps) {
         stepGrid(action === 'grid-down' ? -1 : 1);
         return;
       }
+      if (action === 'group') {
+        // Ctrl+G is the browser's find-next, so it must not fall through.
+        event.preventDefault();
+        app.groupSelection();
+        return;
+      }
+      if (action === 'ungroup') {
+        event.preventDefault();
+        app.ungroupSelection();
+        return;
+      }
+      if (action === 'toggle-group-pick' && !pointerLocked) {
+        event.preventDefault();
+        setGroupPick(app.toggleGroupPick());
+        return;
+      }
+      if (action === 'settings') {
+        event.preventDefault();
+        setSettingsOpen(true);
+        return;
+      }
       if (
         (action === 'tool-select' ||
           action === 'tool-brush' ||
@@ -615,7 +862,7 @@ export function EditorShell(props: EditorShellProps) {
           action === 'tool-face' ||
           action === 'tool-texture' ||
           action === 'tool-entity') &&
-        !(pointerLocked || rightFly)
+        !pointerLocked
       ) {
         event.preventDefault();
         app.setToolMode(
@@ -635,7 +882,7 @@ export function EditorShell(props: EditorShellProps) {
         );
         return;
       }
-      if (action && action.startsWith('tool-') && !(pointerLocked || rightFly)) {
+      if (action && action.startsWith('tool-') && !pointerLocked) {
         event.preventDefault();
         return;
       }
@@ -646,10 +893,7 @@ export function EditorShell(props: EditorShellProps) {
         return;
       }
       const key = event.key.toLowerCase();
-      if (
-        (key === 'w' || key === 'a' || key === 's' || key === 'd') &&
-        (pointerLocked || rightFly)
-      ) {
+      if ((key === 'w' || key === 'a' || key === 's' || key === 'd') && pointerLocked) {
         flyKeys.add(key);
         event.preventDefault();
         ensureMovement();
@@ -663,7 +907,6 @@ export function EditorShell(props: EditorShellProps) {
     };
     const blur = () => {
       flyKeys.clear();
-      rightFly = false;
       pan = null;
       toolPointer = null;
       updateFlyState();
@@ -671,6 +914,7 @@ export function EditorShell(props: EditorShellProps) {
 
     viewport.addEventListener('pointerdown', pointerDown);
     viewport.addEventListener('pointermove', pointerMove);
+    viewport.addEventListener('pointerleave', clearToolFeedback);
     viewport.addEventListener('pointerup', pointerEnd);
     viewport.addEventListener('pointercancel', pointerEnd);
     viewport.addEventListener('wheel', wheel, { passive: false });
@@ -695,11 +939,17 @@ export function EditorShell(props: EditorShellProps) {
         setGridSize(app.gridSize);
       } else if (event.type === 'tool') {
         renderer.setToolPreview([]);
+        renderer.setEditing(new Set());
+        renderer.setHandles([]);
+        clearToolFeedback();
         setActiveTool(app.activeTool);
         setBrushPrimitive(app.brushPrimitive);
         setBrushSides(app.brushSides);
         setTextureLock(app.textureLockEnabled);
         setCurrentTexture(app.currentTextureName);
+        if (event.source === 'user') {
+          showToolHint();
+        }
       }
       if (
         event.type === 'document' ||
@@ -722,6 +972,7 @@ export function EditorShell(props: EditorShellProps) {
       unsubscribe();
       viewport.removeEventListener('pointerdown', pointerDown);
       viewport.removeEventListener('pointermove', pointerMove);
+      viewport.removeEventListener('pointerleave', clearToolFeedback);
       viewport.removeEventListener('pointerup', pointerEnd);
       viewport.removeEventListener('pointercancel', pointerEnd);
       viewport.removeEventListener('wheel', wheel);
@@ -745,6 +996,12 @@ export function EditorShell(props: EditorShellProps) {
         onExportMap={() => void app.exportMap()}
         gameOpen={gameOpen()}
         onCompile={() => setCompileMenuOpen((v) => !v)}
+        onDelete={() => app.deleteSelection()}
+        onGroup={() => app.groupSelection()}
+        onUngroup={() => app.ungroupSelection()}
+        onOpenSettings={() => setSettingsOpen(true)}
+        onToggleGroupPick={() => setGroupPick(app.toggleGroupPick())}
+        groupPick={groupPick}
         onCsgSubtract={() => app.csgSubtract()}
         onCsgIntersect={() => app.csgIntersect()}
         onHollow={(direction) => app.hollowSelection(direction)}
@@ -860,7 +1117,16 @@ export function EditorShell(props: EditorShellProps) {
                     data-testid={`view-title-${view}`}
                   >
                     <span>{viewLabels[view]}</span>
-                    <span class={styles.coordinates}>{coordinates()[view]}</span>
+                    <Show when={groupPick()}>
+                      <span class={styles.groupChip} data-testid="group-pick-chip">
+                        Group
+                      </span>
+                    </Show>
+                    <span class={styles.coordinates}>
+                      {measure() && view === activeView()
+                        ? `${Math.round(measure()!.max[0]! - measure()!.min[0]!)} × ${Math.round(measure()!.max[1]! - measure()!.min[1]!)} × ${Math.round(measure()!.max[2]! - measure()!.min[2]!)}`
+                        : coordinates()[view]}
+                    </span>
                     <span class={styles.titleSpacer} />
                     <button
                       type="button"
@@ -1013,6 +1279,22 @@ export function EditorShell(props: EditorShellProps) {
                 </div>
               )}
             </Show>
+            <MeasureOverlay
+              measure={measure}
+              camera={orthoCamera}
+              rects={() => renderer.viewRects()}
+              ratio={() => renderer.backingRatio()}
+            />
+            <Show when={toolHint()}>
+              {(hint) => (
+                <ToolHint
+                  name={hint().name}
+                  shortcut={hint().shortcut}
+                  description={hint().description}
+                  icon={hint().icon}
+                />
+              )}
+            </Show>
           </div>
           <div
             class={[styles.splitter, styles.horizontalSplitter]}
@@ -1040,24 +1322,6 @@ export function EditorShell(props: EditorShellProps) {
             <Show when={bottomTab() === 'log'}>
               <LogPanel entries={entries()} />
             </Show>
-            <Show when={bottomTab() === 'textures'}>
-              <Show
-                when={gameOpen()}
-                fallback={
-                  <div class={styles.texturePlaceholder} data-testid="texture-placeholder">
-                    Open a game folder to index textures.
-                  </div>
-                }
-              >
-                <TextureBrowser
-                  entries={textureList()}
-                  inUse={() => app.texturesInUse()}
-                  selected={() => currentTexture()}
-                  onSelect={(name) => app.setCurrentTexture(name)}
-                  load={(name) => app.loadTexture(name)}
-                />
-              </Show>
-            </Show>
           </section>
         </div>
         <div
@@ -1070,13 +1334,124 @@ export function EditorShell(props: EditorShellProps) {
           onPointerDown={(event) => beginSplitterDrag(event, 'vertical')}
           onKeyDown={(event) => splitterKey(event, 'vertical')}
         />
-        <PropertiesPanel
-          app={app}
-          mapName={mapName()}
-          gameOpen={gameOpen()}
-          version={panelVersion}
-        />
+        <aside
+          class={styles.dock}
+          aria-label="Properties and textures"
+          ref={(el) => (dockElement = el)}
+        >
+          <div
+            class={styles.dockProperties}
+            style={
+              propertiesCollapsed()
+                ? undefined
+                : texturesCollapsed()
+                  ? { flex: '1' }
+                  : { height: `${dockSplit() * 100}%` }
+            }
+          >
+            <DockSection
+              title="Properties"
+              testId="dock-properties"
+              collapsed={propertiesCollapsed()}
+              onToggle={() => {
+                const next = !propertiesCollapsed();
+                setPropertiesCollapsed(next);
+                reportSetting('propertiesCollapsed', next);
+              }}
+            >
+              <PropertiesPanel
+                app={app}
+                mapName={mapName()}
+                gameOpen={gameOpen()}
+                version={panelVersion}
+              />
+            </DockSection>
+          </div>
+          <Show when={!propertiesCollapsed() && !texturesCollapsed()}>
+            <div
+              class={[styles.splitter, styles.horizontalSplitter]}
+              role="separator"
+              aria-orientation="horizontal"
+              aria-label="Resize dock sections"
+              aria-valuenow={Math.round(dockSplit() * 100)}
+              tabindex="0"
+              onPointerDown={beginDockSplitterDrag}
+              onKeyDown={dockSplitterKey}
+            />
+          </Show>
+          <div
+            class={styles.dockTextures}
+            style={
+              texturesCollapsed() ? undefined : propertiesCollapsed() ? { flex: '1' } : undefined
+            }
+            data-testid="dock-textures-wrap"
+          >
+            <DockSection
+              title="Textures"
+              testId="dock-textures"
+              collapsed={texturesCollapsed()}
+              onToggle={() => {
+                const next = !texturesCollapsed();
+                setTexturesCollapsed(next);
+                reportSetting('texturesCollapsed', next);
+              }}
+            >
+              <div class={styles.textureControls}>
+                <label class={styles.textureSliderLabel}>
+                  Thumbnail size
+                  <input
+                    type="range"
+                    min="32"
+                    max="128"
+                    step="16"
+                    value={thumbSize()}
+                    aria-label="Thumbnail size"
+                    data-testid="thumb-size-slider"
+                    onInput={(event) => {
+                      const next = Number(event.currentTarget.value);
+                      setThumbSize(next);
+                      reportSetting('thumbSize', next);
+                    }}
+                  />
+                </label>
+              </div>
+              <Show
+                when={gameOpen()}
+                fallback={
+                  <div class={styles.texturePlaceholder} data-testid="texture-placeholder">
+                    Open a game folder to index textures.
+                  </div>
+                }
+              >
+                <TextureBrowser
+                  entries={textureList()}
+                  inUse={() => app.texturesInUse()}
+                  selected={() => currentTexture()}
+                  thumbSize={thumbSize}
+                  onSelect={(name) => app.chooseTexture(name)}
+                  load={(name) => app.loadTexture(name)}
+                />
+              </Show>
+            </DockSection>
+          </div>
+        </aside>
       </div>
+      <Show when={settingsOpen()}>
+        <SettingsDialog
+          values={{
+            theme: theme(),
+            wheelStep: wheelStep(),
+            mouseLookSensitivity: mouseLook(),
+            gridSize: gridSize(),
+            thumbSize: thumbSize(),
+            showToolOverlay: showToolOverlay(),
+            groupCsgResults: groupCsgResults(),
+          }}
+          onChange={applySettingsChange}
+          onReset={() => applySettingsChange({ ...DEFAULT_SETTINGS })}
+          onClose={() => setSettingsOpen(false)}
+        />
+      </Show>
       <Show when={recoveryAvailable()}>
         <div
           class={styles.recoveryPrompt}

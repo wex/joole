@@ -1,5 +1,6 @@
 import type { BrushNode, FaceTexture, Id, MapDocument, MapNode, Patch } from '@core/types/index';
 import { analyzeBrush } from '@core/geom/brush';
+import { allBrushesOf } from '@core/doc/index';
 import { texAxes } from '@core/geom/texAxes';
 import { dot } from '@core/geom/vec3';
 
@@ -59,6 +60,23 @@ export function editTexturePatch(
     record(patch, id, brush, next);
   }
   return patch;
+}
+
+/** Expands a selection to brush ids: brushes themselves plus the descendants of groups and entities. */
+export function expandBrushIds(doc: Readonly<MapDocument>, ids: Iterable<Id>): Id[] {
+  const out = new Set<Id>();
+  for (const id of ids) {
+    const node = doc.nodes.get(id);
+    if (!node) continue;
+    if (node.kind === 'brush') {
+      out.add(id);
+    } else {
+      for (const brush of allBrushesOf(doc, id)) {
+        out.add(brush.id);
+      }
+    }
+  }
+  return [...out];
 }
 
 /** Every face of the given brushes. */

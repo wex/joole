@@ -33,3 +33,16 @@ describe('shortcutAction', () => {
     expect(shortcutAction(key('z', { ctrl: true, alt: true }))).toBeNull();
   });
 });
+
+describe('delete shortcut (T1.9)', () => {
+  it('Delete and Backspace map to delete without modifiers', () => {
+    expect(shortcutAction(key('Delete'))).toBe('delete');
+    expect(shortcutAction(key('Backspace'))).toBe('delete');
+  });
+
+  it('a modified Delete is not a delete', () => {
+    expect(shortcutAction(key('Delete', { ctrl: true }))).toBeNull();
+    expect(shortcutAction(key('Delete', { shift: true }))).toBeNull();
+    expect(shortcutAction(key('Backspace', { alt: true }))).toBeNull();
+  });
+});
