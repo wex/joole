@@ -23,6 +23,8 @@ import { TreeView } from './TreeView';
 import { PrefabBrowser } from './PrefabBrowser';
 import { PropertiesPanel } from './PropertiesPanel';
 import { DockSection } from './DockSection';
+import { SettingsDialog } from './SettingsDialog';
+import { DEFAULT_SETTINGS } from '@app/settings';
 import { TextureBrowser } from './TextureBrowser';
 import { Toolbar } from './Toolbar';
 import styles from './EditorShell.module.css';
@@ -47,6 +49,10 @@ export interface EditorShellProps {
     readonly texturesCollapsed: boolean;
     readonly thumbSize: number;
     readonly theme: 'dark' | 'light';
+    readonly wheelStep: number;
+    readonly mouseLookSensitivity: number;
+    readonly showToolOverlay: boolean;
+    readonly groupCsgResults: boolean;
   };
   readonly onSettingsChange?: (partial: Record<string, unknown>) => void;
 }
@@ -142,6 +148,53 @@ export function EditorShell(props: EditorShellProps) {
     initialSettings?.texturesCollapsed ?? false,
   );
   const [thumbSize, setThumbSize] = createSignal(initialSettings?.thumbSize ?? 64);
+  // The dialog settings (T1.15).
+  const [settingsOpen, setSettingsOpen] = createSignal(false);
+  const [wheelStep, setWheelStep] = createSignal(initialSettings?.wheelStep ?? 64);
+  const [mouseLook, setMouseLook] = createSignal(initialSettings?.mouseLookSensitivity ?? 0.15);
+  const [showToolOverlay, setShowToolOverlay] = createSignal(
+    initialSettings?.showToolOverlay ?? true,
+  );
+  const [groupCsgResults, setGroupCsgResults] = createSignal(
+    initialSettings?.groupCsgResults ?? true,
+  );
+  /** Applies one dialog change immediately: signals, side effects, persistence. */
+  const applySettingsChange = (partial: Record<string, unknown>) => {
+    if (typeof partial['theme'] === 'string') {
+      const next = partial['theme'] as 'dark' | 'light';
+      setTheme(next);
+      document.documentElement.dataset.theme = next;
+      renderer.refreshColors();
+    }
+    if (typeof partial['thumbSize'] === 'number') setThumbSize(partial['thumbSize']);
+    if (typeof partial['wheelStep'] === 'number') setWheelStep(partial['wheelStep']);
+    if (typeof partial['mouseLookSensitivity'] === 'number') {
+      setMouseLook(partial['mouseLookSensitivity']);
+    }
+    if (typeof partial['showToolOverlay'] === 'boolean')
+      setShowToolOverlay(partial['showToolOverlay']);
+    if (typeof partial['groupCsgResults'] === 'boolean') {
+      setGroupCsgResults(partial['groupCsgResults']);
+      app.setCsgGrouping(partial['groupCsgResults']);
+    }
+    if (typeof partial['gridSize'] === 'number') app.setGridSize(partial['gridSize']);
+    if (typeof partial['rightWidth'] === 'number') {
+      setRightWidth(partial['rightWidth'] as number);
+      mainElement?.style.setProperty('--right-panel-width', `${partial['rightWidth']}px`);
+    }
+    if (typeof partial['bottomHeight'] === 'number') {
+      setBottomHeight(partial['bottomHeight'] as number);
+      centerElement?.style.setProperty('--bottom-panel-height', `${partial['bottomHeight']}px`);
+    }
+    if (typeof partial['dockSplit'] === 'number') setDockSplit(partial['dockSplit']);
+    if (typeof partial['propertiesCollapsed'] === 'boolean') {
+      setPropertiesCollapsed(partial['propertiesCollapsed']);
+    }
+    if (typeof partial['texturesCollapsed'] === 'boolean') {
+      setTexturesCollapsed(partial['texturesCollapsed']);
+    }
+    props.onSettingsChange?.(partial);
+  };
   const reportSetting = (key: string, value: unknown) => props.onSettingsChange?.({ [key]: value });
   const [viewMenu, setViewMenu] = createSignal<{
     x: number;
@@ -577,7 +630,10 @@ export function EditorShell(props: EditorShellProps) {
       if (pointerLocked && (event.movementX !== 0 || event.movementY !== 0)) {
         const camera = perspectiveCamera();
         if (camera) {
-          controller.setCamera('3d', lookPerspective(camera, event.movementX, event.movementY));
+          controller.setCamera(
+            '3d',
+            lookPerspective(camera, event.movementX, event.movementY, mouseLook()),
+          );
         }
       }
       if (!pointerLocked) {
@@ -608,8 +664,8 @@ export function EditorShell(props: EditorShellProps) {
           return;
         }
         event.preventDefault();
-        // One wheel notch is 64 units, scaled by the same step as the 2D zoom.
-        const distance = (-event.deltaY / 120) * 64;
+        // One wheel notch moves the step chosen in the Settings dialog (T1.15).
+        const distance = (-event.deltaY / 120) * wheelStep();
         controller.setCamera('3d', dollyPerspective(camera, distance));
         return;
       }
@@ -747,6 +803,11 @@ export function EditorShell(props: EditorShellProps) {
       if (action === 'toggle-group-pick' && !pointerLocked) {
         event.preventDefault();
         setGroupPick(app.toggleGroupPick());
+        return;
+      }
+      if (action === 'settings') {
+        event.preventDefault();
+        setSettingsOpen(true);
         return;
       }
       if (
@@ -891,6 +952,7 @@ export function EditorShell(props: EditorShellProps) {
         onDelete={() => app.deleteSelection()}
         onGroup={() => app.groupSelection()}
         onUngroup={() => app.ungroupSelection()}
+        onOpenSettings={() => setSettingsOpen(true)}
         onToggleGroupPick={() => setGroupPick(app.toggleGroupPick())}
         groupPick={groupPick}
         onCsgSubtract={() => app.csgSubtract()}
@@ -1317,6 +1379,22 @@ export function EditorShell(props: EditorShellProps) {
           </div>
         </aside>
       </div>
+      <Show when={settingsOpen()}>
+        <SettingsDialog
+          values={{
+            theme: theme(),
+            wheelStep: wheelStep(),
+            mouseLookSensitivity: mouseLook(),
+            gridSize: gridSize(),
+            thumbSize: thumbSize(),
+            showToolOverlay: showToolOverlay(),
+            groupCsgResults: groupCsgResults(),
+          }}
+          onChange={applySettingsChange}
+          onReset={() => applySettingsChange({ ...DEFAULT_SETTINGS })}
+          onClose={() => setSettingsOpen(false)}
+        />
+      </Show>
       <Show when={recoveryAvailable()}>
         <div
           class={styles.recoveryPrompt}

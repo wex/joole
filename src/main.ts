@@ -180,6 +180,7 @@ window.addEventListener('pagehide', () => void app.autosave());
 renderer.setDocument(app.document);
 updateTargetLinks();
 document.documentElement.dataset.theme = settings.theme;
+app.setCsgGrouping(settings.groupCsgResults);
 if (typeof settings?.gridSize === 'number') app.setGridSize(settings.gridSize);
 renderer.setGridSize(app.gridSize);
 
@@ -314,6 +315,10 @@ mountEditorShell(
       texturesCollapsed: settings.texturesCollapsed,
       thumbSize: settings.thumbSize,
       theme: settings.theme,
+      wheelStep: settings.wheelStep,
+      mouseLookSensitivity: settings.mouseLookSensitivity,
+      showToolOverlay: settings.showToolOverlay,
+      groupCsgResults: settings.groupCsgResults,
     },
     onSettingsChange: queueSettingsSave,
   },

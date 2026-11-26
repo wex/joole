@@ -625,7 +625,7 @@ These three items are one WP because they rebuild the same panel. Splitting them
 - **Depends on:** T1.13 (the selection behaviour with group-pick mode, and the multi-group ungroup used to dissolve the groups again)
 - **Done when:** the unit tests, the property tests, the compiler test and the E2E test pass.
 
-### [ ] T1.15 Persistent settings dialog (#23)
+### [x] T1.15 Persistent settings dialog (#23)
 
 - **Goal:** a Settings dialog, opened from the menu bar, whose values survive reloads.
 - **Design:**

@@ -25,3 +25,44 @@ describe('settings (T1.12)', () => {
     expect(second.rightWidth).toBe(DEFAULT_SETTINGS.rightWidth);
   });
 });
+
+describe('settings validation (T1.15)', () => {
+  it('validates the view and tool settings', () => {
+    const parsed = parseSettings({
+      wheelStep: 128,
+      mouseLookSensitivity: 0.3,
+      showToolOverlay: false,
+      groupCsgResults: false,
+    });
+    expect(parsed.wheelStep).toBe(128);
+    expect(parsed.mouseLookSensitivity).toBe(0.3);
+    expect(parsed.showToolOverlay).toBe(false);
+    expect(parsed.groupCsgResults).toBe(false);
+  });
+
+  it('out-of-range and wrong-typed values fall back to the defaults', () => {
+    const parsed = parseSettings({
+      wheelStep: 10000,
+      mouseLookSensitivity: -1,
+      showToolOverlay: 'yes',
+      groupCsgResults: 0,
+    });
+    expect(parsed.wheelStep).toBe(DEFAULT_SETTINGS.wheelStep);
+    expect(parsed.mouseLookSensitivity).toBe(DEFAULT_SETTINGS.mouseLookSensitivity);
+    expect(parsed.showToolOverlay).toBe(true);
+    expect(parsed.groupCsgResults).toBe(true);
+  });
+
+  it('reset to defaults restores every key', () => {
+    const changed = updateSettings(parseSettings(null), {
+      theme: 'light',
+      wheelStep: 128,
+      thumbSize: 96,
+    });
+    expect(changed.theme).toBe('light');
+    const reset = updateSettings(parseSettings(null), { ...DEFAULT_SETTINGS });
+    expect(reset.theme).toBe('dark');
+    expect(reset.wheelStep).toBe(DEFAULT_SETTINGS.wheelStep);
+    expect(reset.thumbSize).toBe(DEFAULT_SETTINGS.thumbSize);
+  });
+});

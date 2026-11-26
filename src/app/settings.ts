@@ -19,18 +19,30 @@ export interface EditorSettings {
   readonly thumbSize: number;
   /** The UI theme. */
   readonly theme: 'dark' | 'light';
+  /** The 3D wheel step in units per notch (T1.15). */
+  readonly wheelStep: number;
+  /** The mouse-look sensitivity in degrees per pixel (T1.15). */
+  readonly mouseLookSensitivity: number;
+  /** The tool overlay is visible (T1.16). */
+  readonly showToolOverlay: boolean;
+  /** Hollow and Subtract group their fragments (T1.14). */
+  readonly groupCsgResults: boolean;
   readonly [key: string]: unknown;
 }
 
 export const DEFAULT_SETTINGS: EditorSettings = {
   gridSize: 8,
   rightWidth: 320,
-  bottomHeight: 200,
+  bottomHeight: 160,
   dockSplit: 0.5,
   propertiesCollapsed: false,
   texturesCollapsed: false,
   thumbSize: 64,
   theme: 'dark',
+  wheelStep: 64,
+  mouseLookSensitivity: 0.15,
+  showToolOverlay: true,
+  groupCsgResults: true,
 };
 
 function num(min: number, max: number) {
@@ -47,6 +59,10 @@ const checks: Record<string, (value: unknown) => boolean> = {
   texturesCollapsed: (value) => typeof value === 'boolean',
   thumbSize: (value) => typeof value === 'number' && value >= 32 && value <= 128,
   theme: (value) => value === 'dark' || value === 'light',
+  wheelStep: num(8, 512),
+  mouseLookSensitivity: num(0.02, 1),
+  showToolOverlay: (value) => typeof value === 'boolean',
+  groupCsgResults: (value) => typeof value === 'boolean',
 };
 
 /**

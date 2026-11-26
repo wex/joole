@@ -105,6 +105,7 @@ _The light theme changes the window chrome. Viewport colors deliberately remain 
 | **Open pak0.pak…**    | Uses one picked `pak0.pak` as the whole game-data source. This is the most reliable fallback when directory picking is unavailable.            |
 | **Open Map…**         | Opens a `.map` file or a `.joole.json` project. Opening replaces the current document.                                                         |
 | **Export .map…**      | Writes the current document in Quake 2 `.map` format for other editors and external compilers.                                                 |
+| **Settings…**         | Opens the settings dialog (`Ctrl+,`).                                                                                                          |
 
 In Chromium the game-directory handle is remembered locally and permission is requested again on later starts. The native open picker initially filters for `.map`; use its all-files choice to open a `.joole.json` project.
 
@@ -131,6 +132,22 @@ After the first unsaved document change, Joole autosaves the project to OPFS eve
 ![Autosave recovery prompt](images/recovery-prompt.png)
 
 Choose **Recover** to load the autosave as `recovered.joole.json`, or **Discard** to delete the recovery copy. Saving a project explicitly clears the dirty autosave state.
+
+### Settings
+
+**File → Settings…** (`Ctrl+,`) opens the settings dialog. Every change applies immediately and is remembered between sessions; there is no OK or Cancel step. **Reset to Defaults** restores every setting at once. Escape closes the dialog.
+
+| Setting                    | Effect                                                                            |
+| -------------------------- | --------------------------------------------------------------------------------- |
+| **Theme**                  | Dark or light window chrome. The viewport colors stay the editing colors in both. |
+| **3D wheel step**          | How far one mouse-wheel notch moves the 3D camera, in units.                      |
+| **Mouse-look sensitivity** | Degrees of turn per pixel of mouse movement in fly mode.                          |
+| **Grid size at start-up**  | The snap grid a new session starts with.                                          |
+| **Thumbnail size**         | The texture thumbnail size, the same slider as in the Textures section.           |
+| **Show tool overlay**      | Whether the tool overlay is drawn.                                                |
+| **Group CSG results**      | Whether Hollow and CSG Subtract group their fragments automatically.              |
+
+The panel sizes, the collapsed sections and the splitter positions are remembered too, but they do not appear in the dialog.
 
 ## Toolbar reference
 

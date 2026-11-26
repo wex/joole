@@ -22,7 +22,8 @@ export type ShortcutAction =
   | 'next-leak'
   | 'toggle-group-pick'
   | 'group'
-  | 'ungroup';
+  | 'ungroup'
+  | 'settings';
 
 export interface ShortcutInput {
   readonly key: string;
@@ -52,6 +53,7 @@ export function shortcutAction(input: ShortcutInput): ShortcutAction | null {
     if (key === 'h' && !input.shift) return 'hide';
     if (key === 'l' && !input.shift) return 'lock';
     if (key === 'g' && !input.shift) return 'group';
+    if (key === ',' && !input.shift) return 'settings';
     return null;
   }
   if (input.shift) {
