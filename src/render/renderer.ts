@@ -24,6 +24,8 @@ import gridFragment from './shaders/grid.frag.glsl?raw';
 import gridVertex from './shaders/grid.vert.glsl?raw';
 import lineFragment from './shaders/line.frag.glsl?raw';
 import lineVertex from './shaders/line.vert.glsl?raw';
+import handleVertex from './shaders/handle.vert.glsl?raw';
+import handleFragment from './shaders/handle.frag.glsl?raw';
 
 /** The draw modes of the 3D view. */
 export type Mode3d = 'wireframe' | 'flat' | 'textured';
@@ -97,6 +99,15 @@ const LINE_UNIFORMS = [
   'uLeakColor',
   'uHandleColor',
 ] as const;
+const HANDLE_UNIFORMS = [
+  'uViewProjection',
+  'uViewportSize',
+  'uScale',
+  'uIdleColor',
+  'uHoverColor',
+  'uBorderColor',
+] as const;
+
 const GRID_UNIFORMS = [
   'uViewportOrigin',
   'uWorldOrigin',
@@ -134,6 +145,7 @@ export class Renderer {
   private readonly textures: TextureManager;
   private readonly face: Program<(typeof FACE_UNIFORMS)[number]>;
   private readonly line: Program<(typeof LINE_UNIFORMS)[number]>;
+  private readonly handle: Program<(typeof HANDLE_UNIFORMS)[number]>;
   private readonly grid: Program<(typeof GRID_UNIFORMS)[number]>;
   private readonly emptyVao: WebGLVertexArrayObject;
   private readonly multiDraw: WEBGL_multi_draw | null;
@@ -179,9 +191,11 @@ export class Renderer {
     const face = createProgram(gl, faceVertex, faceFragment);
     const line = createProgram(gl, lineVertex, lineFragment);
     const grid = createProgram(gl, gridVertex, gridFragment);
+    const handle = createProgram(gl, handleVertex, handleFragment);
     this.face = { program: face, uniforms: uniformLocations(gl, face, FACE_UNIFORMS) };
     this.line = { program: line, uniforms: uniformLocations(gl, line, LINE_UNIFORMS) };
     this.grid = { program: grid, uniforms: uniformLocations(gl, grid, GRID_UNIFORMS) };
+    this.handle = { program: handle, uniforms: uniformLocations(gl, handle, HANDLE_UNIFORMS) };
     this.emptyVao = gl.createVertexArray();
 
     this.cache = new GeometryCache(gl, options.entityColorOf, options.entityWireframeOf);
@@ -265,6 +279,13 @@ export class Renderer {
   /** The brushes a drag is currently editing, drawn in the selection style. */
   setEditing(ids: ReadonlySet<Id>): void {
     if (this.cache.setEditing(ids)) {
+      this.invalidate();
+    }
+  }
+
+  /** The vertex/edge/face handle dots, drawn as screen-space squares. */
+  setHandles(handles: readonly { point: Vec3; state: 0 | 1 | 2 }[]): void {
+    if (this.cache.setHandles(handles)) {
       this.invalidate();
     }
   }
@@ -388,6 +409,7 @@ export class Renderer {
     const gl = this.gl;
     gl.deleteProgram(this.face.program);
     gl.deleteProgram(this.line.program);
+    gl.deleteProgram(this.handle.program);
     gl.deleteProgram(this.grid.program);
     gl.deleteVertexArray(this.emptyVao);
   }
@@ -439,6 +461,7 @@ export class Renderer {
       if (camera.kind === 'ortho') {
         this.drawGrid(camera, x, y, w, h);
         this.drawLines(vp, w, h, false);
+        this.drawHandles(vp, w, h);
       } else {
         this.draw3d(vp, w, h);
       }
@@ -471,6 +494,24 @@ export class Renderer {
     gl.uniform4fv(u.uAxisColor, this.colors['vp-axis']);
     gl.bindVertexArray(this.emptyVao);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
+  }
+
+  private drawHandles(vp: Mat4, w: number, h: number): void {
+    const count = this.cache.handles.drawCount;
+    if (count === 0) {
+      return;
+    }
+    const gl = this.gl;
+    const { program, uniforms: u } = this.handle;
+    gl.useProgram(program);
+    gl.uniformMatrix4fv(u.uViewProjection, false, toGlMatrix(vp, this.matrix));
+    gl.uniform2f(u.uViewportSize, w, h);
+    gl.uniform1f(u.uScale, this.backingRatio());
+    gl.uniform4fv(u.uIdleColor, this.colors['vp-handle']);
+    gl.uniform4fv(u.uHoverColor, this.colors['vp-select']);
+    gl.uniform4fv(u.uBorderColor, this.colors['vp-bg']);
+    gl.bindVertexArray(this.cache.handles.vao);
+    gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, count);
   }
 
   private drawLines(
@@ -571,6 +612,8 @@ export class Renderer {
     // depth-tested so walls in front still hide them.
     this.drawLines(vp, w, h, false, true);
     gl.disable(gl.DEPTH_TEST);
+    // The handle dots float over everything, in the textured view too.
+    this.drawHandles(vp, w, h);
   }
 
   private drawBatch(batch: FaceBatch, visible: ReadonlySet<Id>): void {

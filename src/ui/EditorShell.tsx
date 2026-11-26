@@ -401,6 +401,9 @@ export function EditorShell(props: EditorShellProps) {
       if (output.editing !== undefined) {
         renderer.setEditing(output.editing);
       }
+      if (output.handles !== undefined) {
+        renderer.setHandles(output.handles);
+      }
       if (output.measure !== undefined) {
         const next = output.measure ?? null;
         if (!sameBox(measure(), next)) {
@@ -750,6 +753,7 @@ export function EditorShell(props: EditorShellProps) {
       } else if (event.type === 'tool') {
         renderer.setToolPreview([]);
         renderer.setEditing(new Set());
+        renderer.setHandles([]);
         clearToolFeedback();
         setActiveTool(app.activeTool);
         setBrushPrimitive(app.brushPrimitive);

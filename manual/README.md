@@ -328,6 +328,7 @@ The Vertex/edge tool edits the derived geometry of selected brushes without chan
 
 - Press `V` for vertex/edge editing. The tool restores its last vertex or edge submode.
 - Press `V` again while already in the tool to switch between vertex and edge handles. Returning from Face mode starts again in vertex mode.
+- Every handle is a fixed-size square dot: yellow when idle, red when hovered or dragged. Vertices sit on the corners, edge dots sit at the edge midpoints and face dots at the face centres. The dots show in the 3D view too, but dragging works in the orthographic views.
 - Drag a handle in an orthographic view. Movement snaps to the grid.
 - Connected planes are recomputed so the brush remains convex.
 

@@ -320,11 +320,23 @@ describe('VertexTool event scripts', () => {
     tool.pointer(up(10, 10));
   });
 
-  it('shows handle crosses while idle', () => {
+  it('shows handle dots while idle and marks the hovered one (T1.8)', () => {
     const doc = vertexDocument();
     const tool = makeVertexTool(doc);
-    const output = tool.pointer(move(200, 200));
-    expect(output.preview!.length).toBeGreaterThan(0);
+    // Far from every handle: all dots are idle.
+    const idle = tool.pointer(move(200, 200));
+    expect(idle.handles!.length).toBe(8);
+    expect(idle.handles!.every((h) => h.state === 0)).toBe(true);
+    // Near the corner vertex at (0, 0, 64)-ish in the top view: one hover dot.
+    const hovered = tool.pointer({ ...move(2, 2), tolerance: 4 });
+    expect(hovered.handles!.filter((h) => h.state === 1)).toHaveLength(1);
+    // In edge mode the hovered edge is also a vp-select preview segment.
+    tool.toggleVertexEdge();
+    const edge = tool.pointer({ ...move(32, 0), point: [32, 0, 64], tolerance: 4 });
+    expect(edge.handles!.length).toBe(12);
+    if (edge.handles!.some((h) => h.state === 1)) {
+      expect(edge.preview!.length).toBe(1);
+    }
   });
 
   it('a rejected drag produces no command and dashed invalid segments', () => {
@@ -473,3 +485,4 @@ describe('editing feedback (T1.7)', () => {
     expect(downOut.editing).toBeUndefined();
   });
 });
+

@@ -1,6 +1,7 @@
 import type { Id, MapDocument, MapNode, Patch, Vec3 } from '@core/types/index';
 import { RangeAllocator } from './allocator';
 import {
+  HANDLE_STRIDE,
   boxEdges,
   buildBrushMesh,
   entityBox,
@@ -204,6 +205,9 @@ export class GeometryCache {
   private readonly cursorIndex: number;
   private leakSegments: readonly LineSegment[] = [];
   private cursorPoint: readonly [number, number, number] | null = null;
+  readonly handles: GpuStore;
+  private readonly handleCornerBuffer: WebGLBuffer;
+  private handleKey = '';
   private readonly faceHighlightIndex: number;
   private facePolygons: readonly (readonly Vec3[])[] = [];
   readonly faceHighlight: GpuStore;
@@ -230,9 +234,13 @@ export class GeometryCache {
     this.faceHighlightIndex = this.takeIndex();
     this.faceHighlight = new GpuStore(gl, FACE_STRIDE, (buffer) => this.bindFaceAttributes(buffer));
     this.cornerBuffer = gl.createBuffer();
+    this.handleCornerBuffer = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, this.cornerBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([0, -1, 0, 1, 1, -1, 1, 1]), gl.STATIC_DRAW);
     this.lines = new GpuStore(gl, LINE_STRIDE, (buffer) => this.bindLineAttributes(buffer));
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.handleCornerBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, -1, 1, 1, -1, 1, 1]), gl.STATIC_DRAW);
+    this.handles = new GpuStore(gl, HANDLE_STRIDE, (buffer) => this.bindHandleAttributes(buffer));
     this.stateTexture = gl.createTexture();
   }
 
@@ -377,6 +385,37 @@ export class GeometryCache {
     this.toolSegments = segments;
     this.invalidSegments = invalid;
     this.rebuildOverlay();
+    return true;
+  }
+
+  /**
+   * The vertex/edge/face handle dots (T1.8), drawn as screen-space squares
+   * after everything else in every view. Returns false when nothing changed.
+   */
+  setHandles(handles: readonly { point: Vec3; state: 0 | 1 | 2 }[]): boolean {
+    let key = '';
+    for (const handle of handles) {
+      key += `${handle.point[0]},${handle.point[1]},${handle.point[2]},${handle.state};`;
+    }
+    if (key === this.handleKey) {
+      return false;
+    }
+    this.handleKey = key;
+    if (handles.length === 0) {
+      this.handles.remove('__handles');
+      return true;
+    }
+    const data = new ArrayBuffer(handles.length * HANDLE_STRIDE);
+    const f32 = new Float32Array(data);
+    const u32 = new Uint32Array(data);
+    handles.forEach((handle, i) => {
+      const base = (i * HANDLE_STRIDE) / 4;
+      f32[base] = handle.point[0];
+      f32[base + 1] = handle.point[1];
+      f32[base + 2] = handle.point[2];
+      u32[base + 3] = handle.state;
+    });
+    this.handles.write('__handles', data, handles.length);
     return true;
   }
 
@@ -587,6 +626,7 @@ export class GeometryCache {
       batch.store.dispose();
     }
     this.faceHighlight.dispose();
+    this.handles.dispose();
     this.batches.clear();
     this.records.clear();
     this.lines.dispose();
@@ -807,5 +847,20 @@ export class GeometryCache {
     gl.enableVertexAttribArray(3);
     gl.vertexAttribIPointer(3, 1, gl.UNSIGNED_INT, LINE_STRIDE, LINE_OFFSET_INDEX);
     gl.vertexAttribDivisor(3, 1);
+  }
+
+  private bindHandleAttributes(buffer: WebGLBuffer): void {
+    const gl = this.gl;
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.handleCornerBuffer);
+    gl.enableVertexAttribArray(0);
+    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+    gl.vertexAttribDivisor(0, 0);
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+    gl.enableVertexAttribArray(1);
+    gl.vertexAttribPointer(1, 3, gl.FLOAT, false, HANDLE_STRIDE, 0);
+    gl.vertexAttribDivisor(1, 1);
+    gl.enableVertexAttribArray(2);
+    gl.vertexAttribIPointer(2, 1, gl.UNSIGNED_INT, HANDLE_STRIDE, 12);
+    gl.vertexAttribDivisor(2, 1);
   }
 }

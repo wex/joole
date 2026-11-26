@@ -352,7 +352,7 @@ Each milestone can ship as its own minor release. Tag the releases as the owner 
 - **Depends on:** T1.2
 - **Done when:** every drag type shows its edited brushes highlighted in all four views, and the screenshots and the performance measurement are recorded.
 
-### [ ] T1.8 Large handle dots (#10, #11)
+### [x] T1.8 Large handle dots (#10, #11)
 
 - **Goal:**
   - In vertex mode, vertices are shown as large dots.

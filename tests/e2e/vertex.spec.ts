@@ -79,3 +79,44 @@ test('the vertex tool edits a brush corner through the UI and undo restores it',
   await page.keyboard.press('Control+z');
   expect(await faceCount(page)).toBe(6);
 });
+
+test('edges and faces are grabbed by their midpoint and centre dots (T1.8)', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.locator('[data-testid=editor-shell]')).toBeVisible();
+  await page.getByRole('button', { name: 'Brush (B)' }).click();
+  const a = await worldScreen(page, [0, 0, 0]);
+  const b = await worldScreen(page, [64, 64, 0]);
+  await page.mouse.move(a.x, a.y);
+  await page.mouse.down();
+  await page.mouse.move(b.x, b.y, { steps: 5 });
+  await page.mouse.up();
+  expect(await faceCount(page)).toBe(6);
+
+  // Edge mode: v enters the vertex tool, v again toggles to edge mode. The
+  // front-bottom edge runs along X at y = 0, z = 0; its midpoint dot is at
+  // (32, 0) in the top view.
+  await page.keyboard.press('v');
+  await page.keyboard.press('v');
+  const mid = await worldScreen(page, [32, 0, 0]);
+  const target = await worldScreen(page, [32, 16, 0]);
+  await page.mouse.move(mid.x, mid.y);
+  await page.mouse.down();
+  await page.mouse.move(target.x, target.y);
+  await page.mouse.up();
+  // Moving the edge's endpoints reshapes the brush — undo restores the box.
+  await page.keyboard.press('Control+z');
+  expect(await faceCount(page)).toBe(6);
+
+  // Face mode: the bottom face's centre dot is at (32, 32) in the top view.
+  // A click exactly there starts a face drag, which moves the whole face.
+  await page.keyboard.press('f');
+  const centre = await worldScreen(page, [32, 32, 0]);
+  const faceTarget = await worldScreen(page, [48, 32, 0]);
+  await page.mouse.move(centre.x, centre.y);
+  await page.mouse.down();
+  await page.mouse.move(faceTarget.x, faceTarget.y);
+  await page.mouse.up();
+  // The drag produced an undoable command: one undo returns to the box.
+  await page.keyboard.press('Control+z');
+  expect(await faceCount(page)).toBe(6);
+});

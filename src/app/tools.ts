@@ -58,6 +58,8 @@ export interface ToolOutput {
   readonly cursor?: Vec3 | null;
   /** The brushes this drag is editing (T1.7), drawn in the selection style. */
   readonly editing?: ReadonlySet<Id>;
+  /** The vertex/edge/face handle dots (T1.8): state 0 idle, 1 hover, 2 active. */
+  readonly handles?: readonly { point: Vec3; state: 0 | 1 | 2 }[];
   /** The size box of the in-progress edit, when the tool has one. */
   readonly measure?: { readonly min: Vec3; readonly max: Vec3 } | null;
 }
@@ -422,29 +424,18 @@ export function dashedSegment(a: Vec3, b: Vec3, dash = 4): PreviewSegment[] {
   return out;
 }
 
-function segmentDistance(point: Vec3, a: Vec3, b: Vec3, axes: readonly [number, number]): number {
-  const pa = [point[axes[0]]! - a[axes[0]]!, point[axes[1]]! - a[axes[1]]!];
-  const ba = [b[axes[0]]! - a[axes[0]]!, b[axes[1]]! - a[axes[1]]!];
-  const len2 = ba[0]! * ba[0]! + ba[1]! * ba[1]!;
-  const t = len2 < 1e-12 ? 0 : Math.max(0, Math.min(1, (pa[0]! * ba[0]! + pa[1]! * ba[1]!) / len2));
-  return Math.hypot(pa[0]! - ba[0]! * t, pa[1]! - ba[1]! * t);
-}
-
-function cross3(center: Vec3, size: number): PreviewSegment[] {
-  return [
-    [
-      [center[0] - size, center[1], center[2]],
-      [center[0] + size, center[1], center[2]],
-    ],
-    [
-      [center[0], center[1] - size, center[2]],
-      [center[0], center[1] + size, center[2]],
-    ],
-    [
-      [center[0], center[1], center[2] - size],
-      [center[0], center[1], center[2] + size],
-    ],
-  ];
+/** The dot position of a vertex/edge/face handle (T1.8): the vertex itself, the edge midpoint or the face centroid. */
+function handlePoint(handle: { positions: Vec3[] }): Vec3 {
+  if (handle.positions.length === 1) {
+    return handle.positions[0]!;
+  }
+  const center: Vec3 = [0, 0, 0];
+  for (const p of handle.positions) {
+    center[0] += p[0] / handle.positions.length;
+    center[1] += p[1] / handle.positions.length;
+    center[2] += p[2] / handle.positions.length;
+  }
+  return center;
 }
 
 /**
@@ -509,19 +500,46 @@ export class VertexTool {
     return out;
   }
 
-  /** Small crosses at every handle, drawn while the tool is idle. */
-  handlePreview(size: number): PreviewSegment[] {
-    const out: PreviewSegment[] = [];
-    for (const handle of this.handles()) {
-      const center: Vec3 = [0, 0, 0];
-      for (const p of handle.positions) {
-        center[0] += p[0] / handle.positions.length;
-        center[1] += p[1] / handle.positions.length;
-        center[2] += p[2] / handle.positions.length;
+  /**
+   * The handle dots for the renderer (T1.8): every handle of the selection,
+   * with the hovered or dragged one marked. The drag's positions track the
+   * same delta the commands apply, so they still match the recomputed
+   * handles of the moved brush.
+   */
+  handleDots(hover: { brush: Id; positions: Vec3[]; kind: VertexSubmode } | null = null): readonly {
+    point: Vec3;
+    state: 0 | 1 | 2;
+  }[] {
+    const sameHandle = (
+      a: { brush: Id; positions: Vec3[]; kind: VertexSubmode },
+      b: { brush: Id; positions: Vec3[]; kind: VertexSubmode },
+    ) =>
+      a.brush === b.brush &&
+      a.kind === b.kind &&
+      a.positions.length === b.positions.length &&
+      a.positions.every((p) =>
+        b.positions.some(
+          (q) =>
+            Math.abs(q[0] - p[0]) < 1e-6 &&
+            Math.abs(q[1] - p[1]) < 1e-6 &&
+            Math.abs(q[2] - p[2]) < 1e-6,
+        ),
+      );
+    return this.handles().map((handle) => {
+      let state: 0 | 1 | 2 = 0;
+      if (
+        this.drag &&
+        sameHandle(
+          { brush: this.drag.brush, positions: this.drag.positions, kind: this.drag.kind },
+          handle,
+        )
+      ) {
+        state = 2;
+      } else if (hover && sameHandle(hover, handle)) {
+        state = 1;
       }
-      out.push(...cross3(center, size));
-    }
-    return out;
+      return { point: handlePoint(handle), state };
+    });
   }
 
   private pickHandle(
@@ -532,24 +550,13 @@ export class VertexTool {
     let best: { brush: Id; positions: Vec3[]; kind: VertexSubmode } | null = null;
     let bestDistance = Infinity;
     for (const handle of this.handles()) {
-      let d: number;
-      if (handle.kind === 'vertex') {
-        const v = handle.positions[0]!;
-        d = Math.hypot(v[axes[0]]! - event.point[axes[0]]!, v[axes[1]]! - event.point[axes[1]]!);
-      } else if (handle.kind === 'edge') {
-        d = segmentDistance(event.point, handle.positions[0]!, handle.positions[1]!, axes);
-      } else {
-        const center: Vec3 = [0, 0, 0];
-        for (const p of handle.positions) {
-          center[0] += p[0] / handle.positions.length;
-          center[1] += p[1] / handle.positions.length;
-          center[2] += p[2] / handle.positions.length;
-        }
-        d = Math.hypot(
-          center[axes[0]]! - event.point[axes[0]]!,
-          center[axes[1]]! - event.point[axes[1]]!,
-        );
-      }
+      // Every hit target is the fixed-size dot (T1.8): the vertex itself,
+      // the edge midpoint or the face centroid.
+      const dot = handlePoint(handle);
+      const d = Math.hypot(
+        dot[axes[0]]! - event.point[axes[0]]!,
+        dot[axes[1]]! - event.point[axes[1]]!,
+      );
       if (d < bestDistance) {
         bestDistance = d;
         best = handle;
@@ -562,7 +569,7 @@ export class VertexTool {
     if (event.button !== 0 && event.type === 'down') return { commands: [] };
     if (event.type === 'down') {
       const handle = this.pickHandle(event);
-      if (!handle) return { commands: [], preview: this.handlePreview(event.tolerance) };
+      if (!handle) return { commands: [], handles: this.handleDots() };
       this.drag = {
         brush: handle.brush,
         positions: handle.positions.map((p) => [...p] as Vec3),
@@ -571,10 +578,19 @@ export class VertexTool {
         last: event.point,
         view: event.view,
       };
-      return { commands: [], editing: new Set([handle.brush]) };
+      return { commands: [], editing: new Set([handle.brush]), handles: this.handleDots() };
     }
     if (event.type === 'move') {
-      if (!this.drag) return { commands: [], preview: this.handlePreview(event.tolerance) };
+      if (!this.drag) {
+        // Idle hover: the dot under the cursor is marked, and in edge mode
+        // the edge itself is highlighted as a vp-select segment.
+        const hover = this.pickHandle(event);
+        const preview: PreviewSegment[] = [];
+        if (hover && hover.kind === 'edge') {
+          preview.push([hover.positions[0]!, hover.positions[1]!]);
+        }
+        return { commands: [], handles: this.handleDots(hover), preview };
+      }
       if (event.view !== this.drag.view) return { commands: [] };
       const axes = planeAxes(this.drag.view);
       const grid = this.gridSize();
@@ -616,6 +632,7 @@ export class VertexTool {
       );
       return {
         invalid: [],
+        handles: this.handleDots(),
         commands: [
           {
             label: `Move ${this.drag.kind}`,
@@ -639,7 +656,9 @@ export class VertexTool {
     }
     const hadDrag = this.drag !== null;
     this.drag = null;
-    return hadDrag ? { commands: [], invalid: [], editing: new Set() } : { commands: [] };
+    return hadDrag
+      ? { commands: [], invalid: [], editing: new Set(), handles: this.handleDots() }
+      : { commands: [] };
   }
 }
 
