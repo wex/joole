@@ -28,6 +28,27 @@ List of items to implement or fix:
   - We need a persisent options/settings modal that can be opened from the menu bar
   - When selecting a tool from a toolbar (or using a hotkey), the app should show a transparent overlay with the shortcut/keybind, icon and tool name & description for a few seconds - this needs to be possible to disable in settings
 
+- Phase 1.5: More features and fixes
+  - Thumbnail size is only resizing the boxes, not the images inside
+  - S button (backwards) is not working in 3D view
+  - Dots added in previous phase should be larger
+  - While moving a vertex/edge/face, the dot is rendered "one frame behind" - so when moving from origon to position (10, 10, 10), the dot will be at (0, 0, 0) - it should be tied to the actual position
+  - In Brush-mode clicking a single point in 2D view should open an inline input field to enter the size of the brush
+    - Size will be entered as X Y Z (width, height, depth) separated by spaces or commas
+    - When enter is pressed in the input field, the brush should be created with the specified dimensions
+    - Orientation should be set to the current view orientation
+    - Origin should be set to the clicked point
+    - Also selected brush in Select-mode should be editable in the same way
+  - When a brush is selected and space is pressed, hovered view should be centered on the brush and zoomed ~50% out
+  - Pressing TAB in Texture-mode should cycle through it's faces (same as next face)
+  - Face should be highlighted with a different border color than the rest of the brush (brush is now red, face should be yellow)
+  - In last phase we added a tooltip that shows the shortcut/keybind, icon and tool name & description
+    - This should be larger (200% size)
+  - Bottom panel (Tree / Prefabs / Log) should be collapsible and closed by default
+  - All colors should be configurable in settings
+    - Add tabs for settings - keep current settings in General -tab and add a new tab for Colors
+    - Add a reset button to reset all colors to default
+
 - Phase 2: Future features
   - User should be able to create, save and load projects
   - User should be able to create custom arrangements of tools/windows in app and save them

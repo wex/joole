@@ -20,6 +20,7 @@ uniform vec4 uEntityColor;
 uniform vec4 uSelectColor;
 uniform vec4 uInvalidColor;
 uniform vec4 uHandleColor;
+uniform vec4 uFaceColor;
 uniform vec4 uLeakColor;
 
 out vec4 vColor;
@@ -32,7 +33,9 @@ void main() {
   int i = int(aIndex);
   uvec4 texel = texelFetch(uState, ivec2(i % size.x, i / size.x), 0);
   uint state = texel.r;
-  bool selected = (state & 33u) != 0u; // bit 1 selected, bit 32 editing
+  bool face = (state & 128u) != 0u;
+  // bit 1 selected, bit 32 editing; the focused face rides the selected pass
+  bool selected = ((state & 33u) != 0u) || face;
   bool entity = (state & 2u) != 0u;
   bool invalid = (state & 4u) != 0u;
   bool dimmed = (state & 8u) != 0u;
@@ -42,7 +45,7 @@ void main() {
   vec4 b = uViewProjection * vec4(aB, 1.0);
   vec4 classColor = vec4(vec3(texel.gba) / 255.0, 1.0);
   bool hasClassColor = entity && (texel.g + texel.b + texel.a) > 0u;
-  vColor = handle ? uHandleColor : invalid ? uInvalidColor : selected ? uSelectColor : entity ? (hasClassColor ? classColor : uEntityColor) : uBrushColor;
+  vColor = face ? uFaceColor : handle ? uHandleColor : invalid ? uInvalidColor : selected ? uSelectColor : entity ? (hasClassColor ? classColor : uEntityColor) : uBrushColor;
   if (dimmed) {
     vColor = vec4(vColor.rgb * 0.35, vColor.a);
   }

@@ -249,3 +249,118 @@ test('the focus buttons step through the brush and its faces (T1.6)', async ({ p
     ),
   ).toBe(1);
 });
+
+test('Tab steps through the faces in the texture tool (T15.6)', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.locator('[data-testid=editor-shell]')).toBeVisible();
+
+  await page.getByRole('button', { name: 'Brush (B)' }).click();
+  const top = await page.evaluate(() => {
+    const joole = (
+      window as unknown as {
+        joole: {
+          camera(name: string): { center: [number, number, number]; zoom: number };
+          viewRects(): Record<string, { x: number; y: number; width: number; height: number }>;
+        };
+      }
+    ).joole;
+    const camera = joole.camera('top');
+    const rect = joole.viewRects()['top']!;
+    const canvas = document.querySelector('canvas')!.getBoundingClientRect();
+    const ratio = window.devicePixelRatio || 1;
+    const toScreen = (wx: number, wy: number) => ({
+      x: canvas.left + rect.x + (wx - camera.center[0]) * (camera.zoom / ratio) + rect.width / 2,
+      y: canvas.top + rect.y - (wy - camera.center[1]) * (camera.zoom / ratio) + rect.height / 2,
+    });
+    return { a: toScreen(0, 0), b: toScreen(64, 64) };
+  });
+  await page.mouse.move(top.a.x, top.a.y);
+  await page.mouse.down();
+  await page.mouse.move(top.b.x, top.b.y, { steps: 4 });
+  await page.mouse.up();
+
+  await page.keyboard.press('t');
+  const row = page.locator('[data-testid=texture-focus]');
+  await expect(row).toContainText('Brush (6 faces)');
+
+  // Tab steps forward and Shift+Tab steps back, like ◀ ▶.
+  await page.keyboard.press('Tab');
+  await expect(row).toContainText('Face 1 of 6');
+  await page.keyboard.press('Tab');
+  await expect(row).toContainText('Face 2 of 6');
+  await page.keyboard.press('Shift+Tab');
+  await expect(row).toContainText('Face 1 of 6');
+
+  // A keyboard-focused control keeps Tab for focus movement.
+  await page.locator('[data-testid=thumb-size-slider]').focus();
+  await page.keyboard.press('Tab');
+  await expect(row).toContainText('Face 1 of 6');
+  const focus = await page.evaluate(() => document.activeElement?.getAttribute('data-testid'));
+  expect(focus).not.toBe('thumb-size-slider');
+});
+
+test('the focused face outline is yellow in the 2D views (T15.7)', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.locator('[data-testid=editor-shell]')).toBeVisible();
+
+  type Joole = {
+    joole: {
+      camera(name: string): { center: [number, number, number]; zoom: number };
+      viewRects(): Record<string, { x: number; y: number; width: number; height: number }>;
+      whenIdle(): Promise<void>;
+    };
+  };
+
+  // Draw a box in the Top view, frame it in 3D with Space and pick a face.
+  await page.getByRole('button', { name: 'Brush (B)' }).click();
+  const geom = await page.evaluate(() => {
+    const joole = (window as unknown as Joole).joole;
+    const camera = joole.camera('top');
+    const rect = joole.viewRects()['top']!;
+    const canvas = document.querySelector('canvas')!.getBoundingClientRect();
+    const ratio = window.devicePixelRatio || 1;
+    const toScreen = (wx: number, wy: number) => ({
+      x: canvas.left + rect.x + (wx - camera.center[0]) * (camera.zoom / ratio) + rect.width / 2,
+      y: canvas.top + rect.y - (wy - camera.center[1]) * (camera.zoom / ratio) + rect.height / 2,
+    });
+    const r3 = joole.viewRects()['3d']!;
+    return {
+      a: toScreen(0, 0),
+      b: toScreen(64, 64),
+      c3: { x: canvas.left + r3.x + r3.width / 2, y: canvas.top + r3.y + r3.height / 2 },
+    };
+  });
+  await page.mouse.move(geom.a.x, geom.a.y);
+  await page.mouse.down();
+  await page.mouse.move(geom.b.x, geom.b.y, { steps: 4 });
+  await page.mouse.up();
+  await page.mouse.move(geom.c3.x, geom.c3.y);
+  await page.keyboard.press(' ');
+  await page.keyboard.press('t');
+  const before = await page.locator('[data-testid=viewport-area] canvas').screenshot();
+  await page.mouse.click(geom.c3.x, geom.c3.y);
+  await page.evaluate(() => (window as unknown as Joole).joole.whenIdle());
+
+  // The pick changes hundreds of 3D pixels (the translucent fill over the
+  // face) and the outlines come out in vp-face yellow, not selection red.
+  const { decodePng, countColor } = await import('./png');
+  const imgBefore = decodePng(before);
+  const imgAfter = decodePng(await page.locator('[data-testid=viewport-area] canvas').screenshot());
+  let diff = 0;
+  for (let i = 0; i < imgBefore.data.length; i += 4) {
+    const px = (i / 4) % imgBefore.width;
+    const py = Math.floor(i / 4 / imgBefore.width);
+    if (px > imgBefore.width / 2 || py < 22) continue;
+    if (
+      imgBefore.data[i] !== imgAfter.data[i] ||
+      imgBefore.data[i + 1] !== imgAfter.data[i + 1] ||
+      imgBefore.data[i + 2] !== imgAfter.data[i + 2]
+    ) {
+      diff++;
+    }
+  }
+  expect(diff).toBeGreaterThan(500);
+  const full = { x: 0, y: 0, width: imgAfter.width, height: imgAfter.height };
+  const yellow = countColor(imgAfter, full, (r, g, b) => r > 200 && g > 150 && b < 100);
+  expect(yellow).toBeGreaterThan(10);
+});

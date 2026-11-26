@@ -1,5 +1,6 @@
-import { For } from 'solid-js';
+import { For, Show } from 'solid-js';
 import type { ViewId } from '@render/index';
+import { Icon } from './Icon';
 import styles from './PanelTabs.module.css';
 
 export type BottomTab = 'tree' | 'prefabs' | 'log';
@@ -19,8 +20,13 @@ const viewTabs: readonly { id: ViewId; label: string; key: string }[] = [
 export interface PanelTabsProps {
   readonly selected: BottomTab;
   readonly maximized: ViewId | null;
+  /** The panel is collapsed to its tab strip (T15.9). */
+  readonly collapsed: boolean;
+  /** Error entries added since the Log tab was last shown (T15.9). */
+  readonly newErrors: number;
   readonly onSelect: (tab: BottomTab) => void;
   readonly onView: (view: ViewId) => void;
+  readonly onToggleCollapsed: () => void;
 }
 
 export function PanelTabs(props: PanelTabsProps) {
@@ -38,6 +44,15 @@ export function PanelTabs(props: PanelTabsProps) {
 
   return (
     <div class={styles.tabs}>
+      <button
+        type="button"
+        class={styles.disclosure}
+        aria-expanded={props.collapsed ? 'false' : 'true'}
+        aria-label={props.collapsed ? 'Expand bottom panel' : 'Collapse bottom panel'}
+        onClick={() => props.onToggleCollapsed()}
+      >
+        <Icon name={props.collapsed ? 'chevronRight' : 'chevronDown'} />
+      </button>
       <div role="tablist" aria-label="Bottom panel" class={styles.group} onKeyDown={move}>
         <For each={contentTabs}>
           {(tab) => (
@@ -50,6 +65,11 @@ export function PanelTabs(props: PanelTabsProps) {
               onClick={() => props.onSelect(tab.id)}
             >
               {tab.label}
+              <Show when={tab.id === 'log' && props.newErrors > 0}>
+                <span class={styles.errorBadge} aria-label={`Log, ${props.newErrors} new errors`}>
+                  <Icon name="alertTriangle" /> {props.newErrors}
+                </span>
+              </Show>
             </button>
           )}
         </For>

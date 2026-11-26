@@ -24,10 +24,11 @@
   --vp-grid-major: #4d4d4d; /* Every 8th grid line and every 64 units. */
   --vp-axis: #6e6a32; /* World origin axes (x = 0, y = 0, z = 0) in the 2D views. */
   --vp-brush: #e6e6e6; /* Unselected brush wireframe in the 2D views and 3D wireframe mode. */
-  --vp-select: #ff2b1f; /* Selected brush or entity in every view. Selection is never shown in any other color. */
+  --vp-select: #ff2b1f; /* Selected brush or entity in every view. Selection is never shown in any other color; the single exception is the texture tool's focused face in vp-face yellow. */
   --vp-entity: #3ccaff; /* Point entities in the 2D views when the entity definition gives no color. */
   --vp-target: #1c86b3; /* target/targetname link lines in the 2D views, dashed. */
   --vp-handle: #ffd60a; /* Vertex, edge and face handles, and clip plane points. */
+  --vp-face: #ffd60a; /* The texture tool's focused face: outline in every view and translucent fill in 3D. The one exception to the rule that selection is only red. */
   --vp-invalid: #ff9f0a; /* Rejected move (non-convex result), drawn dashed. Not red, because red is reserved for selection. */
   --vp-leak: #e040fb; /* qbsp3 leak path (.pts) in every view. */
   --vp-sky: #5f7898; /* SURF_SKY faces in the 3D view. */
@@ -64,6 +65,7 @@
   --vp-entity: #3ccaff;
   --vp-target: #1c86b3;
   --vp-handle: #ffd60a;
+  --vp-face: #ffd60a;
   --vp-invalid: #ff9f0a;
   --vp-leak: #e040fb;
   --vp-sky: #5f7898;

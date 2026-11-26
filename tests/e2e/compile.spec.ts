@@ -28,7 +28,13 @@ test('compiles the map in the browser through all three tools', async ({ page })
   test.setTimeout(90000);
   await openWithGame(page);
   const errors: string[] = [];
-  page.on('pageerror', (error) => errors.push(error.message));
+  page.on('pageerror', (error) => {
+    // WebKit raises this benign notification when a layout change lands inside
+    // a ResizeObserver callback; it is not an application error.
+    if (!error.message.startsWith('ResizeObserver loop')) {
+      errors.push(error.message);
+    }
+  });
 
   // Open the sealed gate sample: two rooms, a door, a button, a monster.
   const sample = path.join(

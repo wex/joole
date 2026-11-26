@@ -256,6 +256,7 @@ export function framePerspective(
   yaw = 45,
   pitch = -30,
   fovY = DEFAULT_FOV_Y,
+  fill = 1 / 1.05,
 ): PerspectiveCamera {
   const forward = forwardFromAngles(yaw, pitch);
   const base = {
@@ -278,7 +279,8 @@ export function framePerspective(
   const radius = Math.max(1, Math.hypot(extent[0], extent[1], extent[2]) / 2);
   const halfY = (fovY * Math.PI) / 360;
   const halfX = Math.atan(Math.tan(halfY) * Math.max(aspect, 1e-6));
-  const distance = (radius / Math.sin(Math.min(halfX, halfY))) * 1.05;
+  // The bounding sphere covers `fill` of the narrower field of view.
+  const distance = radius / (Math.sin(Math.min(halfX, halfY)) * fill);
   return {
     ...base,
     position: [

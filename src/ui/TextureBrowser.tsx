@@ -257,10 +257,15 @@ function ThumbCanvas(props: {
       const context = canvas?.getContext('2d');
       if (!canvas || !context) return;
       const cached = thumbCache.get(props.name);
-      const size = props.size();
+      // The backing store follows the device pixel ratio so a scaled
+      // thumbnail stays sharp on HiDPI screens (T15.1).
+      const size = Math.round(props.size() * (window.devicePixelRatio || 1));
+      if (canvas.width !== size) canvas.width = size;
+      if (canvas.height !== size) canvas.height = size;
       context.clearRect(0, 0, size, size);
       if (cached?.bitmap) {
-        const scale = Math.min(size / cached.width, size / cached.height, 1);
+        // No upper cap: small textures scale up to fill the cell, pixelated.
+        const scale = Math.min(size / cached.width, size / cached.height);
         const w = cached.width * scale;
         const h = cached.height * scale;
         context.imageSmoothingEnabled = false;
@@ -270,9 +275,8 @@ function ThumbCanvas(props: {
   );
   return (
     <canvas
-      width={props.size()}
-      height={props.size()}
       class={styles.thumb}
+      style={{ width: `${props.size()}px`, height: `${props.size()}px` }}
       ref={(el) => {
         canvas = el;
         props.request(props.name);

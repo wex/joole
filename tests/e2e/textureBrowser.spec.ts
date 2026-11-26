@@ -59,9 +59,11 @@ test('the texture browser lists, searches, filters and selects textures', async 
         ) as HTMLCanvasElement | null;
         if (!canvas) return false;
         const context = canvas.getContext('2d')!;
-        const data = context.getImageData(0, 0, 64, 64).data;
+        // The backing store follows the device pixel ratio (T15.1), so the
+        // whole canvas is sampled rather than a fixed corner.
+        const data = context.getImageData(0, 0, canvas.width, canvas.height).data;
         // The checker fallback is grey; the converted mine texture is not.
-        return Array.from(data.slice(0, 400)).some((v) => v > 100 && v < 240);
+        return Array.from(data).some((v) => v > 100 && v < 240);
       });
     })
     .toBe(true);

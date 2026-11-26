@@ -21,6 +21,30 @@ import {
 import { unionAabb, type Aabb } from './camera';
 
 /** Bits of a node's byte in the state texture, read by the shaders. */
+/**
+ * The polygon's outward unit normal times the highlight lift, by Newell's
+ * method. Brush windings are clockwise viewed from outside, so the Newell
+ * normal points into the brush and is negated.
+ */
+function faceLift(polygon: readonly Vec3[]): Vec3 {
+  const LIFT = 0.05;
+  let nx = 0;
+  let ny = 0;
+  let nz = 0;
+  for (let i = 0; i < polygon.length; i++) {
+    const a = polygon[i]!;
+    const b = polygon[(i + 1) % polygon.length]!;
+    nx += (a[1] - b[1]) * (a[2] + b[2]);
+    ny += (a[2] - b[2]) * (a[0] + b[0]);
+    nz += (a[0] - b[0]) * (a[1] + b[1]);
+  }
+  const len = Math.hypot(nx, ny, nz);
+  if (len < 1e-12) {
+    return [0, 0, 0];
+  }
+  return [(-nx / len) * LIFT, (-ny / len) * LIFT, (-nz / len) * LIFT];
+}
+
 function sameSegments(a: readonly LineSegment[], b: readonly LineSegment[]): boolean {
   if (a.length !== b.length) return false;
   for (let i = 0; i < a.length; i++) {
@@ -55,6 +79,7 @@ export const STATE_DIMMED = 8;
 export const STATE_LEAK = 16;
 export const STATE_HANDLE = 64;
 export const STATE_EDITING = 32;
+export const STATE_FACE = 128;
 
 /** The state texture is this many texels wide, one byte per node index. */
 const STATE_WIDTH = 1024;
@@ -212,6 +237,8 @@ export class GeometryCache {
   readonly handles: GpuStore;
   private readonly handleCornerBuffer: WebGLBuffer;
   private handleKey = '';
+  /** The current handle dots, for the test hook. */
+  handleList: readonly { point: Vec3; state: 0 | 1 | 2 }[] = [];
   private readonly faceHighlightIndex: number;
   private facePolygons: readonly (readonly Vec3[])[] = [];
   readonly faceHighlight: GpuStore;
@@ -240,6 +267,7 @@ export class GeometryCache {
     this.groupHoverIndex = this.takeIndex();
     this.state[this.groupHoverIndex * 4] = STATE_SELECTED;
     this.faceHighlightIndex = this.takeIndex();
+    this.state[this.faceHighlightIndex * 4] = STATE_FACE;
     this.faceHighlight = new GpuStore(gl, FACE_STRIDE, (buffer) => this.bindFaceAttributes(buffer));
     this.cornerBuffer = gl.createBuffer();
     this.handleCornerBuffer = gl.createBuffer();
@@ -409,6 +437,7 @@ export class GeometryCache {
       return false;
     }
     this.handleKey = key;
+    this.handleList = handles;
     if (handles.length === 0) {
       this.handles.remove('__handles');
       return true;
@@ -458,25 +487,44 @@ export class GeometryCache {
         v++;
       };
       for (const polygon of polygons) {
+        // The fill floats a hair above the face along its normal: a coplanar
+        // fill loses the depth test against the face itself (T15.7), and a
+        // polygon offset does not help on every GL implementation.
+        const lift = faceLift(polygon);
+        const at = (point: readonly number[]): Vec3 => [
+          point[0]! + lift[0],
+          point[1]! + lift[1],
+          point[2]! + lift[2],
+        ];
         for (let i = 1; i + 1 < polygon.length; i++) {
-          put(polygon[0]!);
-          put(polygon[i]!);
-          put(polygon[i + 1]!);
+          put(at(polygon[0]!));
+          put(at(polygon[i]!));
+          put(at(polygon[i + 1]!));
         }
       }
       this.faceHighlight.write('__faceHighlight', data, vertexCount);
     }
-    // Outlines in the selected-line pass of every view.
+    // Outlines in the selected-line pass of every view, lifted with the fill.
     const segments: LineSegment[] = [];
     for (const polygon of polygons) {
+      const lift = faceLift(polygon);
+      const at = (point: readonly number[]): Vec3 => [
+        point[0]! + lift[0],
+        point[1]! + lift[1],
+        point[2]! + lift[2],
+      ];
       for (let i = 0; i < polygon.length; i++) {
-        segments.push([polygon[i]!, polygon[(i + 1) % polygon.length]!]);
+        segments.push([at(polygon[i]!), at(polygon[(i + 1) % polygon.length]!)]);
       }
     }
     if (segments.length === 0) {
       this.lines.remove('__overlayFaces');
     } else {
-      this.lines.write('__overlayFaces', writeLines(segments, 0), segments.length);
+      this.lines.write(
+        '__overlayFaces',
+        writeLines(segments, this.faceHighlightIndex),
+        segments.length,
+      );
     }
     return true;
   }

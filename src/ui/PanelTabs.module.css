@@ -54,3 +54,34 @@
   outline: 2px solid var(--focus-ring);
   outline-offset: 1px;
 }
+
+.disclosure {
+  display: inline-flex;
+  width: 18px;
+  height: 18px;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--ink-muted);
+  cursor: pointer;
+}
+
+.disclosure:hover {
+  background: var(--surface-3);
+  color: var(--ink);
+}
+
+.errorBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  color: var(--error);
+  font: var(--text-mono-small);
+}
+
+.errorBadge svg {
+  width: 10px;
+  height: 10px;
+}

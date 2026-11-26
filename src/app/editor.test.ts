@@ -375,3 +375,37 @@ describe('texture lock', () => {
     expect(after.faces.map((f) => f.tex)).toEqual(before.faces.map((f) => f.tex));
   });
 });
+
+describe('typed brush size (T15.4)', () => {
+  it('creates a brush in one undo step and remembers the size', () => {
+    const { app } = makeApp();
+    const before = app.document.nodes.size;
+    expect(app.createBrushAt('xy', [32, 32, 0], [128, 64, 32])).toBe(true);
+    expect(app.document.nodes.size).toBe(before + 1);
+    const id = [...app.selection][0]!;
+    const box = analyzeBrush(app.document.nodes.get(id) as BrushNode).aabb!;
+    expect(box.min.map((x) => x + 0)).toEqual([-32, 0, -16]);
+    expect(box.max.map((x) => x + 0)).toEqual([96, 64, 16]);
+    expect(app.lastBrushSize).toBe('128 64 32');
+    app.undo();
+    expect(app.document.nodes.size).toBe(before);
+  });
+
+  it('prefills and resizes the selection in the view orientation', () => {
+    const { app } = makeApp();
+    app.createBrushAt('xy', [0, 0, 0], [64, 32, 16]);
+    // In the front view, width is x, height is z and depth is y.
+    expect(app.selectionSizePrompt('xz')).toEqual({ center: [0, 0, 0], text: '64 16 32' });
+    expect(app.resizeSelectionTo('xz', [128, 16, 32])).toBe(true);
+    const id = [...app.selection][0]!;
+    const box = analyzeBrush(app.document.nodes.get(id) as BrushNode).aabb!;
+    expect(box.max[0]! - box.min[0]!).toBeCloseTo(128, 6);
+    expect((box.min[0]! + box.max[0]!) / 2).toBeCloseTo(0, 6);
+    app.undo();
+    const restored = analyzeBrush(app.document.nodes.get(id) as BrushNode).aabb!;
+    expect(restored.max[0]! - restored.min[0]!).toBeCloseTo(64, 6);
+    app.setSelection(new Set());
+    expect(app.selectionSizePrompt('xy')).toBeNull();
+    expect(app.resizeSelectionTo('xy', [8, 8, 8])).toBe(false);
+  });
+});

@@ -13,6 +13,7 @@ interface JooleWindow {
     };
     selection(): string[];
     autosave(): Promise<boolean>;
+    camera(view: string): unknown;
   };
 }
 
@@ -100,6 +101,8 @@ test('the shell has the workspace, file menu, panels, splitters, theme and view 
   await vertical.focus();
   await page.keyboard.press('ArrowLeft');
   expect(Number(await vertical.getAttribute('aria-valuenow'))).toBe(widthBefore + 8);
+  // The bottom panel starts collapsed (T15.9): expand it to reach the splitter.
+  await page.getByRole('button', { name: 'Expand bottom panel' }).click();
   const horizontal = page.getByRole('separator', { name: 'Resize bottom panel' });
   const heightBefore = Number(await horizontal.getAttribute('aria-valuenow'));
   await horizontal.focus();
@@ -136,6 +139,29 @@ test('opens the fixture game folder and map and reports them in the log', async 
 });
 
 test('2D pan and zoom and 3D fly change the rendered views', async ({ page }) => {
+  // Fly mode runs on a stand-in for the Pointer Lock API. The app sees the
+  // same document.pointerLockElement and pointerlockchange events, but the
+  // browser's real lock is avoided: Playwright's WebKit denies it, and
+  // headless Chromium starves its input and evaluation channels while the
+  // pointer is locked.
+  await page.addInitScript(() => {
+    const lock: { element: Element | null } = { element: null };
+    const changed = () =>
+      queueMicrotask(() => document.dispatchEvent(new Event('pointerlockchange')));
+    Object.defineProperty(Document.prototype, 'pointerLockElement', {
+      configurable: true,
+      get: () => lock.element,
+    });
+    Element.prototype.requestPointerLock = function (this: Element) {
+      lock.element = this;
+      changed();
+      return Promise.resolve();
+    } as Element['requestPointerLock'];
+    Document.prototype.exitPointerLock = function () {
+      lock.element = null;
+      changed();
+    };
+  });
   const errors = consoleErrors(page);
   await openFixtureMap(page);
 
@@ -186,31 +212,40 @@ test('2D pan and zoom and 3D fly change the rendered views', async ({ page }) =>
   const dollied = await canvasScreenshot(page);
   expect(dollied.equals(zoomed)).toBe(false);
 
-  // Mouse-look and WASD work in pointer-lock mode (middle-click). Some
-  // environments deny the lock — Playwright's WebKit does — and the app
-  // handles that by design, so the fly assertions run only when the lock
-  // actually engages.
+  // Mouse-look and WASD work in pointer-lock mode (middle-click).
   await page.mouse.move(fly.x, fly.y);
   await page.mouse.down({ button: 'middle' });
   await page.mouse.up({ button: 'middle' });
-  await page.waitForTimeout(300);
-  const lockEngaged = await page.evaluate(() => document.pointerLockElement !== null);
-  if (lockEngaged) {
-    await expect(page.locator('[data-testid=view-title-3d]')).toContainText('Fly');
-    await page.mouse.move(fly.x + 48, fly.y + 8, { steps: 3 });
-    await page.keyboard.down('w');
-    await page.waitForTimeout(350);
-    await page.keyboard.up('w');
-    await page.mouse.down({ button: 'middle' });
-    await page.mouse.up({ button: 'middle' });
-    await expect(page.locator('[data-testid=view-title-3d]')).toContainText('Textured');
-    await page.evaluate(() => (window as unknown as JooleWindow).joole!.whenIdle());
-    const flown = await canvasScreenshot(page);
-    expect(flown.equals(zoomed)).toBe(false);
-  } else {
-    // The lock was denied: the view must stay exactly as it was.
-    await expect(page.locator('[data-testid=view-title-3d]')).toContainText('Textured');
-  }
+  await expect(page.locator('[data-testid=view-title-3d]')).toContainText('Fly');
+  await page.mouse.move(fly.x + 48, fly.y + 8, { steps: 3 });
+  // Copied inside the page: the moved camera is not a plain object.
+  const position = () =>
+    page.evaluate(() => {
+      const camera = (window as unknown as JooleWindow).joole!.camera('3d') as {
+        position: number[];
+      };
+      return [...camera.position];
+    });
+  const start = await position();
+  await page.keyboard.down('w');
+  await page.waitForTimeout(350);
+  await page.keyboard.up('w');
+  const forward = await position();
+  // S moves backwards (T15.2): opposite to the W step, and the Select tool
+  // shortcut does not take the key.
+  await page.keyboard.down('s');
+  await page.waitForTimeout(350);
+  await page.keyboard.up('s');
+  const back = await position();
+  const step = forward.map((v, i) => v - start[i]!);
+  const backStep = back.map((v, i) => v - forward[i]!);
+  expect(step.reduce((sum, v, i) => sum + v * backStep[i]!, 0)).toBeLessThan(0);
+  await page.mouse.down({ button: 'middle' });
+  await page.mouse.up({ button: 'middle' });
+  await expect(page.locator('[data-testid=view-title-3d]')).toContainText('Textured');
+  await page.evaluate(() => (window as unknown as JooleWindow).joole!.whenIdle());
+  const flown = await canvasScreenshot(page);
+  expect(flown.equals(zoomed)).toBe(false);
 
   const framesAtIdle = await page.evaluate(
     () => (window as unknown as JooleWindow).joole!.stats().frames,
@@ -378,4 +413,59 @@ test('an edit autosaves and reload offers recovery', async ({ page }) => {
     .poll(() => page.evaluate(() => (window as unknown as JooleWindow).joole!.stats().nodes))
     .toBe(nodesBefore + 1);
   expect(errors).toEqual([]);
+});
+
+test('Space frames the selection in the hovered view (T15.5)', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.locator('[data-testid=editor-shell]')).toBeVisible();
+
+  type Joole = {
+    joole: {
+      camera(name: string): { center: [number, number, number]; zoom: number };
+      viewRects(): Record<string, { x: number; y: number; width: number; height: number }>;
+    };
+  };
+  const camera = (view: string) =>
+    page.evaluate((v) => (window as unknown as Joole).joole.camera(v), view);
+
+  // Draw a box in the Top view.
+  await page.getByRole('button', { name: 'Brush (B)' }).click();
+  const top = await page.evaluate(() => {
+    const joole = (window as unknown as Joole).joole;
+    const cam = joole.camera('top');
+    const rect = joole.viewRects()['top']!;
+    const canvas = document.querySelector('canvas')!.getBoundingClientRect();
+    const ratio = window.devicePixelRatio || 1;
+    const toScreen = (wx: number, wy: number) => ({
+      x: canvas.left + rect.x + (wx - cam.center[0]) * (cam.zoom / ratio) + rect.width / 2,
+      y: canvas.top + rect.y - (wy - cam.center[1]) * (cam.zoom / ratio) + rect.height / 2,
+    });
+    return {
+      a: toScreen(0, 0),
+      b: toScreen(64, 64),
+      cx: canvas.left + rect.x + rect.width / 2,
+      cy: canvas.top + rect.y + rect.height / 2,
+    };
+  });
+  await page.mouse.move(top.a.x, top.a.y);
+  await page.mouse.down();
+  await page.mouse.move(top.b.x, top.b.y, { steps: 4 });
+  await page.mouse.up();
+
+  // Zoom far out, then Space in the Top view frames the selection.
+  const before = await camera('top');
+  await page.mouse.move(top.cx, top.cy);
+  await page.keyboard.press(' ');
+  const after = await camera('top');
+  expect(after.center[0]).toBeCloseTo(32, 1);
+  expect(after.center[1]).toBeCloseTo(32, 1);
+  expect(after.zoom).not.toBeCloseTo(before.zoom, 2);
+  // The selection fills about half of the view: extent × zoom / height ≈ 0.5.
+  const ratio = await page.evaluate(() => window.devicePixelRatio || 1);
+  const rect = await page.evaluate(() => (window as unknown as Joole).joole.viewRects()['top']!);
+  const fill = (64 * after.zoom) / ratio / Math.min(rect.width, rect.height);
+  expect(fill).toBeGreaterThan(0.3);
+  expect(fill).toBeLessThan(0.7);
+  // The depth coordinate does not jump.
+  expect(after.center[2]).toBeCloseTo(before.center[2], 5);
 });

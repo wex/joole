@@ -144,3 +144,47 @@ test('a vertex drag shows the snapped size while dragging (T1.11)', async ({ pag
   // After the drag the measurement is gone and the title shows coordinates.
   await expect(page.locator('[data-testid=view-title-top]')).not.toContainText('×');
 });
+
+test('the dragged dot stays on the vertex during the drag and after undo (T15.3)', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await expect(page.locator('[data-testid=editor-shell]')).toBeVisible();
+  await page.getByRole('button', { name: 'Brush (B)' }).click();
+  const a = await worldScreen(page, [0, 0, 0]);
+  const b = await worldScreen(page, [64, 64, 0]);
+  await page.mouse.move(a.x, a.y);
+  await page.mouse.down();
+  await page.mouse.move(b.x, b.y, { steps: 5 });
+  await page.mouse.up();
+
+  const dots = () =>
+    page.evaluate(() =>
+      (
+        window as unknown as { joole: { handles(): { point: number[]; state: number }[] } }
+      ).joole.handles(),
+    );
+  // Choosing the tool shows the dots without a pointer event over a view.
+  await page.keyboard.press('v');
+  await expect.poll(async () => (await dots()).length).toBe(8);
+
+  const corner = await worldScreen(page, [0, 0, 0]);
+  const target = await worldScreen(page, [16, 16, 0]);
+  await page.mouse.move(corner.x, corner.y);
+  await page.mouse.down();
+  await page.mouse.move(target.x, target.y, { steps: 4 });
+  // Mid-drag, the active dot is where the vertex is now, not one step behind.
+  const active = (await dots()).filter((dot) => dot.state === 2);
+  expect(active).toHaveLength(1);
+  expect(active[0]!.point[0]).toBeCloseTo(16, 4);
+  expect(active[0]!.point[1]).toBeCloseTo(16, 4);
+  await page.mouse.up();
+  const near = (x: number, y: number) => (list: { point: number[] }[]) =>
+    list.some((dot) => Math.abs(dot.point[0]! - x) < 1e-4 && Math.abs(dot.point[1]! - y) < 1e-4);
+  expect(near(16, 16)(await dots())).toBe(true);
+
+  // Undo puts the dot back on the restored corner without a pointer move.
+  await page.keyboard.press('Control+z');
+  await expect.poll(async () => near(0, 0)(await dots())).toBe(true);
+  expect(near(16, 16)(await dots())).toBe(false);
+});

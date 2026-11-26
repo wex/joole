@@ -1,3 +1,5 @@
+import { COLOR_TOKENS, isHexColor } from './colors';
+
 /**
  * The persisted editor settings (T1.12): one typed object with defaults.
  * Unknown keys survive a round trip, so a newer build's settings are not
@@ -27,6 +29,15 @@ export interface EditorSettings {
   readonly showToolOverlay: boolean;
   /** Hollow and Subtract group their fragments (T1.14). */
   readonly groupCsgResults: boolean;
+  /** The idle vertex/edge/face handle dot diameter in CSS pixels (T15.3). */
+  readonly handleSize: number;
+  /** The bottom panel shows only its tab strip (T15.9). */
+  readonly bottomCollapsed: boolean;
+  /** Colour overrides per theme, only the changed tokens (T15.10). */
+  readonly colors: {
+    readonly dark: Record<string, string>;
+    readonly light: Record<string, string>;
+  };
   readonly [key: string]: unknown;
 }
 
@@ -43,6 +54,9 @@ export const DEFAULT_SETTINGS: EditorSettings = {
   mouseLookSensitivity: 0.15,
   showToolOverlay: true,
   groupCsgResults: true,
+  handleSize: 14,
+  bottomCollapsed: true,
+  colors: { dark: {}, light: {} },
 };
 
 function num(min: number, max: number) {
@@ -56,6 +70,19 @@ const checks: Record<string, (value: unknown) => boolean> = {
   bottomHeight: num(96, 640),
   dockSplit: num(0.15, 0.85),
   propertiesCollapsed: (value) => typeof value === 'boolean',
+  bottomCollapsed: (value) => typeof value === 'boolean',
+  colors: (value) => {
+    if (!value || typeof value !== 'object') {
+      return false;
+    }
+    const themes = value as Record<string, unknown>;
+    for (const theme of ['dark', 'light']) {
+      if (!(theme in themes) || typeof themes[theme] !== 'object' || themes[theme] === null) {
+        return false;
+      }
+    }
+    return true;
+  },
   texturesCollapsed: (value) => typeof value === 'boolean',
   thumbSize: (value) => typeof value === 'number' && value >= 32 && value <= 128,
   theme: (value) => value === 'dark' || value === 'light',
@@ -63,6 +90,7 @@ const checks: Record<string, (value: unknown) => boolean> = {
   mouseLookSensitivity: num(0.02, 1),
   showToolOverlay: (value) => typeof value === 'boolean',
   groupCsgResults: (value) => typeof value === 'boolean',
+  handleSize: num(7, 28),
 };
 
 /**
@@ -81,6 +109,21 @@ export function parseSettings(stored: unknown): EditorSettings {
       }
     }
   }
+  // The nested colour map keeps only known tokens with valid hex values, so a
+  // corrupt or foreign entry cannot break the color inputs (T15.10).
+  const raw = out['colors'] as Record<string, unknown>;
+  const clean: Record<string, Record<string, string>> = { dark: {}, light: {} };
+  for (const theme of ['dark', 'light'] as const) {
+    const entries = raw[theme];
+    if (entries && typeof entries === 'object') {
+      for (const [token, color] of Object.entries(entries as Record<string, unknown>)) {
+        if (COLOR_TOKENS.some((t) => t.name === token) && isHexColor(color)) {
+          clean[theme]![token] = color.toLowerCase();
+        }
+      }
+    }
+  }
+  out['colors'] = clean;
   return out as EditorSettings;
 }
 

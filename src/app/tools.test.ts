@@ -3,7 +3,15 @@ import { createEmptyDocument, addNodePatch, applyPatch } from '@core/doc/index';
 import { analyzeBrush, extractWireframe, validateBrush } from '@core/geom/index';
 import type { BrushNode, Command, MapDocument } from '@core/types/index';
 import { makeBox } from '../core/geom/__tests__/helpers';
-import { BrushTool, ClipTool, SelectTool, VertexTool, type ToolPointerEvent } from './tools';
+import {
+  BrushTool,
+  ClipTool,
+  resizeToCommand,
+  selectionBounds,
+  SelectTool,
+  VertexTool,
+  type ToolPointerEvent,
+} from './tools';
 
 function brush(
   id: string,
@@ -204,6 +212,60 @@ describe('BrushTool', () => {
       expect(analyzeBrush(frontBrush).aabb?.min.map((x) => x + 0)).toEqual([0, -32, 0]);
       expect(analyzeBrush(frontBrush).aabb?.max.map((x) => x + 0)).toEqual([64, 32, 64]);
     }
+  });
+});
+
+describe('typed brush size (T15.4)', () => {
+  it('a click without extent asks for a size at the snapped point', () => {
+    const doc = createEmptyDocument();
+    const tool = new BrushTool(
+      () => doc,
+      () => 8,
+    );
+    tool.pointer(down(3, 13));
+    const out = tool.pointer(up(3, 13));
+    expect(out.commands).toEqual([]);
+    expect(out.sizePrompt).toEqual({ view: 'xy', point: [0, 16, 0] });
+    // A real drag still creates a brush and asks nothing.
+    tool.pointer(down(0, 0));
+    tool.pointer(move(64, 64));
+    const drag = tool.pointer(up(64, 64));
+    expect(drag.commands).toHaveLength(1);
+    expect(drag.sizePrompt).toBeUndefined();
+  });
+
+  it('creates a brush centred on the point in the view orientation', () => {
+    const doc = createEmptyDocument();
+    const tool = new BrushTool(
+      () => doc,
+      () => 8,
+    );
+    // Front view: width is x, height is z, depth is y around the working plane.
+    const out = tool.createAt('xz', [100, 0, 50], [128, 64, 32]);
+    expect(out.commands).toHaveLength(1);
+    const patched = applyPatch(doc, out.commands[0]!.run(doc));
+    const brush = [...patched.nodes.values()].find((node) => node.kind === 'brush');
+    expect(brush?.kind).toBe('brush');
+    if (brush?.kind === 'brush') {
+      const box = analyzeBrush(brush).aabb!;
+      expect(box.min.map((x) => x + 0)).toEqual([36, -16, 18]);
+      expect(box.max.map((x) => x + 0)).toEqual([164, 16, 82]);
+      expect(out.selection).toEqual(new Set([brush.id]));
+    }
+  });
+
+  it('resizes the selection about its centre and keeps flat axes', () => {
+    let doc = createEmptyDocument();
+    doc = applyPatch(doc, addNodePatch(doc, doc.worldspawn, brush('a', [0, 0, 0], [64, 64, 64])));
+    const bounds = selectionBounds(doc, new Set(['a']))!;
+    expect(bounds.min.map((x) => x + 0)).toEqual([0, 0, 0]);
+    expect(bounds.max.map((x) => x + 0)).toEqual([64, 64, 64]);
+    const command = resizeToCommand(doc, new Set(['a']), [128, 32, 64])!;
+    const resized = applyPatch(doc, command.run(doc));
+    const box = analyzeBrush(resized.nodes.get('a') as BrushNode).aabb!;
+    expect(box.min.map((x) => x + 0)).toEqual([-32, 16, 0]);
+    expect(box.max.map((x) => x + 0)).toEqual([96, 48, 64]);
+    expect(resizeToCommand(doc, new Set(), [8, 8, 8])).toBeNull();
   });
 });
 
@@ -549,12 +611,13 @@ describe('vertex/edge/face absolute grid snapping (T1.11)', () => {
 
   // The editor executes each command right away, so the document the tool
   // reads stays in sync with the drag; the harness does the same.
-  function makeToolHolder(start: MapDocument) {
+  function makeToolHolder(start: MapDocument, handleSize = 14) {
     const holder = { doc: start };
     const tool = new VertexTool(
       () => holder.doc,
       () => 8,
       () => new Set(['target']),
+      () => handleSize,
     );
     const apply = (commands: readonly Command[]) => {
       for (const command of commands) {
@@ -594,6 +657,47 @@ describe('vertex/edge/face absolute grid snapping (T1.11)', () => {
     expect(moved.measure).not.toBeNull();
     expect(moved.measure!.min[0]!).toBeCloseTo(16, 4);
     expect(moved.measure!.max[0]! - moved.measure!.min[0]!).toBeCloseTo(64 - 16, 4);
+  });
+
+  it('the active dot sits on the moved vertex during the drag (T15.3)', () => {
+    const { tool, apply, holder } = makeToolHolder(vertexDocAt([0, 0, 0], [64, 64, 64]));
+    tool.pointer(down(0, 0));
+    const moved = tool.pointer(move(16, 16));
+    const active = moved.handles!.filter((h) => h.state === 2);
+    expect(active).toHaveLength(1);
+    // The dot is at the vertex's new position, not where it was before the
+    // step's command ran.
+    expect(active[0]!.point[0]).toBeCloseTo(16, 6);
+    expect(active[0]!.point[1]).toBeCloseTo(16, 6);
+    // After the command runs, the document's dots agree with the output.
+    apply(moved.commands);
+    const fromDocument = tool.handleDots().filter((h) => h.state === 2);
+    expect(fromDocument[0]!.point).toEqual(active[0]!.point);
+    void holder;
+  });
+
+  it('the edge dot follows the moved edge midpoint (T15.3)', () => {
+    const { tool } = makeToolHolder(vertexDocAt([0, 0, 0], [64, 64, 64]));
+    tool.toggleVertexEdge();
+    // The edge x = 0 along y in the top view has its midpoint at (0, 32).
+    tool.pointer(down(0, 32));
+    const moved = tool.pointer(move(-16, 32));
+    const active = moved.handles!.filter((h) => h.state === 2);
+    expect(active).toHaveLength(1);
+    expect(active[0]!.point[0]).toBeCloseTo(-16, 6);
+    expect(active[0]!.point[1]).toBeCloseTo(32, 6);
+  });
+
+  it('the hit radius is half the handle size (T15.3)', () => {
+    // Tolerance 4 means 1 world unit per CSS px; the default 14 px dot has
+    // a 7 px radius.
+    const near = makeToolHolder(vertexDocAt([0, 0, 0], [64, 64, 64]));
+    expect(near.tool.pointer(down(6, 0)).editing?.has('target')).toBe(true);
+    const far = makeToolHolder(vertexDocAt([0, 0, 0], [64, 64, 64]));
+    expect(far.tool.pointer(down(9, 0)).editing).toBeUndefined();
+    // Doubling the handle size doubles the radius.
+    const large = makeToolHolder(vertexDocAt([0, 0, 0], [64, 64, 64]), 28);
+    expect(large.tool.pointer(down(12, 0)).editing?.has('target')).toBe(true);
   });
 
   it('a rejected step keeps the last valid measure and up clears both', () => {

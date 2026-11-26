@@ -4,6 +4,7 @@ import { VIEW_ORDER, type Camera, type OrthoCamera, type ViewId } from '@render/
 import {
   dollyPerspective,
   CameraController,
+  flyKey,
   lookPerspective,
   MAX_ORTHO_ZOOM_CSS,
   movePerspective,
@@ -139,5 +140,19 @@ describe('dollyPerspective (T1.5)', () => {
     const back = dollyPerspective(camera, -64);
     expect(back.position[0]).toBeCloseTo(-moved.position[0], 6);
     expect(dollyPerspective(camera, 0)).toBe(camera);
+  });
+});
+
+describe('fly keys (T15.2)', () => {
+  it('claims W, A, S and D in either case while the pointer is locked', () => {
+    for (const key of ['w', 'a', 's', 'd', 'W', 'A', 'S', 'D']) {
+      expect(flyKey(key, true)).toBe(key.toLowerCase());
+    }
+    expect(flyKey('e', true)).toBeNull();
+  });
+
+  it('leaves every key to the shortcuts without pointer lock', () => {
+    expect(flyKey('s', false)).toBeNull();
+    expect(flyKey('w', false)).toBeNull();
   });
 });

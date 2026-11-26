@@ -84,7 +84,7 @@ Fly mode is intended to own `W`, `A`, `S` and `D`, and tool shortcuts are ignore
 ### Panels and splitters
 
 - The **right dock** has two collapsible sections: **Properties** on top — entity properties, the selection texture, per-face surface attributes and file status — and **Textures** below. A section collapses to its header with the disclosure button, and the horizontal splitter between the sections moves with the mouse or the arrow keys.
-- The **bottom panel** has three tabs: **Tree**, **Prefabs** and **Log**.
+- The **bottom panel** has three tabs: **Tree**, **Prefabs** and **Log**. It starts collapsed to its tab strip; clicking a tab or the chevron opens it. While it is collapsed — or another tab is up — the **Log** tab counts new errors, and it never opens by itself.
 - Drag the vertical or horizontal splitter to resize a panel. A focused splitter can also be moved with the arrow keys in 8-pixel steps.
 - The bottom panel can be enlarged when reading long compile logs or a deep document tree.
 - The panel sizes, the dock's splitter position, the collapsed sections, the thumbnail size, the grid size and the theme are remembered between sessions.
@@ -137,6 +137,10 @@ Choose **Recover** to load the autosave as `recovered.joole.json`, or **Discard*
 
 **File → Settings…** (`Ctrl+,`) opens the settings dialog. Every change applies immediately and is remembered between sessions; there is no OK or Cancel step. **Reset to Defaults** restores every setting at once. Escape closes the dialog.
 
+![The Colors tab of the settings dialog](images/settings-colors.png)
+
+The dialog has two tabs. **General** holds the theme, the view and grid options, the texture thumbnail size, the tool overlay, the handle size and CSG grouping. **Colors** lists every colour of the editor — the views and the interface — for the current theme: change one with its colour well, restore one row with its × button, or restore them all with **Reset colours** (which clears both themes). Colours apply at once and are remembered per theme.
+
 | Setting                    | Effect                                                                            |
 | -------------------------- | --------------------------------------------------------------------------------- |
 | **Theme**                  | Dark or light window chrome. The viewport colors stay the editing colors in both. |
@@ -146,6 +150,7 @@ Choose **Recover** to load the autosave as `recovered.joole.json`, or **Discard*
 | **Thumbnail size**         | The texture thumbnail size, the same slider as in the Textures section.           |
 | **Show tool overlay**      | Whether the tool overlay is drawn.                                                |
 | **Group CSG results**      | Whether Hollow and CSG Subtract group their fragments automatically.              |
+| **Handle size**            | The size of the vertex, edge and face dots, 7–28 px (14 px by default).           |
 
 The panel sizes, the collapsed sections and the splitter positions are remembered too, but they do not appear in the dialog.
 
@@ -155,7 +160,7 @@ The panel sizes, the collapsed sections and the splitter positions are remembere
 
 The toolbar is arranged left to right in functional groups.
 
-Picking a tool — from the toolbar, with its shortcut or from a view's context menu — shows a translucent overlay at the bottom centre of the views for a few seconds: the tool's icon, name, shortcut and a one-line description. The overlay never blocks the views, it hides while fly mode is on, and **Settings → Show tool overlay** turns it off.
+Picking a tool — from the toolbar, with its shortcut or from a view's context menu — shows a large translucent overlay at the bottom centre of the views for a few seconds: the tool's icon, name, shortcut and a one-line description. The overlay never blocks the views, it hides while fly mode is on, and **Settings → Show tool overlay** turns it off.
 
 ### File and Edit menus
 
@@ -269,6 +274,8 @@ The Select tool picks and transforms whole brushes.
 
 A drag is merged into one undo step even though intermediate positions are applied continuously. Texture lock affects move and rotate operations when enabled.
 
+**Typing a size:** with brushes selected, point at an orthographic view and press `Enter`. A field opens at the selection's centre with its current size as _width height depth_ of that view — in Front, for example, width is X, height is Z and depth is Y. Type a new size and press `Enter`: the selection is resized around its centre in one undo step. `Escape` cancels. Typed sizes are used exactly and are not snapped to the grid.
+
 View picking is brush-based. Pick point entities, groups and brush-entity containers in the **Tree** tab; their properties then appear in the right panel.
 
 ### Brush (`B`)
@@ -283,6 +290,8 @@ The Brush tool creates new convex primitives.
 4. Release to create the brush. It becomes the selection.
 
 The two dragged axes snap to the grid, and a small cross marks the snapped point under the cursor before the button is pressed. While dragging, a red box shows the brush in every orthographic view, with its in-plane extents labelled next to the edges and the full `W × D × H` size in the active view's title bar. The axis perpendicular to the view receives a depth of at least 64 units — the smallest multiple of the grid that reaches 64 — placed so that both faces lie on grid lines. Every bound of a painted brush is therefore a grid multiple at any grid size. Brush creation is not available in the 3D view.
+
+**Typing a size:** click once in Top, Front or Side without dragging. A field opens at the clicked point; type the size as _width height depth_ of that view, separated by spaces or commas — for example `128 64 32` — and press `Enter`. The brush is created centred on the clicked point (snapped to the grid) and on the same working plane as a dragged brush, with the current primitive and side count. The size is used exactly, so a size that is not a multiple of the grid puts faces off the grid. `Escape` or clicking elsewhere cancels; an invalid entry shows a message and creates nothing. The field remembers the last size as its placeholder.
 
 New brushes are created with Qoole's default texture, `e2u1/mine10_1`; choosing another texture in the browser does not change brushes that are already drawn.
 
@@ -348,7 +357,7 @@ The Vertex/edge tool edits the derived geometry of selected brushes without chan
 
 - Press `V` for vertex/edge editing. The tool restores its last vertex or edge submode.
 - Press `V` again while already in the tool to switch between vertex and edge handles. Returning from Face mode starts again in vertex mode.
-- Every handle is a fixed-size square dot: yellow when idle, red when hovered or dragged. Vertices sit on the corners, edge dots sit at the edge midpoints and face dots at the face centres. The dots show in the 3D view too, but dragging works in the orthographic views.
+- Every handle is a fixed-size square dot: yellow when idle, red when hovered or dragged. Vertices sit on the corners, edge dots sit at the edge midpoints and face dots at the face centres. The dots show in the 3D view too, but dragging works in the orthographic views. **Settings → Handle size** makes the dots larger or smaller; the area you can click grows with them.
 - Drag a handle in an orthographic view. The grabbed point snaps onto the grid, so a vertex that started off the grid joins it with the first step. A small cross marks the snapped target and the brush's current size shows in the view's title bar while you drag.
 - Connected planes are recomputed so the brush remains convex.
 
@@ -375,7 +384,7 @@ The same grid snapping, convexity checking and dashed-orange rejection feedback 
 The Texture tool selects individual faces in the 3D view.
 
 - Click a visible face to select it. Clicking the same single selected face again clears it.
-  The picked faces are highlighted: a translucent red fill in the 3D view and red outlines in the orthographic views. The ◀ ▶ row at the top of the Properties panel steps through the brush as a whole and each of its faces in turn, wrapping around at both ends: stepping onto `Face n` picks just that face, and stepping back to `Brush` targets the whole brush again. The highlight disappears with the face selection when you leave the tool.
+  The picked faces are highlighted in yellow: a translucent yellow fill in the 3D view and yellow outlines in the orthographic views, so the focused face stands out from the red selection. The ◀ ▶ row at the top of the Properties panel steps through the brush as a whole and each of its faces in turn, wrapping around at both ends: stepping onto `Face n` picks just that face, and stepping back to `Brush` targets the whole brush again. The highlight disappears with the face selection when you leave the tool.
 
 - `Shift+click` adds or removes faces in a multi-face selection.
 - `Ctrl+click` (`Cmd+click`) is the eyedropper: it copies the face's texture name to the current texture without changing the face selection.
@@ -670,20 +679,24 @@ This example builds and tests a simple room using the features described above.
 
 ### Editing commands
 
-| Shortcut       | Action                                                         |
-| -------------- | -------------------------------------------------------------- |
-| `Delete`       | delete the selection, no confirmation                          |
-| `Ctrl+Z`       | undo                                                           |
-| `Ctrl+Shift+Z` | redo                                                           |
-| `Ctrl+Y`       | redo                                                           |
-| `Ctrl+S`       | save `.joole.json` project                                     |
-| `Ctrl+X`       | cut selected brushes as `.map` text                            |
-| `Ctrl+C`       | copy selected brushes as `.map` text                           |
-| `Ctrl+V`       | paste `.map` text                                              |
-| `Ctrl+D`       | duplicate selected brushes, offset by one grid step in X and Y |
-| `[`            | halve grid size                                                |
-| `]`            | double grid size                                               |
-| `N`            | go to the next leak-path point after a leaking compile         |
+Point at a view and press `Space` to frame the selection so it fills about half of that view. The zoom and the centre change; the depth coordinate of an orthographic camera stays, so brush painting keeps its working plane. With the pointer over the 3D view, the perspective camera frames the selection from its current direction. With nothing selected, `Space` does nothing. A control focused with the keyboard keeps `Space` for itself.
+
+| Shortcut       | Action                                                                     |
+| -------------- | -------------------------------------------------------------------------- |
+| `Delete`       | delete the selection, no confirmation                                      |
+| `Enter`        | in Select, type a new size for the selection in the view under the pointer |
+| `Ctrl+Z`       | undo                                                                       |
+| `Ctrl+Shift+Z` | redo                                                                       |
+| `Ctrl+Y`       | redo                                                                       |
+| `Ctrl+S`       | save `.joole.json` project                                                 |
+| `Ctrl+X`       | cut selected brushes as `.map` text                                        |
+| `Ctrl+C`       | copy selected brushes as `.map` text                                       |
+| `Ctrl+V`       | paste `.map` text                                                          |
+| `Ctrl+D`       | duplicate selected brushes, offset by one grid step in X and Y             |
+| `[`            | halve grid size                                                            |
+| `]`            | double grid size                                                           |
+| `N`            | go to the next leak-path point after a leaking compile                     |
+| `Tab`          | in the texture tool, step to the next face (`Shift+Tab` back)              |
 
 `Ctrl+H` and `Ctrl+L` are present in the key map as reserved hide/lock commands, but they currently do not execute an editing command. Use the `H` and `L` buttons on group rows in the Tree tab.
 
@@ -758,7 +771,6 @@ Quake texture axes cannot represent every transformed orientation exactly. A war
 - Save, Undo and Redo toolbar icons are disabled placeholders; the keyboard shortcuts work.
 - `Ctrl+H` and `Ctrl+L` are reserved but currently do not invoke hide/lock commands.
 - Entity placement is intended for orthographic views; 3D placement does not project onto a ground plane.
-- `S` does not currently move the 3D fly camera backward because the key is intercepted before fly movement is recorded.
 - There is no group rename field in the current Tree UI.
 - The side-count input remains enabled for `sphere`, but the fixed octahedral primitive does not use it.
 - The File menu has no **New** command. An empty document exists when the editor starts; reloading the page is the only way to return to a truly empty document, subject to the autosave recovery prompt.

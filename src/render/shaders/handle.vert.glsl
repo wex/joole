@@ -9,6 +9,8 @@ uniform mat4 uViewProjection;
 uniform vec2 uViewportSize;
 // The backing ratio: sizes are specified in CSS pixels.
 uniform float uScale;
+// The idle dot diameter in CSS pixels, from the Handle size setting.
+uniform float uSize;
 
 flat out uint vState;
 out vec2 vCorner;
@@ -24,7 +26,7 @@ void main() {
     gl_Position = OUTSIDE;
     return;
   }
-  float size = aState == 0u ? 7.0 : 9.0;
+  float size = aState == 0u ? uSize : uSize * 9.0 / 7.0;
   vHalfSize = size * 0.5 * uScale;
   vec2 half_viewport = uViewportSize * 0.5;
   vec2 screen = c.xy / c.w * half_viewport;

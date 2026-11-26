@@ -79,13 +79,14 @@ test('saves a prefab and places it again', async ({ page }) => {
   await page.locator('[data-testid=prefab-save]').click();
   await expect(page.locator('[data-testid=prefab-pillar]')).toBeVisible();
 
-  // Insert it through the browser's insert button.
+  // Insert it through the browser's insert button. The insert reads OPFS
+  // asynchronously, so the count is polled rather than read once.
   await page.locator('[data-testid=prefab-insert-pillar]').click();
-  await page.evaluate(() => (window as unknown as JooleWindow).joole!.whenIdle());
-  const after = brushCount(
-    await page.evaluate(() => (window as unknown as JooleWindow).joole!.project()),
-  );
-  expect(after).toBe(2);
+  await expect
+    .poll(async () =>
+      brushCount(await page.evaluate(() => (window as unknown as JooleWindow).joole!.project())),
+    )
+    .toBe(2);
 
   // Undo removes the placed prefab in one step.
   await page.keyboard.press('Control+z');

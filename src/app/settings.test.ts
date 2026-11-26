@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_SETTINGS, parseSettings, updateSettings } from './settings';
 
+describe('bottomCollapsed (T15.9)', () => {
+  it('defaults to true and keeps a stored false', () => {
+    expect(parseSettings(null).bottomCollapsed).toBe(true);
+    expect(parseSettings({ bottomCollapsed: false }).bottomCollapsed).toBe(false);
+    expect(parseSettings({ bottomCollapsed: 'yes' }).bottomCollapsed).toBe(true);
+  });
+});
+
 describe('settings (T1.12)', () => {
   it('falls back to the defaults for missing and invalid values', () => {
     expect(parseSettings(null)).toEqual(DEFAULT_SETTINGS);
