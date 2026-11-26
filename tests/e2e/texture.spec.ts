@@ -134,6 +134,9 @@ test('applying a texture through the UI changes faces and renders in the views',
   // so the screenshot is a regression baseline of the editor after editing.
   await expect(page.locator('[data-testid=viewport-area]').locator('canvas')).toHaveScreenshot(
     'texture-tool-applied.png',
+    // The tool overlay (T1.16) is HTML over the canvas and vanishes after
+    // 2.5 s, so it is masked out of the baseline.
+    { mask: [page.locator('[data-testid=tool-hint]')] },
   );
 });
 
