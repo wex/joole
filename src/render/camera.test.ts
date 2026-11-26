@@ -159,3 +159,26 @@ describe('framing', () => {
     }
   });
 });
+
+describe('Space framing (T15.5)', () => {
+  it('frames a box at half the view with frameOrtho margin 0.5', () => {
+    const camera = frameOrtho('xy', { min: [0, 0, -8], max: [64, 64, 8] }, 256, 128, 0.5);
+    expect(camera.center.slice(0, 2)).toEqual([32, 32]);
+    // Height limits: the 128-unit margin-adjusted extent in 128 px is zoom 1,
+    // and the 64-unit box then covers exactly half of the view height.
+    expect(camera.zoom).toBeCloseTo(1, 6);
+    expect((64 * camera.zoom) / 128).toBeCloseTo(0.5, 6);
+  });
+
+  it('the perspective distance is inverse to the fill', () => {
+    const box = {
+      min: [0, 0, 0] as [number, number, number],
+      max: [64, 64, 64] as [number, number, number],
+    };
+    const near = framePerspective(box, 1, 45, -30, 60, 1);
+    const far = framePerspective(box, 1, 45, -30, 60, 0.5);
+    const dist = (c: { position: readonly number[] }) =>
+      Math.hypot(c.position[0]! - 32, c.position[1]! - 32, c.position[2]! - 32);
+    expect(dist(far)).toBeCloseTo(dist(near) * 2, 3);
+  });
+});

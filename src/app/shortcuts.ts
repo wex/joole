@@ -23,7 +23,8 @@ export type ShortcutAction =
   | 'toggle-group-pick'
   | 'group'
   | 'ungroup'
-  | 'settings';
+  | 'settings'
+  | 'frame-selection';
 
 export interface ShortcutInput {
   readonly key: string;
@@ -86,6 +87,8 @@ export function shortcutAction(input: ShortcutInput): ShortcutAction | null {
       return 'next-leak';
     case 'g':
       return 'toggle-group-pick';
+    case ' ':
+      return 'frame-selection';
     default:
       return null;
   }

@@ -205,7 +205,7 @@ None of the WPs changes the `.map` or `.joole.json` format. The settings gain ne
 
 **Done when:** both flows work in all three 2D views with the right orientation, each in one undo step, and invalid input never changes the document.
 
-### [ ] T15.5 Space frames the selection in the hovered view (#30)
+### [x] T15.5 Space frames the selection in the hovered view (#30)
 
 **Goal:** Space centres the hovered view on the selection, with the selection filling about half of the view.
 

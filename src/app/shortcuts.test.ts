@@ -9,6 +9,14 @@ const key = (k: string, extra: Partial<Parameters<typeof shortcutAction>[0]> = {
   ...extra,
 });
 
+it('maps Space to frame-selection and not with modifiers (T15.5)', () => {
+  expect(shortcutAction({ key: ' ', ctrl: false, shift: false, alt: false })).toBe(
+    'frame-selection',
+  );
+  expect(shortcutAction({ key: ' ', ctrl: true, shift: false, alt: false })).toBeNull();
+  expect(shortcutAction({ key: ' ', ctrl: false, shift: true, alt: false })).toBeNull();
+});
+
 describe('shortcutAction', () => {
   it('maps tool and grid keys', () => {
     expect(shortcutAction(key('s'))).toBe('tool-select');

@@ -880,6 +880,12 @@ export class EditorApp {
     return true;
   }
 
+  /** The bounding box of the selected brushes, or null when nothing is selected (T15.5). */
+  selectionBounds(): { min: Vec3; max: Vec3 } | null {
+    const box = selectionBounds(this.document, this.selection);
+    return box ? { min: [...box.min] as Vec3, max: [...box.max] as Vec3 } : null;
+  }
+
   /** The idle handle dot diameter in CSS px; the hit radius follows it (T15.3). */
   setHandleSize(value: number): void {
     this.handleSizePx = value;

@@ -2,7 +2,7 @@ import { createSignal, For, onSettled, Show, untrack } from 'solid-js';
 import type { EditorApp, LogEntry, ToolOutput, ToolPointerEvent } from '@app/index';
 import { shortcutAction } from '@app/index';
 import type { OrthoCamera, PerspectiveCamera, Renderer, ViewId, ViewRect } from '@render/index';
-import { orthoBasis, VIEW_AXES, VIEW_ORDER } from '@render/index';
+import { frameOrtho, framePerspective, orthoBasis, VIEW_AXES, VIEW_ORDER } from '@render/index';
 import { dot } from '@core/geom/index';
 import type { Vec3 } from '@core/types/index';
 import {
@@ -975,6 +975,55 @@ export function EditorShell(props: EditorShellProps) {
         // Ctrl+G is the browser's find-next, so it must not fall through.
         event.preventDefault();
         app.groupSelection();
+        return;
+      }
+      // Space frames the selection in the hovered view (T15.5): it fills
+      // about half of the view.
+      if (
+        action === 'frame-selection' &&
+        !pointerLocked &&
+        viewShortcutAllowed(event.target, viewport)
+      ) {
+        const box = app.selectionBounds();
+        if (box) {
+          event.preventDefault();
+          const view = hoveredView ?? 'top';
+          if (view === '3d') {
+            const camera = perspectiveCamera();
+            const rect = renderer.viewRects().get('3d');
+            if (camera && rect) {
+              const framed = framePerspective(
+                box,
+                rect.width / Math.max(1, rect.height),
+                camera.yaw,
+                camera.pitch,
+                camera.fovY,
+                0.5,
+              );
+              controller.setCamera('3d', framed);
+            }
+          } else {
+            const rect = renderer.viewRects().get(view);
+            if (rect) {
+              const ratio = renderer.backingRatio();
+              const framed = frameOrtho(
+                VIEW_AXES[view],
+                box,
+                rect.width / ratio,
+                rect.height / ratio,
+                0.5,
+              );
+              // The depth coordinate stays, so the working plane for new
+              // brushes does not jump.
+              const camera = orthoCamera(view);
+              const depth = VIEW_AXES[view] === 'xy' ? 2 : VIEW_AXES[view] === 'xz' ? 1 : 0;
+              if (camera) framed.center[depth] = camera.center[depth];
+              controller.setCamera(view, framed);
+            }
+          }
+          return;
+        }
+        event.preventDefault();
         return;
       }
       if (action === 'ungroup') {
