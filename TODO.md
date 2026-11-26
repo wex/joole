@@ -27,7 +27,7 @@ List of items to implement or fix:
   - Hollow and CSG tools should create groups automatically
   - We need a persisent options/settings modal that can be opened from the menu bar
   - When selecting a tool from a toolbar (or using a hotkey), the app should show a transparent overlay with the shortcut/keybind, icon and tool name & description for a few seconds - this needs to be possible to disable in settings
-  
+
 - Phase 2: Future features
   - User should be able to create, save and load projects
   - User should be able to create custom arrangements of tools/windows in app and save them
