@@ -72,6 +72,7 @@ Press the key again to restore the four-view grid. The view buttons are repeated
 | ------------------------------------ | -------------------------------------------------------------------- |
 | Middle-drag in Top, Front or Side    | pan the orthographic view                                            |
 | Mouse wheel in Top, Front or Side    | zoom around the cursor; one notch multiplies or divides zoom by 1.32 |
+| Mouse wheel in 3D                    | move forward or backward, one notch is 64 units                      |
 | Middle-click in 3D                   | toggle pointer lock for mouse look                                   |
 | Move mouse in pointer-lock mode      | look around                                                          |
 | `W` / `A` / `D` in pointer-lock mode | move forward, left and right at 256 units/s                          |
@@ -690,6 +691,7 @@ This example builds and tests a simple room using the features described above.
 | Left-drag selection corner | Select tool, orthographic | scale selection               |
 | Middle-drag                | orthographic              | pan                           |
 | Mouse wheel                | orthographic              | zoom around cursor            |
+| Mouse wheel                | 3D                        | move forward/backward         |
 | Middle-click               | 3D                        | toggle pointer lock           |
 | `W/A/D`                    | in pointer-lock mode      | move in 3D                    |
 | Right-click                | orthographic              | view context menu             |

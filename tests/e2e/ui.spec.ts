@@ -177,6 +177,13 @@ test('2D pan and zoom and 3D fly change the rendered views', async ({ page }) =>
     framesBeforeRightDrag,
   );
 
+  // The wheel moves the 3D camera forward and backward (T1.5).
+  await page.mouse.move(fly.x, fly.y);
+  await page.mouse.wheel(0, -240);
+  await page.evaluate(() => (window as unknown as JooleWindow).joole!.whenIdle());
+  const dollied = await canvasScreenshot(page);
+  expect(dollied.equals(zoomed)).toBe(false);
+
   // Mouse-look and WASD work in pointer-lock mode (middle-click).
   await page.mouse.move(fly.x, fly.y);
   await page.mouse.down({ button: 'middle' });

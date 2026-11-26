@@ -264,7 +264,7 @@ Each milestone can ship as its own minor release. Tag the releases as the owner 
 - **Depends on:** –
 - **Done when:** the E2E test passes in Chromium, Firefox and WebKit.
 
-### [ ] T1.5 The mouse wheel moves the 3D camera (#7)
+### [x] T1.5 The mouse wheel moves the 3D camera (#7)
 
 - **Goal:** the wheel over the 3D view moves the camera forward and back along its view direction, whether or not pointer lock is on.
 - **Design:**

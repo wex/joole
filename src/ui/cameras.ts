@@ -169,6 +169,19 @@ export function lookPerspective(
   };
 }
 
+/**
+ * The mouse wheel moves the fly camera along its forward axis, in steps
+ * that follow the zoom step of the orthographic views. Positive distance
+ * moves forward.
+ */
+export function dollyPerspective(camera: PerspectiveCamera, distance: number): PerspectiveCamera {
+  if (distance === 0) {
+    return camera;
+  }
+  const forward = forwardFromAngles(camera.yaw, camera.pitch);
+  return { ...camera, position: ma(camera.position, forward, distance) };
+}
+
 /** Fly movement for one frame, with diagonal movement normalised. */
 export function movePerspective(
   camera: PerspectiveCamera,

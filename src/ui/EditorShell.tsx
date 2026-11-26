@@ -5,6 +5,7 @@ import type { OrthoCamera, PerspectiveCamera, Renderer, ViewId, ViewRect } from 
 import { VIEW_ORDER } from '@render/index';
 import {
   CameraController,
+  dollyPerspective,
   lookPerspective,
   movePerspective,
   orthoCoordinates,
@@ -526,7 +527,18 @@ export function EditorShell(props: EditorShellProps) {
 
     const wheel = (event: WheelEvent) => {
       const hit = hitView(event.clientX, event.clientY);
-      if (!hit || hit.view === '3d') {
+      if (!hit) {
+        return;
+      }
+      if (hit.view === '3d') {
+        const camera = perspectiveCamera();
+        if (!camera) {
+          return;
+        }
+        event.preventDefault();
+        // One wheel notch is 64 units, scaled by the same step as the 2D zoom.
+        const distance = (-event.deltaY / 120) * 64;
+        controller.setCamera('3d', dollyPerspective(camera, distance));
         return;
       }
       const camera = orthoCamera(hit.view);
