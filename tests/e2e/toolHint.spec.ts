@@ -14,6 +14,14 @@ test('the tool overlay appears on tool changes and hides after the timeout (T1.1
   await expect(hint).toContainText('Clip');
   await expect(hint).toContainText('C');
 
+  // The chip is twice its original size (T15.8): the 26 px name line plus
+  // padding, and it stays inside the views.
+  const box = (await hint.boundingBox())!;
+  expect(box.height).toBeGreaterThanOrEqual(60);
+  const area = (await page.locator('[data-testid=viewport-area]').boundingBox())!;
+  expect(box.x).toBeGreaterThanOrEqual(area.x);
+  expect(box.x + box.width).toBeLessThanOrEqual(area.x + area.width);
+
   // It disappears after 2.5 s — no fade, just gone.
   await page.clock.fastForward(2600);
   await expect(hint).toHaveCount(0);

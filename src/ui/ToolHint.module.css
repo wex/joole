@@ -6,15 +6,19 @@
   z-index: 20;
   transform: translateX(-50%);
   pointer-events: none;
+  /* The chip is twice its original size (T15.8); every dimension below is
+     the base size times this factor. */
+  --hint-scale: 2;
 }
 
 .chip {
   display: flex;
   align-items: center;
-  gap: var(--space-sm);
-  padding: var(--space-xs) var(--space-md);
+  gap: calc(var(--space-sm) * var(--hint-scale));
+  max-width: calc(100vw - 2 * var(--space-lg));
+  padding: calc(var(--space-xs) * var(--hint-scale)) calc(var(--space-md) * var(--hint-scale));
   border: 1px solid var(--line);
-  border-radius: var(--radius-md);
+  border-radius: calc(var(--radius-md) * var(--hint-scale));
   background: var(--surface-2);
   box-shadow: var(--shadow-float);
   color: var(--ink);
@@ -23,25 +27,34 @@
 
 .icon {
   display: flex;
-  width: 16px;
-  height: 16px;
+  width: calc(16px * var(--hint-scale));
+  height: calc(16px * var(--hint-scale));
+  flex: none;
+}
+
+/* More specific than the icon component's own 16 px rule. */
+.chip .icon svg {
+  width: 100%;
+  height: 100%;
 }
 
 .name {
-  font-size: 13px;
+  flex: none;
+  font-size: calc(13px * var(--hint-scale));
   font-weight: 600;
 }
 
 .keycap {
-  padding: 0 var(--space-xs);
+  flex: none;
+  padding: 0 calc(var(--space-xs) * var(--hint-scale));
   border: 1px solid var(--line-strong);
-  border-radius: var(--radius-sm);
+  border-radius: calc(var(--radius-sm) * var(--hint-scale));
   background: var(--surface-1);
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: calc(11px * var(--hint-scale));
 }
 
 .description {
   color: var(--ink-muted);
-  font-size: 12px;
+  font-size: calc(12px * var(--hint-scale));
 }

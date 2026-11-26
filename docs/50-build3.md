@@ -284,7 +284,7 @@ None of the WPs changes the `.map` or `.joole.json` format. The settings gain ne
 
 **Done when:** a focused face is yellow in all four views while its brush stays red.
 
-### [ ] T15.8 Tool overlay at 200% size (#33) ⇄
+### [x] T15.8 Tool overlay at 200% size (#33) ⇄
 
 **Goal:** the tool overlay is easy to read at a glance.
 
