@@ -98,6 +98,7 @@ const LINE_UNIFORMS = [
   'uInvalidColor',
   'uLeakColor',
   'uHandleColor',
+  'uFaceColor',
 ] as const;
 const HANDLE_UNIFORMS = [
   'uViewProjection',
@@ -564,6 +565,7 @@ export class Renderer {
     gl.uniform4fv(u.uInvalidColor, this.colors['vp-invalid']);
     gl.uniform4fv(u.uHandleColor, this.colors['vp-handle']);
     gl.uniform4fv(u.uLeakColor, this.colors['vp-leak']);
+    gl.uniform4fv(u.uFaceColor, this.colors['vp-face']);
     gl.bindVertexArray(this.cache.lines.vao);
     for (const pass of [0, 1]) {
       gl.uniform1i(u.uPass, pass);
@@ -613,19 +615,20 @@ export class Renderer {
         this.drawBatch(batch, visible);
       }
     }
-    // The texture tool's picked faces: a translucent vp-select fill over
+    // The texture tool's picked faces: a translucent vp-face fill over
     // the faces themselves, depth-tested but not writing depth.
     const highlightCount = this.cache.faceHighlight.drawCount;
     if (highlightCount > 0) {
-      const select = this.colors['vp-select'];
+      const face = this.colors['vp-face'];
       gl.uniform1i(u.uTextured, 0);
       gl.uniform1i(u.uShaded, 0);
-      gl.uniform4f(u.uColor, select[0], select[1], select[2], 0.35);
-      gl.enable(gl.POLYGON_OFFSET_FILL);
-      gl.polygonOffset(-1, -1);
+      gl.uniform4f(u.uColor, face[0], face[1], face[2], 0.35);
+      // The highlight is an overlay: double-sided, because brush windings
+      // are clockwise viewed from outside and the fill must show from the
+      // side the face was picked on (T15.7).
+      gl.disable(gl.CULL_FACE);
       gl.bindVertexArray(this.cache.faceHighlight.vao);
       gl.drawArrays(gl.TRIANGLES, 0, highlightCount);
-      gl.disable(gl.POLYGON_OFFSET_FILL);
     }
     gl.depthMask(true);
     gl.disable(gl.BLEND);

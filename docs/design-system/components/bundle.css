@@ -135,6 +135,10 @@ body {
 .vp-handle {
   fill: var(--vp-handle);
 }
+.vp-face {
+  stroke: var(--vp-face);
+  fill: none;
+}
 .vp-leak {
   stroke: var(--vp-leak);
   stroke-width: 2;

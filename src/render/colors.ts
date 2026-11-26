@@ -15,6 +15,7 @@ export const VIEWPORT_COLOR_TOKENS = [
   'vp-entity',
   'vp-target',
   'vp-handle',
+  'vp-face',
   'vp-invalid',
   'vp-leak',
   'vp-sky',

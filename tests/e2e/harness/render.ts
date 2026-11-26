@@ -67,6 +67,22 @@ if (select) {
   renderer.setSelection(select.split(','));
 }
 
+const faceHighlight = params.get('faces');
+if (faceHighlight) {
+  // The first brush's first derived polygon: real geometry, visible in every view.
+  const { analyzeBrush } = await import('@core/geom/index');
+  for (const node of doc.nodes.values()) {
+    if (node.kind === 'brush') {
+      const analysis = analyzeBrush(node);
+      const polygon = analysis.polygons[0] ?? [];
+      if (polygon.length >= 3) {
+        renderer.setFaceHighlight([polygon]);
+      }
+      break;
+    }
+  }
+}
+
 const bounds = renderer.bounds();
 // The room is closed, so the 3D view looks in from a corner inside it;
 // other maps are framed from outside.

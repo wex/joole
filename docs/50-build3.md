@@ -260,7 +260,7 @@ None of the WPs changes the `.map` or `.joole.json` format. The settings gain ne
 
 **Done when:** Tab and Shift+Tab step through the faces in the views and leave panel focus order alone.
 
-### [ ] T15.7 The focused face is outlined in yellow (#32)
+### [x] T15.7 The focused face is outlined in yellow (#32)
 
 **Goal:** in the texture tool, the focused face stands out from its red selected brush.
 
