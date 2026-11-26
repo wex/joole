@@ -124,7 +124,15 @@ describe('CameraController', () => {
 
 describe('dollyPerspective (T1.5)', () => {
   it('moves along the forward axis, positive forward', () => {
-    const camera = { position: [0, 0, 0] as Vec3, yaw: 0, pitch: 0, fovY: 90 };
+    const camera = {
+      kind: 'perspective' as const,
+      position: [0, 0, 0] as Vec3,
+      yaw: 0,
+      pitch: 0,
+      fovY: 90,
+      near: 1,
+      far: 65536,
+    };
     const moved = dollyPerspective(camera, 64);
     const d = Math.hypot(moved.position[0], moved.position[1], moved.position[2]);
     expect(d).toBeCloseTo(64, 6);
