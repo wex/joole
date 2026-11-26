@@ -1,4 +1,4 @@
-import { createSignal, For, onSettled, Show, untrack } from 'solid-js';
+import { createSignal, For, onSettled, Show, untrack, createEffect } from 'solid-js';
 import type { EditorApp, LogEntry, ToolOutput, ToolPointerEvent } from '@app/index';
 import { shortcutAction } from '@app/index';
 import type { OrthoCamera, PerspectiveCamera, Renderer, ViewId, ViewRect } from '@render/index';
@@ -22,6 +22,7 @@ import { Icon } from './Icon';
 import type { IconName } from './icons';
 import { LogPanel } from './LogPanel';
 import { MeasureOverlay, type MeasureBox } from './MeasureOverlay';
+import { countNewErrors, newestLogId } from '@app/logErrors';
 import { PanelTabs, type BottomTab } from './PanelTabs';
 import { TreeView } from './TreeView';
 import { PrefabBrowser } from './PrefabBrowser';
@@ -62,6 +63,7 @@ export interface EditorShellProps {
     readonly showToolOverlay: boolean;
     readonly groupCsgResults: boolean;
     readonly handleSize: number;
+    readonly bottomCollapsed: boolean;
   };
   readonly onSettingsChange?: (partial: Record<string, unknown>) => void;
 }
@@ -155,9 +157,32 @@ export function EditorShell(props: EditorShellProps) {
   const [maximizedView, setMaximizedView] = createSignal<ViewId | null>(null);
   const [compileMenuOpen, setCompileMenuOpen] = createSignal(false);
   const [bottomTab, setBottomTab] = createSignal<BottomTab>('tree');
+  const [bottomCollapsed, setBottomCollapsed] = createSignal(
+    initialSettings?.bottomCollapsed !== false,
+  );
+  // The newest log entry the Log tab has shown (T15.9): errors after it are
+  // counted on the tab while the panel is collapsed or another tab is up.
+  const [logSeenId, setLogSeenId] = createSignal(0);
   const [theme, setTheme] = createSignal<'dark' | 'light'>(initialSettings?.theme ?? 'dark');
   const [coordinates, setCoordinates] = createSignal(coordinateDefaults(false));
   const [flyActive, setFlyActive] = createSignal(false);
+  createEffect(
+    () => [bottomCollapsed(), bottomHeight()] as const,
+    () => {
+      centerElement?.style.setProperty(
+        '--bottom-panel-height',
+        bottomCollapsed() ? 'calc(var(--size-titlebar) + 1px)' : `${bottomHeight()}px`,
+      );
+    },
+  );
+  createEffect(
+    () => [bottomCollapsed(), bottomTab(), entries()] as const,
+    () => {
+      if (!bottomCollapsed() && bottomTab() === 'log') {
+        setLogSeenId(newestLogId(entries()));
+      }
+    },
+  );
   const [rightWidth, setRightWidth] = createSignal(
     initialSettings?.rightWidth ?? initialRightWidth,
   );
@@ -212,6 +237,9 @@ export function EditorShell(props: EditorShellProps) {
     if (typeof partial['rightWidth'] === 'number') {
       setRightWidth(partial['rightWidth'] as number);
       mainElement?.style.setProperty('--right-panel-width', `${partial['rightWidth']}px`);
+    }
+    if (typeof partial['bottomCollapsed'] === 'boolean') {
+      setBottomCollapsed(partial['bottomCollapsed'] as boolean);
     }
     if (typeof partial['bottomHeight'] === 'number') {
       setBottomHeight(partial['bottomHeight'] as number);
@@ -1509,31 +1537,55 @@ export function EditorShell(props: EditorShellProps) {
               )}
             </Show>
           </div>
-          <div
-            class={[styles.splitter, styles.horizontalSplitter]}
-            role="separator"
-            aria-orientation="horizontal"
-            aria-label="Resize bottom panel"
-            aria-valuenow={bottomHeight()}
-            tabindex="0"
-            onPointerDown={(event) => beginSplitterDrag(event, 'horizontal')}
-            onKeyDown={(event) => splitterKey(event, 'horizontal')}
-          />
-          <section class={styles.bottomPanel} aria-label="Textures and log">
+          <Show when={!bottomCollapsed()}>
+            <div
+              class={[styles.splitter, styles.horizontalSplitter]}
+              role="separator"
+              aria-orientation="horizontal"
+              aria-label="Resize bottom panel"
+              aria-valuenow={bottomHeight()}
+              tabindex="0"
+              onPointerDown={(event) => beginSplitterDrag(event, 'horizontal')}
+              onKeyDown={(event) => splitterKey(event, 'horizontal')}
+            />
+          </Show>
+          <section
+            class={[styles.bottomPanel, bottomCollapsed() ? styles.collapsed : ''].join(' ')}
+            aria-label="Textures and log"
+          >
             <PanelTabs
               selected={bottomTab()}
               maximized={maximizedView()}
-              onSelect={setBottomTab}
+              collapsed={bottomCollapsed()}
+              newErrors={
+                bottomCollapsed() || bottomTab() !== 'log'
+                  ? countNewErrors(entries(), logSeenId())
+                  : 0
+              }
+              onSelect={(tab) => {
+                setBottomTab(tab);
+                if (bottomCollapsed()) {
+                  setBottomCollapsed(false);
+                  reportSetting('bottomCollapsed', false);
+                }
+              }}
               onView={toggleMaximized}
+              onToggleCollapsed={() => {
+                const next = !bottomCollapsed();
+                setBottomCollapsed(next);
+                reportSetting('bottomCollapsed', next);
+              }}
             />
-            <Show when={bottomTab() === 'tree'}>
-              <TreeView app={app} version={panelVersion} />
-            </Show>
-            <Show when={bottomTab() === 'prefabs'}>
-              <PrefabBrowser app={app} version={panelVersion} />
-            </Show>
-            <Show when={bottomTab() === 'log'}>
-              <LogPanel entries={entries()} />
+            <Show when={!bottomCollapsed()}>
+              <Show when={bottomTab() === 'tree'}>
+                <TreeView app={app} version={panelVersion} />
+              </Show>
+              <Show when={bottomTab() === 'prefabs'}>
+                <PrefabBrowser app={app} version={panelVersion} />
+              </Show>
+              <Show when={bottomTab() === 'log'}>
+                <LogPanel entries={entries()} />
+              </Show>
             </Show>
           </section>
         </div>

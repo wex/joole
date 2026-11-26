@@ -324,6 +324,7 @@ mountEditorShell(
       showToolOverlay: settings.showToolOverlay,
       groupCsgResults: settings.groupCsgResults,
       handleSize: settings.handleSize,
+      bottomCollapsed: settings.bottomCollapsed,
     },
     onSettingsChange: queueSettingsSave,
   },

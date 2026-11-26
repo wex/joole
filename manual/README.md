@@ -84,7 +84,7 @@ Fly mode is intended to own `W`, `A`, `S` and `D`, and tool shortcuts are ignore
 ### Panels and splitters
 
 - The **right dock** has two collapsible sections: **Properties** on top — entity properties, the selection texture, per-face surface attributes and file status — and **Textures** below. A section collapses to its header with the disclosure button, and the horizontal splitter between the sections moves with the mouse or the arrow keys.
-- The **bottom panel** has three tabs: **Tree**, **Prefabs** and **Log**.
+- The **bottom panel** has three tabs: **Tree**, **Prefabs** and **Log**. It starts collapsed to its tab strip; clicking a tab or the chevron opens it. While it is collapsed — or another tab is up — the **Log** tab counts new errors, and it never opens by itself.
 - Drag the vertical or horizontal splitter to resize a panel. A focused splitter can also be moved with the arrow keys in 8-pixel steps.
 - The bottom panel can be enlarged when reading long compile logs or a deep document tree.
 - The panel sizes, the dock's splitter position, the collapsed sections, the thumbnail size, the grid size and the theme are remembered between sessions.

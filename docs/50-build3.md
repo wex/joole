@@ -310,7 +310,7 @@ None of the WPs changes the `.map` or `.joole.json` format. The settings gain ne
 
 **Done when:** the overlay is twice as large and fits the views at the smallest supported window.
 
-### [ ] T15.9 Collapsible bottom panel, collapsed by default (#34) ⇄
+### [x] T15.9 Collapsible bottom panel, collapsed by default (#34) ⇄
 
 **Goal:** the bottom panel (Tree, Prefabs, Log) gives its space to the views until it is needed.
 

@@ -29,6 +29,8 @@ export interface EditorSettings {
   readonly groupCsgResults: boolean;
   /** The idle vertex/edge/face handle dot diameter in CSS pixels (T15.3). */
   readonly handleSize: number;
+  /** The bottom panel shows only its tab strip (T15.9). */
+  readonly bottomCollapsed: boolean;
   readonly [key: string]: unknown;
 }
 
@@ -46,6 +48,7 @@ export const DEFAULT_SETTINGS: EditorSettings = {
   showToolOverlay: true,
   groupCsgResults: true,
   handleSize: 14,
+  bottomCollapsed: true,
 };
 
 function num(min: number, max: number) {
@@ -59,6 +62,7 @@ const checks: Record<string, (value: unknown) => boolean> = {
   bottomHeight: num(96, 640),
   dockSplit: num(0.15, 0.85),
   propertiesCollapsed: (value) => typeof value === 'boolean',
+  bottomCollapsed: (value) => typeof value === 'boolean',
   texturesCollapsed: (value) => typeof value === 'boolean',
   thumbSize: (value) => typeof value === 'number' && value >= 32 && value <= 128,
   theme: (value) => value === 'dark' || value === 'light',

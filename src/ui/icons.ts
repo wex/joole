@@ -1,3 +1,4 @@
+import alertTriangleIcon from 'lucide-static/icons/alert-triangle.svg?raw';
 import boxIcon from 'lucide-static/icons/box.svg?raw';
 import brushIcon from 'lucide-static/icons/brush.svg?raw';
 import chevronDownIcon from 'lucide-static/icons/chevron-down.svg?raw';
@@ -32,6 +33,7 @@ function normalize(svg: string): string {
 }
 
 export const icons = {
+  alertTriangle: normalize(alertTriangleIcon),
   box: normalize(boxIcon),
   brush: normalize(brushIcon),
   chevronDown: normalize(chevronDownIcon),
