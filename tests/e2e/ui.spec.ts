@@ -469,3 +469,17 @@ test('Space frames the selection in the hovered view (T15.5)', async ({ page }) 
   // The depth coordinate does not jump.
   expect(after.center[2]).toBeCloseTo(before.center[2], 5);
 });
+
+test('the top bar shows the application version before the theme toggle', async ({ page }) => {
+  await openEditor(page);
+  const version = page.locator('[data-testid=app-version]');
+  await expect(version).toHaveText(/^v\d+\.\d+\.\d+$/);
+  // It sits immediately before the theme toggle.
+  const order = await page.evaluate(() => {
+    const v = document.querySelector('[data-testid=app-version]');
+    const t = document.querySelector('[aria-label*="Theme"]');
+    if (!v || !t) return 'missing';
+    return v.compareDocumentPosition(t) & Node.DOCUMENT_POSITION_FOLLOWING ? 'before' : 'after';
+  });
+  expect(order).toBe('before');
+});

@@ -10,7 +10,7 @@ Item numbers continue the phase-1/1.5 sequence (#25–#35 were phase 1.5).
 
 ## Work packages
 
-### T16.1 – Version and build number in the top bar (#36)
+### T16.1 – Version and build number in the top bar (#36) — DONE
 
 **TODO item:** _Add a version & build number to the app. It should be displayed in the
 top bar, before the dark/light mode toggle._

@@ -67,3 +67,6 @@ declare module 'virtual:pwa-register' {
   /** Registers the service worker; the return reloads the page for an update. */
   export function registerSW(options?: RegisterSWOptions): (reloadPage?: boolean) => Promise<void>;
 }
+
+declare const __JOOLE_VERSION__: string;
+declare const __JOOLE_BUILD__: string;

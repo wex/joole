@@ -158,7 +158,7 @@ The panel sizes, the collapsed sections and the splitter positions are remembere
 
 ![The complete toolbar](images/toolbar.png)
 
-The toolbar is arranged left to right in functional groups.
+The toolbar is arranged left to right in functional groups. At the right end, before the theme toggle, the application version is shown in muted text — hovering it reveals the exact build.
 
 Picking a tool — from the toolbar, with its shortcut or from a view's context menu — shows a large translucent overlay at the bottom centre of the views for a few seconds: the tool's icon, name, shortcut and a one-line description. The overlay never blocks the views, it hides while fly mode is on, and **Settings → Show tool overlay** turns it off.
 

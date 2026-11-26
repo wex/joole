@@ -1,6 +1,7 @@
 import solidPlugin from '@solidjs/vite-plugin';
 import { VitePWA } from 'vite-plugin-pwa';
 import { fileURLToPath, URL } from 'node:url';
+import { readFileSync } from 'node:fs';
 import { defineConfig } from 'vite';
 
 const crossOriginHeaders = {
@@ -20,7 +21,25 @@ const contentSecurityPolicy = [
   "frame-ancestors 'none'",
 ].join('; ');
 
+import { execSync } from 'node:child_process';
+
+const buildHash = (() => {
+  try {
+    return execSync('git rev-parse --short HEAD', { stdio: ['ignore', 'pipe', 'ignore'] })
+      .toString()
+      .trim();
+  } catch {
+    return 'dev';
+  }
+})();
+const appVersion = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8'))
+  .version as string;
+
 export default defineConfig({
+  define: {
+    __JOOLE_VERSION__: JSON.stringify(appVersion),
+    __JOOLE_BUILD__: JSON.stringify(buildHash),
+  },
   plugins: [
     solidPlugin(),
     VitePWA({
