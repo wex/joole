@@ -7,7 +7,10 @@ const modes = ['select', 'brush', 'entity', 'clip', 'vertex', 'face', 'texture']
 describe('tool info (T1.16)', () => {
   it('every editor tool mode has a table entry', () => {
     for (const mode of modes) {
-      expect(TOOL_INFO.some((info) => info.id === mode), mode).toBe(true);
+      expect(
+        TOOL_INFO.some((info) => info.id === mode),
+        mode,
+      ).toBe(true);
     }
   });
 

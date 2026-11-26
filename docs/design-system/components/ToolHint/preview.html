@@ -1,0 +1,61 @@
+<!doctype html>
+<html data-theme="dark">
+  <head>
+    <meta charset="utf-8" />
+    <title>ToolHint preview</title>
+    <link rel="stylesheet" href="../../tokens.css" />
+    <style>
+      body {
+        margin: 0;
+        background: var(--surface-0);
+        font-family: sans-serif;
+      }
+      .holder {
+        position: absolute;
+        bottom: var(--space-lg);
+        left: 50%;
+        transform: translateX(-50%);
+        pointer-events: none;
+      }
+      .q2-toolhint {
+        display: flex;
+        align-items: center;
+        gap: var(--space-sm);
+        padding: var(--space-xs) var(--space-md);
+        border: 1px solid var(--line);
+        border-radius: var(--radius-md);
+        background: var(--surface-2);
+        box-shadow: var(--shadow-float);
+        color: var(--ink);
+        opacity: 0.85;
+      }
+      .q2-toolhint .name {
+        font-size: 13px;
+        font-weight: 600;
+      }
+      .q2-toolhint kbd {
+        padding: 0 var(--space-xs);
+        border: 1px solid var(--line-strong);
+        border-radius: var(--radius-sm);
+        background: var(--surface-1);
+        font-family: monospace;
+        font-size: 11px;
+      }
+      .q2-toolhint .description {
+        color: var(--ink-muted);
+        font-size: 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="holder">
+      <div class="q2-toolhint">
+        <span class="name">Clip</span>
+        <kbd>C</kbd>
+        <span class="description"
+          >Click two points in a 2D view. Tab picks the side to keep, Enter clips.</span
+        >
+      </div>
+    </div>
+  </body>
+</html>

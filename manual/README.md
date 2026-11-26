@@ -155,6 +155,8 @@ The panel sizes, the collapsed sections and the splitter positions are remembere
 
 The toolbar is arranged left to right in functional groups.
 
+Picking a tool — from the toolbar, with its shortcut or from a view's context menu — shows a translucent overlay at the bottom centre of the views for a few seconds: the tool's icon, name, shortcut and a one-line description. The overlay never blocks the views, it hides while fly mode is on, and **Settings → Show tool overlay** turns it off.
+
 ### File and Edit menus
 
 The **File** menu is documented in [Files, saving and autosave](#files-saving-and-autosave).
@@ -754,7 +756,6 @@ Quake texture axes cannot represent every transformed orientation exactly. A war
 ### Current UI gaps to be aware of
 
 - Save, Undo and Redo toolbar icons are disabled placeholders; the keyboard shortcuts work.
-- The Entity and Texture toolbar icons do not currently activate their tools when clicked; use `E` and `T`.
 - `Ctrl+H` and `Ctrl+L` are reserved but currently do not invoke hide/lock commands.
 - Entity placement is intended for orthographic views; 3D placement does not project onto a ground plane.
 - `S` does not currently move the 3D fly camera backward because the key is intercepted before fly movement is recorded.

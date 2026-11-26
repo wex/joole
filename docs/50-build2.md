@@ -668,7 +668,7 @@ These three items are one WP because they rebuild the same panel. Splitting them
 - **Depends on:** T1.12 (the settings model)
 - **Done when:** every setting in the list persists across reloads in Chromium, Firefox and WebKit.
 
-### [ ] T1.16 Tool overlay (#24)
+### [x] T1.16 Tool overlay (#24)
 
 - **Goal:** when a tool is chosen from the toolbar or with its shortcut, a translucent overlay shows the tool's icon, name, shortcut and a one-line description for a few seconds. Settings can turn it off.
 - **Design:**

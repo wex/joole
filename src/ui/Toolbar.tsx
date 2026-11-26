@@ -53,7 +53,12 @@ function tool(
 
 // The titles come from the one tool-metadata table (T1.16).
 const tools = [
-  tool('select', `${toolInfo('select').name} (${toolInfo('select').shortcut})`, 'mousePointer', true),
+  tool(
+    'select',
+    `${toolInfo('select').name} (${toolInfo('select').shortcut})`,
+    'mousePointer',
+    true,
+  ),
   tool('brush', `${toolInfo('brush').name} (${toolInfo('brush').shortcut})`, 'box', true),
   tool('entity', `${toolInfo('entity').name} (${toolInfo('entity').shortcut})`, 'circleUser', true),
   tool('clip', `${toolInfo('clip').name} (${toolInfo('clip').shortcut})`, 'clip', true),
