@@ -239,3 +239,18 @@ describe('chooseTexture (T1.1)', () => {
     expect(names.filter((name) => name === 'e1u1/whole')).toHaveLength(6);
   });
 });
+
+describe('faceHighlightPolygons (T1.3)', () => {
+  it('returns the picked face polygons only in the texture tool', () => {
+    const app = makeApp();
+    addBox(app);
+    app.setToolMode('texture');
+    expect(app.faceHighlightPolygons()).toHaveLength(0);
+    clickFace(app);
+    expect(app.faceHighlightPolygons()).toHaveLength(1);
+    const polygon = app.faceHighlightPolygons()[0]!;
+    expect(polygon.length).toBeGreaterThanOrEqual(3);
+    app.setToolMode('select');
+    expect(app.faceHighlightPolygons()).toHaveLength(0);
+  });
+});

@@ -342,7 +342,7 @@ The default layout has four views in a 2×2 grid (3D, top, front, side), a prope
 | Entity (E)                                             | a click creates an entity of the chosen class. A brush class (`func_*`, `trigger_*`) turns the selected brushes into an entity | `QEntSel`                                   |
 | Clip (C)                                               | two points in a 2D view, Enter clips, Tab switches the side to keep                                                            | `OpPlaneClip` (scissors icon)               |
 | Vertex and edge (V, pressing again switches), face (F) | handles for the derived elements, dragging snaps to the grid                                                                   | `MoveVertex`, `MoveEdge`, `MoveFace`        |
-| Texture (T)                                            | selecting a face in the 3D view, setting and adjusting its texture                                                             | `QPropSrf`, `QPropTex`                      |
+| Texture (T)                                            | selecting a face in the 3D view, setting and adjusting its texture; the picked faces are highlighted in every view             | `QPropSrf`, `QPropTex`                      |
 
 **Commands in menus and as shortcuts:** cut, copy, paste and duplicate (as `.map` text on the clipboard, so transfer to another editor works). Also CSG subtract, CSG intersect, hollow inwards and outwards, mirror X/Y/Z, rotate 90°, group and ungroup, hide and show, lock, and grid size \[ and \]. The views have a right-click context menu with Add Brush, Add Entity and Apply Entity → category → class.
 
@@ -476,6 +476,8 @@ The implementation proceeds in five phases. Each phase ends with a usable versio
 5. **Compilation and polish.** WASM tools in the browser (qbsp3, qvis3 and qrad3 in workers, threads), the leak path, compile profiles, PWA, the performance targets and Firefox/Safari support. _Done when_ the targets in the performance table are met and a map compiles to a playable BSP file without leaving the browser.
 
 **Decisions 26.11.2026:**
+
+- **Texture-tool face highlight (26.11.2026):** the picked faces are drawn as a translucent `vp-select` fill at 35 % opacity in the 3D view (polygon-offset, depth-tested) and as `vp-select` polygon outlines in the 2D views, because the per-node selection state cannot mark a single face. The polygons are recomputed by the app on document and tool events; the renderer receives core types only.
 
 - **Face picks belong to the texture tool:** leaving the texture tool clears the face selection, so the texture operations outside the tool always target whole brushes. The face selection is not part of the document or the undo history, so clearing it loses no data. Texture targets expand groups and brush entities: a selected `func_door` or group is textured as a whole.
 

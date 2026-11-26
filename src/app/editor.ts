@@ -1,3 +1,4 @@
+import { analyzeBrush } from '@core/geom/index';
 import { reparentNodePatch, addNodePatch, createEmptyDocument, createId } from '@core/doc/index';
 import {
   mergeEntityDefs,
@@ -1326,6 +1327,23 @@ export class EditorApp {
       }
     }
     this.emit({ type: 'tool' });
+  }
+
+  /** The polygons of the texture tool's picked faces, for the renderer highlight. */
+  faceHighlightPolygons(): readonly (readonly Vec3[])[] {
+    if (this.toolMode !== 'texture') {
+      return [];
+    }
+    const out: (readonly Vec3[])[] = [];
+    for (const ref of this.textureTool.faceSelection) {
+      const node = this.document.nodes.get(ref.brush);
+      if (node?.kind !== 'brush') continue;
+      const polygon = analyzeBrush(node).polygons[ref.face];
+      if (polygon && polygon.length >= 3) {
+        out.push(polygon);
+      }
+    }
+    return out;
   }
 
   clearFaceSelection(): void {

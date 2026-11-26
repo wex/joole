@@ -219,8 +219,11 @@ app.subscribe((event) => {
     } else {
       renderer.setLeakPath([]);
     }
+    renderer.setFaceHighlight(app.faceHighlightPolygons());
   } else if (event.type === 'selection') {
     renderer.setSelection(app.selection);
+  } else if (event.type === 'tool') {
+    renderer.setFaceHighlight(app.faceHighlightPolygons());
   } else if (event.type === 'game') {
     renderer.reloadTextures();
   } else if (event.type === 'grid') {
@@ -242,6 +245,7 @@ declare global {
       leakPath: () => readonly (readonly number[])[] | null;
       texture: (name?: string) => string;
       faces: () => number;
+      faceHighlight: () => number;
     };
   }
 }
@@ -275,6 +279,7 @@ window.joole = {
     return app.currentTextureName;
   },
   faces: () => app.faceSelectionCount,
+  faceHighlight: () => app.faceHighlightPolygons().length,
 };
 
 mountEditorShell({ app, renderer, canvas }, root);

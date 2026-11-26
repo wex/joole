@@ -32,6 +32,21 @@ function sameSegments(a: readonly LineSegment[], b: readonly LineSegment[]): boo
   return true;
 }
 
+function samePolygons(a: readonly (readonly Vec3[])[], b: readonly (readonly Vec3[])[]): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    const pa = a[i]!;
+    const pb = b[i]!;
+    if (pa.length !== pb.length) return false;
+    for (let j = 0; j < pa.length; j++) {
+      if (pa[j]![0] !== pb[j]![0] || pa[j]![1] !== pb[j]![1] || pa[j]![2] !== pb[j]![2]) {
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
 export const STATE_SELECTED = 1;
 export const STATE_ENTITY = 2;
 export const STATE_INVALID = 4;
@@ -187,6 +202,9 @@ export class GeometryCache {
   private readonly cursorIndex: number;
   private leakSegments: readonly LineSegment[] = [];
   private cursorPoint: readonly [number, number, number] | null = null;
+  private readonly faceHighlightIndex: number;
+  private facePolygons: readonly (readonly Vec3[])[] = [];
+  readonly faceHighlight: GpuStore;
 
   constructor(
     private readonly gl: WebGL2RenderingContext,
@@ -207,6 +225,8 @@ export class GeometryCache {
     this.state[this.leakIndex * 4] = STATE_SELECTED | STATE_LEAK;
     this.cursorIndex = this.takeIndex();
     this.state[this.cursorIndex * 4] = STATE_SELECTED | STATE_HANDLE;
+    this.faceHighlightIndex = this.takeIndex();
+    this.faceHighlight = new GpuStore(gl, FACE_STRIDE, (buffer) => this.bindFaceAttributes(buffer));
     this.cornerBuffer = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, this.cornerBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([0, -1, 0, 1, 1, -1, 1, 1]), gl.STATIC_DRAW);
@@ -326,6 +346,60 @@ export class GeometryCache {
     this.toolSegments = segments;
     this.invalidSegments = invalid;
     this.rebuildOverlay();
+    return true;
+  }
+
+  /**
+   * The texture tool's picked faces: a translucent fill in 3D and a
+   * vp-select outline in every view. Returns false when nothing changed.
+   */
+  setFaceHighlight(polygons: readonly (readonly Vec3[])[]): boolean {
+    if (samePolygons(polygons, this.facePolygons)) {
+      return false;
+    }
+    this.facePolygons = polygons;
+    // Fan-triangulated fill in the face vertex format.
+    let vertexCount = 0;
+    for (const polygon of polygons) {
+      vertexCount += Math.max(0, polygon.length - 2) * 3;
+    }
+    if (vertexCount === 0) {
+      this.faceHighlight.remove('__faceHighlight');
+    } else {
+      const data = new ArrayBuffer(vertexCount * FACE_STRIDE);
+      const f32 = new Float32Array(data);
+      const u32 = new Uint32Array(data);
+      let v = 0;
+      const put = (point: Vec3) => {
+        const base = (v * FACE_STRIDE) / 4;
+        f32[base] = point[0];
+        f32[base + 1] = point[1];
+        f32[base + 2] = point[2];
+        // uv zeros at +12, normal zeros at +20: shading is off for the fill.
+        u32[(v * FACE_STRIDE + 24) / 4] = this.faceHighlightIndex;
+        v++;
+      };
+      for (const polygon of polygons) {
+        for (let i = 1; i + 1 < polygon.length; i++) {
+          put(polygon[0]!);
+          put(polygon[i]!);
+          put(polygon[i + 1]!);
+        }
+      }
+      this.faceHighlight.write('__faceHighlight', data, vertexCount);
+    }
+    // Outlines in the selected-line pass of every view.
+    const segments: LineSegment[] = [];
+    for (const polygon of polygons) {
+      for (let i = 0; i < polygon.length; i++) {
+        segments.push([polygon[i]!, polygon[(i + 1) % polygon.length]!]);
+      }
+    }
+    if (segments.length === 0) {
+      this.lines.remove('__overlayFaces');
+    } else {
+      this.lines.write('__overlayFaces', writeLines(segments, 0), segments.length);
+    }
     return true;
   }
 
@@ -481,6 +555,7 @@ export class GeometryCache {
     for (const batch of this.batches.values()) {
       batch.store.dispose();
     }
+    this.faceHighlight.dispose();
     this.batches.clear();
     this.records.clear();
     this.lines.dispose();

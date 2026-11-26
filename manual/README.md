@@ -353,6 +353,8 @@ The same grid snapping, convexity checking and dashed-orange rejection feedback 
 The Texture tool selects individual faces in the 3D view.
 
 - Click a visible face to select it. Clicking the same single selected face again clears it.
+  The picked faces are highlighted: a translucent red fill in the 3D view and red outlines in the orthographic views. The highlight disappears with the face selection when you leave the tool.
+
 - `Shift+click` adds or removes faces in a multi-face selection.
 - `Ctrl+click` (`Cmd+click`) is the eyedropper: it copies the face's texture name to the current texture without changing the face selection.
 - Click empty space without a modifier to clear the face selection.

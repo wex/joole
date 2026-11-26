@@ -217,7 +217,7 @@ Each milestone can ship as its own minor release. Tag the releases as the owner 
   - The box and its size labels follow the cursor in all four views.
   - The snapped cursor is visible before the button is pressed.
 
-### [ ] T1.3 Texture tool: highlight the current face or brush (#5)
+### [x] T1.3 Texture tool: highlight the current face or brush (#5)
 
 - **Goal:** in the texture tool, the faces being worked on (the picked faces, or the selected brushes when no faces are picked) are clearly highlighted in 2D and 3D.
 - **Design:**

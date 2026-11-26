@@ -261,6 +261,13 @@ export class Renderer {
     }
   }
 
+  /** The texture tool's picked faces: a translucent fill in 3D, outlines in 2D. */
+  setFaceHighlight(polygons: readonly (readonly Vec3[])[]): void {
+    if (this.cache.setFaceHighlight(polygons)) {
+      this.invalidate();
+    }
+  }
+
   /** Persistent target–targetname link lines in the 2D views. */
   setTargetLinks(segments: readonly (readonly [Vec3, Vec3])[]): void {
     this.cache.setTargetLinks(segments);
@@ -525,6 +532,20 @@ export class Renderer {
       if (transparent || (batch.cls === 'tool' && this.toolFaces === 'dim')) {
         this.drawBatch(batch, visible);
       }
+    }
+    // The texture tool's picked faces: a translucent vp-select fill over
+    // the faces themselves, depth-tested but not writing depth.
+    const highlightCount = this.cache.faceHighlight.drawCount;
+    if (highlightCount > 0) {
+      const select = this.colors['vp-select'];
+      gl.uniform1i(u.uTextured, 0);
+      gl.uniform1i(u.uShaded, 0);
+      gl.uniform4f(u.uColor, select[0], select[1], select[2], 0.35);
+      gl.enable(gl.POLYGON_OFFSET_FILL);
+      gl.polygonOffset(-1, -1);
+      gl.bindVertexArray(this.cache.faceHighlight.vao);
+      gl.drawArrays(gl.TRIANGLES, 0, highlightCount);
+      gl.disable(gl.POLYGON_OFFSET_FILL);
     }
     gl.depthMask(true);
     gl.disable(gl.BLEND);
