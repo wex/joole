@@ -178,41 +178,6 @@ export function EditorShell(props: EditorShellProps) {
   });
   const [coordinates, setCoordinates] = createSignal(coordinateDefaults(false));
   const [flyActive, setFlyActive] = createSignal(false);
-  // Colour overrides (T15.10): the current theme's changed tokens are written
-  // as inline custom properties on the root element; everything reading the
-  // design-system variables follows at once, and the renderer re-reads its
-  // colours. Removing an override removes the property, so the token file's
-  // value returns.
-  createEffect(
-    () => [theme(), colors()] as const,
-    () => {
-      const root = document.documentElement;
-      for (const token of COLOR_TOKENS) {
-        root.style.removeProperty(`--${token.name}`);
-      }
-      for (const [token, value] of Object.entries(colors()[theme()])) {
-        root.style.setProperty(`--${token}`, value);
-      }
-      renderer.refreshColors();
-    },
-  );
-  createEffect(
-    () => [bottomCollapsed(), bottomHeight()] as const,
-    () => {
-      centerElement?.style.setProperty(
-        '--bottom-panel-height',
-        bottomCollapsed() ? 'calc(var(--size-titlebar) + 1px)' : `${bottomHeight()}px`,
-      );
-    },
-  );
-  createEffect(
-    () => [bottomCollapsed(), bottomTab(), entries()] as const,
-    () => {
-      if (!bottomCollapsed() && bottomTab() === 'log') {
-        setLogSeenId(newestLogId(entries()));
-      }
-    },
-  );
   const [rightWidth, setRightWidth] = createSignal(
     initialSettings?.rightWidth ?? initialRightWidth,
   );
@@ -1240,6 +1205,41 @@ export function EditorShell(props: EditorShellProps) {
     };
   });
 
+  // Colour overrides (T15.10): the current theme's changed tokens are written
+  // as inline custom properties on the root element; everything reading the
+  // design-system variables follows at once, and the renderer re-reads its
+  // colours. Removing an override removes the property, so the token file's
+  // value returns.
+  createEffect(
+    () => [theme(), colors()] as const,
+    () => {
+      const root = document.documentElement;
+      for (const token of COLOR_TOKENS) {
+        root.style.removeProperty(`--${token.name}`);
+      }
+      for (const [token, value] of Object.entries(colors()[theme()])) {
+        root.style.setProperty(`--${token}`, value);
+      }
+      renderer.refreshColors();
+    },
+  );
+  createEffect(
+    () => [bottomCollapsed(), bottomHeight()] as const,
+    () => {
+      centerElement?.style.setProperty(
+        '--bottom-panel-height',
+        bottomCollapsed() ? 'calc(var(--size-titlebar) + 1px)' : `${bottomHeight()}px`,
+      );
+    },
+  );
+  createEffect(
+    () => [bottomCollapsed(), bottomTab(), entries()] as const,
+    () => {
+      if (!bottomCollapsed() && bottomTab() === 'log') {
+        setLogSeenId(newestLogId(entries()));
+      }
+    },
+  );
   return (
     <div class={styles.shell} data-testid="editor-shell">
       <Toolbar
