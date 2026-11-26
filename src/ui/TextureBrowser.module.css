@@ -76,8 +76,7 @@
 }
 
 .thumb {
-  width: 64px;
-  height: 64px;
+  /* The size comes from the thumbnail slider as an inline style (T15.1). */
   image-rendering: pixelated;
   /* Checker for an unloaded texture, from the surface tokens. */
   background-image:

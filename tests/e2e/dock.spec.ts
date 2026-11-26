@@ -27,11 +27,23 @@ test('the right dock collapses, resizes thumbnails and persists (T1.12)', async 
   const browser = page.locator('[data-testid=texture-browser]');
   await expect(browser).toBeVisible();
   const firstCanvas = browser.locator('canvas').first();
-  await expect(firstCanvas).toHaveAttribute('width', '64');
+  await expect.poll(async () => (await firstCanvas.boundingBox())?.width).toBe(64);
 
-  // The slider changes the thumbnail size.
+  // The slider changes the thumbnail size, and the image scales with it
+  // (T15.1): the canvas is 128 px on screen and its pixels are drawn
+  // outside the old 64 px square.
   await page.locator('[data-testid=thumb-size-slider]').fill('128');
-  await expect(firstCanvas).toHaveAttribute('width', '128');
+  await expect.poll(async () => (await firstCanvas.boundingBox())?.width).toBe(128);
+  await expect
+    .poll(() =>
+      firstCanvas.evaluate((canvas: HTMLCanvasElement) => {
+        const context = canvas.getContext('2d')!;
+        const ratio = canvas.width / 128;
+        // A pixel near the bottom-right corner, outside the old 64 px area.
+        return context.getImageData(Math.floor(120 * ratio), Math.floor(120 * ratio), 1, 1).data[3];
+      }),
+    )
+    .toBeGreaterThan(0);
 
   // The state survives a reload: thumbnail size and the collapsed state.
   await page.getByRole('button', { name: 'Collapse Properties' }).click();

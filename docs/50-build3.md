@@ -99,7 +99,7 @@ None of the WPs changes the `.map` or `.joole.json` format. The settings gain ne
 
 ## Work packages
 
-### [ ] T15.1 Thumbnail images follow the size slider (#25)
+### [x] T15.1 Thumbnail images follow the size slider (#25)
 
 **Goal:** moving the thumbnail slider scales the texture images, not only their cells.
 
