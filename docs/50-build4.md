@@ -33,7 +33,7 @@ top bar, before the dark/light mode toggle._
   that the top bar shows `v`-prefixed text matching the package version is enough.
 - Docs: manual (the top bar section), spec if it describes the top bar.
 
-### T16.2 – Space frames a selected group (#37)
+### T16.2 – Space frames a selected group (#37) — DONE
 
 **TODO item:** _When a group is selected, pressing space should focus on the group._
 

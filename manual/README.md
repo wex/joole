@@ -679,7 +679,7 @@ This example builds and tests a simple room using the features described above.
 
 ### Editing commands
 
-Point at a view and press `Space` to frame the selection so it fills about half of that view. The zoom and the centre change; the depth coordinate of an orthographic camera stays, so brush painting keeps its working plane. With the pointer over the 3D view, the perspective camera frames the selection from its current direction. With nothing selected, `Space` does nothing. A control focused with the keyboard keeps `Space` for itself.
+Point at a view and press `Space` to frame the selection so it fills about half of that view. The zoom and the centre change; the depth coordinate of an orthographic camera stays, so brush painting keeps its working plane. With the pointer over the 3D view, the perspective camera frames the selection from its current direction. With nothing selected, `Space` does nothing. A control focused with the keyboard keeps `Space` for itself. Groups and brush entities frame their member contents.
 
 | Shortcut       | Action                                                                     |
 | -------------- | -------------------------------------------------------------------------- |
