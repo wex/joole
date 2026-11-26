@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createEmptyDocument, addNodePatch, applyPatch } from '@core/doc/index';
-import { analyzeBrush, validateBrush } from '@core/geom/index';
+import { analyzeBrush, extractWireframe, validateBrush } from '@core/geom/index';
 import type { BrushNode, Command, MapDocument } from '@core/types/index';
 import { makeBox } from '../core/geom/__tests__/helpers';
 import { BrushTool, ClipTool, SelectTool, VertexTool, type ToolPointerEvent } from './tools';
@@ -539,3 +539,75 @@ describe('resize grid snapping (T1.10)', () => {
     }
   });
 });
+
+describe('vertex/edge/face absolute grid snapping (T1.11)', () => {
+  function vertexDocAt(min: [number, number, number], max: [number, number, number]) {
+    let doc = createEmptyDocument();
+    doc = applyPatch(doc, addNodePatch(doc, doc.worldspawn, brush('target', min, max)));
+    return doc;
+  }
+
+  // The editor executes each command right away, so the document the tool
+  // reads stays in sync with the drag; the harness does the same.
+  function makeToolHolder(start: MapDocument) {
+    const holder = { doc: start };
+    const tool = new VertexTool(
+      () => holder.doc,
+      () => 8,
+      () => new Set(['target']),
+    );
+    const apply = (commands: readonly Command[]) => {
+      for (const command of commands) {
+        holder.doc = applyPatch(holder.doc, command.run(holder.doc));
+      }
+    };
+    return { tool, apply, holder };
+  }
+
+  it('an off-grid vertex lands on the grid with its first step', () => {
+    // The box corner (3, 5) is off the grid-8 lines. Dragging it toward
+    // x = 11 snaps the reference point to x = 8, not x = 11.
+    const { tool, apply, holder } = makeToolHolder(vertexDocAt([3, 5, 0], [67, 69, 64]));
+    const downOut = tool.pointer({ ...down(3, 5), tolerance: 4 });
+    expect(downOut.editing?.has('target')).toBe(true);
+    // The snapped cursor sits on the grid line x = 8.
+    const moved = tool.pointer(move(11, 5));
+    expect(moved.cursor![0]).toBe(8);
+    expect(moved.commands).toHaveLength(1);
+    apply(moved.commands);
+    const analysis = analyzeBrush(holder.doc.nodes.get('target') as BrushNode);
+    const xs = extractWireframe(analysis.polygons).vertices.map((v) => v[0]!);
+    // The grabbed vertex joined the grid at x = 8; nothing sits at x = 11.
+    expect(xs.some((x) => Math.abs(x - 8) < 1e-6)).toBe(true);
+    expect(xs.every((x) => Math.abs(x - 11) > 1e-6)).toBe(true);
+  });
+
+  it('reports the snapped cursor and the measure box during a drag', () => {
+    const { tool } = makeToolHolder(vertexDocAt([0, 0, 0], [64, 64, 64]));
+    // Face mode: the whole x = 0 face moves, so the size box follows.
+    tool.submode = 'face';
+    tool.pointer({ ...down(2, 32), tolerance: 6 });
+    const moved = tool.pointer(move(18, 32));
+    expect(moved.cursor).toBeDefined();
+    // The face vertex nearest the cursor dragged towards x=18 snaps to x=16.
+    expect(moved.cursor![0]).toBe(16);
+    expect(moved.measure).not.toBeNull();
+    expect(moved.measure!.min[0]!).toBeCloseTo(16, 4);
+    expect(moved.measure!.max[0]! - moved.measure!.min[0]!).toBeCloseTo(64 - 16, 4);
+  });
+
+  it('a rejected step keeps the last valid measure and up clears both', () => {
+    const { tool, apply } = makeToolHolder(vertexDocAt([0, 0, 0], [64, 64, 64]));
+    tool.pointer(down(2, 2));
+    const valid = tool.pointer(move(10, 10));
+    expect(valid.measure).not.toBeNull();
+    apply(valid.commands);
+    const rejected = tool.pointer(move(200, 200));
+    expect(rejected.invalid!.length).toBeGreaterThan(0);
+    expect(rejected.measure).toEqual(valid.measure);
+    const upOut = tool.pointer(up(200, 200));
+    expect(upOut.cursor).toBeNull();
+    expect(upOut.measure).toBeNull();
+  });
+});
+

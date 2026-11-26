@@ -405,6 +405,14 @@ type VertexDrag = {
   readonly key: string;
   last: Vec3;
   view: ToolView;
+  /** The grabbed point: the vertex, or the edge/face point nearest the cursor. */
+  readonly reference: Vec3;
+  /** The pointer position where the drag started. */
+  readonly down: Vec3;
+  /** The total snapped step applied so far, so each move is absolute. */
+  applied: Vec3;
+  /** The edited brush's AABB after the last valid step, for the size overlay. */
+  measure: { min: Vec3; max: Vec3 } | null;
 };
 
 /** Splits a segment into dash-length pieces for the invalid-edit preview. */
@@ -570,6 +578,22 @@ export class VertexTool {
     if (event.type === 'down') {
       const handle = this.pickHandle(event);
       if (!handle) return { commands: [], handles: this.handleDots() };
+      // The reference point (T1.11): the vertex itself in vertex mode, the
+      // edge endpoint or face vertex nearest the cursor otherwise. It is the
+      // point that lands on grid lines.
+      const axes2 = planeAxes(event.view) as readonly [number, number];
+      let reference: Vec3 = handle.positions[0]!;
+      let bestD = Infinity;
+      for (const p of handle.positions) {
+        const d = Math.hypot(
+          p[axes2[0]]! - event.point[axes2[0]]!,
+          p[axes2[1]]! - event.point[axes2[1]]!,
+        );
+        if (d < bestD) {
+          bestD = d;
+          reference = p;
+        }
+      }
       this.drag = {
         brush: handle.brush,
         positions: handle.positions.map((p) => [...p] as Vec3),
@@ -577,6 +601,10 @@ export class VertexTool {
         key: `vertex-${++this.serial}`,
         last: event.point,
         view: event.view,
+        reference: [...reference] as Vec3,
+        down: [...event.point] as Vec3,
+        applied: [0, 0, 0],
+        measure: null,
       };
       return { commands: [], editing: new Set([handle.brush]), handles: this.handleDots() };
     }
@@ -589,19 +617,34 @@ export class VertexTool {
         if (hover && hover.kind === 'edge') {
           preview.push([hover.positions[0]!, hover.positions[1]!]);
         }
-        return { commands: [], handles: this.handleDots(hover), preview };
+        const cursor: Vec3 = [...event.point] as Vec3;
+        for (const axis of planeAxes(event.view) as readonly [number, number]) {
+          cursor[axis] = snap(cursor[axis]!, this.gridSize());
+        }
+        return { commands: [], handles: this.handleDots(hover), preview, cursor };
       }
       if (event.view !== this.drag.view) return { commands: [] };
       const axes = planeAxes(this.drag.view);
       const grid = this.gridSize();
+      // Absolute snapping (T1.11): the total step snaps the reference point
+      // onto a grid line, so an off-grid element joins the grid with its
+      // first step instead of keeping its offset forever.
+      const total: Vec3 = [0, 0, 0];
+      for (const axis of axes) {
+        const raw = this.drag.reference[axis]! + (event.point[axis]! - this.drag.down[axis]!);
+        total[axis] = snap(raw, grid) - this.drag.reference[axis]!;
+      }
+      const cursor: Vec3 = [...event.point] as Vec3;
+      for (const axis of axes) {
+        cursor[axis] = this.drag.reference[axis]! + total[axis]!;
+      }
       const delta: Vec3 = [0, 0, 0];
       let nonzero = false;
       for (const axis of axes) {
-        const amount = snap(event.point[axis]! - this.drag.last[axis]!, grid);
-        delta[axis] = amount;
-        nonzero ||= amount !== 0;
+        delta[axis] = total[axis]! - this.drag.applied[axis]!;
+        nonzero ||= delta[axis] !== 0;
       }
-      if (!nonzero) return { commands: [] };
+      if (!nonzero) return { commands: [], cursor };
       const brush = this.brushAt(this.drag.brush);
       if (!brush) {
         this.drag = null;
@@ -609,15 +652,17 @@ export class VertexTool {
       }
       const result = moveVertices(brush, this.drag.positions, delta);
       if (!result.ok) {
-        // Rejected: nothing is applied; the drag is shown dashed instead.
+        // Rejected: nothing is applied; the drag is shown dashed instead,
+        // with the last valid size next to it.
         const preview: PreviewSegment[] = [];
         for (const pos of this.drag.positions) {
           preview.push(
             ...dashedSegment(pos, [pos[0] + delta[0], pos[1] + delta[1], pos[2] + delta[2]]),
           );
         }
-        return { commands: [], invalid: preview };
+        return { commands: [], invalid: preview, cursor, measure: this.drag.measure };
       }
+      this.drag.applied = [...total] as Vec3;
       this.drag.last = [
         this.drag.last[0] + delta[0],
         this.drag.last[1] + delta[1],
@@ -630,9 +675,13 @@ export class VertexTool {
       const before = positions.map(
         (p) => [p[0] - delta[0], p[1] - delta[1], p[2] - delta[2]] as Vec3,
       );
+      const measure = analyzeBrush(result.value).aabb;
+      this.drag.measure = measure ? { min: [...measure.min] as Vec3, max: [...measure.max] as Vec3 } : null;
       return {
         invalid: [],
         handles: this.handleDots(),
+        cursor,
+        measure: this.drag.measure,
         commands: [
           {
             label: `Move ${this.drag.kind}`,
@@ -657,7 +706,14 @@ export class VertexTool {
     const hadDrag = this.drag !== null;
     this.drag = null;
     return hadDrag
-      ? { commands: [], invalid: [], editing: new Set(), handles: this.handleDots() }
+      ? {
+          commands: [],
+          invalid: [],
+          editing: new Set(),
+          handles: this.handleDots(),
+          cursor: null,
+          measure: null,
+        }
       : { commands: [] };
   }
 }

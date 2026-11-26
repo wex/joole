@@ -120,3 +120,27 @@ test('edges and faces are grabbed by their midpoint and centre dots (T1.8)', asy
   await page.keyboard.press('Control+z');
   expect(await faceCount(page)).toBe(6);
 });
+
+test('a vertex drag shows the snapped size while dragging (T1.11)', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.locator('[data-testid=editor-shell]')).toBeVisible();
+  await page.getByRole('button', { name: 'Brush (B)' }).click();
+  const a = await worldScreen(page, [0, 0, 0]);
+  const b = await worldScreen(page, [64, 64, 0]);
+  await page.mouse.move(a.x, a.y);
+  await page.mouse.down();
+  await page.mouse.move(b.x, b.y, { steps: 5 });
+  await page.mouse.up();
+
+  await page.keyboard.press('v');
+  const corner = await worldScreen(page, [0, 0, 0]);
+  const target = await worldScreen(page, [16, 0, 0]);
+  await page.mouse.move(corner.x, corner.y);
+  await page.mouse.down();
+  await page.mouse.move(target.x, target.y, { steps: 4 });
+  // Mid-drag, the active view's title bar carries the measurement.
+  await expect(page.locator('[data-testid=view-title-top]')).toContainText('×');
+  await page.mouse.up();
+  // After the drag the measurement is gone and the title shows coordinates.
+  await expect(page.locator('[data-testid=view-title-top]')).not.toContainText('×');
+});

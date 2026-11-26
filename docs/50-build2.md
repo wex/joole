@@ -447,7 +447,7 @@ Each milestone can ship as its own minor release. Tag the releases as the owner 
 - **Depends on:** T1.2
 - **Done when:** resized brushes lie on the grid and the property test passes.
 
-### [ ] T1.11 Vertex, edge and face drags snap to the grid and show the size (#14, #15, #16)
+### [x] T1.11 Vertex, edge and face drags snap to the grid and show the size (#14, #15, #16)
 
 - **Goal:**
   - Vertex, edge and face drags move the grabbed element to grid positions, not just by grid-sized steps.
