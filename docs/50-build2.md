@@ -243,7 +243,7 @@ Each milestone can ship as its own minor release. Tag the releases as the owner 
 - **Depends on:** –
 - **Done when:** a picked face is visibly highlighted in 3D and in every 2D view where it is not seen edge-on, and the highlight follows undo and redo.
 
-### [ ] T1.4 Right-click policy (#6) ⇄
+### [x] T1.4 Right-click policy (#6) ⇄
 
 - **Goal:** right-click does nothing anywhere unless that view or panel has its own context menu.
 - **Design:**

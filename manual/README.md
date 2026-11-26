@@ -68,16 +68,15 @@ Press the key again to restore the four-view grid. The view buttons are repeated
 
 ### View navigation
 
-| Action                            | Effect                                                               |
-| --------------------------------- | -------------------------------------------------------------------- |
-| Middle-drag in Top, Front or Side | pan the orthographic view                                            |
-| Mouse wheel in Top, Front or Side | zoom around the cursor; one notch multiplies or divides zoom by 1.32 |
-| Middle-click in 3D                | toggle pointer lock for mouse look                                   |
-| Hold right mouse button in 3D     | temporary fly/mouse-look mode                                        |
-| Move mouse while flying           | look around                                                          |
-| `W` / `A` / `D` while flying      | move forward, left and right at 256 units/s                          |
-| Left mouse button                 | use the active tool                                                  |
-| Right-click in Top, Front or Side | open the view context menu                                           |
+| Action                               | Effect                                                               |
+| ------------------------------------ | -------------------------------------------------------------------- |
+| Middle-drag in Top, Front or Side    | pan the orthographic view                                            |
+| Mouse wheel in Top, Front or Side    | zoom around the cursor; one notch multiplies or divides zoom by 1.32 |
+| Middle-click in 3D                   | toggle pointer lock for mouse look                                   |
+| Move mouse in pointer-lock mode      | look around                                                          |
+| `W` / `A` / `D` in pointer-lock mode | move forward, left and right at 256 units/s                          |
+| Left mouse button                    | use the active tool                                                  |
+| Right-click in Top, Front or Side    | open the view context menu                                           |
 
 Fly mode is intended to own `W`, `A`, `S` and `D`, and tool shortcuts are ignored while it is active. In the current implementation `S` is still intercepted by the Select-tool shortcut path before movement is recorded, so backward movement does not work; `W`, `A` and `D` do.
 
@@ -692,8 +691,7 @@ This example builds and tests a simple room using the features described above.
 | Middle-drag                | orthographic              | pan                           |
 | Mouse wheel                | orthographic              | zoom around cursor            |
 | Middle-click               | 3D                        | toggle pointer lock           |
-| Right-hold                 | 3D                        | fly mode                      |
-| `W/A/D`                    | while flying              | move in 3D                    |
+| `W/A/D`                    | in pointer-lock mode      | move in 3D                    |
 | Right-click                | orthographic              | view context menu             |
 | `Shift+click`              | Texture tool in 3D        | add/remove face               |
 | `Ctrl+click`               | Texture tool in 3D        | texture eyedropper            |

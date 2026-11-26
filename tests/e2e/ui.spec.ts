@@ -163,15 +163,31 @@ test('2D pan and zoom and 3D fly change the rendered views', async ({ page }) =>
     framesBeforeIgnoredKeys,
   );
 
+  // Right-hold fly is gone (T1.4): a right-drag in 3D must not change the view.
   const fly = await viewPoint(page, '3d');
+  const framesBeforeRightDrag = await page.evaluate(
+    () => (window as unknown as JooleWindow).joole!.stats().frames,
+  );
   await page.mouse.move(fly.x, fly.y);
   await page.mouse.down({ button: 'right' });
+  await page.mouse.move(fly.x + 48, fly.y + 8, { steps: 3 });
+  await page.mouse.up({ button: 'right' });
+  await expect(page.locator('[data-testid=view-title-3d]')).toContainText('Textured');
+  expect(await page.evaluate(() => (window as unknown as JooleWindow).joole!.stats().frames)).toBe(
+    framesBeforeRightDrag,
+  );
+
+  // Mouse-look and WASD work in pointer-lock mode (middle-click).
+  await page.mouse.move(fly.x, fly.y);
+  await page.mouse.down({ button: 'middle' });
+  await page.mouse.up({ button: 'middle' });
   await expect(page.locator('[data-testid=view-title-3d]')).toContainText('Fly');
   await page.mouse.move(fly.x + 48, fly.y + 8, { steps: 3 });
   await page.keyboard.down('w');
   await page.waitForTimeout(350);
   await page.keyboard.up('w');
-  await page.mouse.up({ button: 'right' });
+  await page.mouse.down({ button: 'middle' });
+  await page.mouse.up({ button: 'middle' });
   await expect(page.locator('[data-testid=view-title-3d]')).toContainText('Textured');
   await page.evaluate(() => (window as unknown as JooleWindow).joole!.whenIdle());
   const flown = await canvasScreenshot(page);

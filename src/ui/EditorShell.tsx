@@ -286,7 +286,6 @@ export function EditorShell(props: EditorShellProps) {
       lastY: number;
     } | null = null;
     let toolPointer: { readonly pointerId: number; readonly view: ViewId } | null = null;
-    let rightFly = false;
     let pointerLocked = false;
     let frame: number | null = null;
     let lastFrameTime = 0;
@@ -294,7 +293,7 @@ export function EditorShell(props: EditorShellProps) {
 
     const updateCursor = (clientX: number, clientY: number) => {
       const hit = hitView(clientX, clientY);
-      const next = coordinateDefaults(pointerLocked || rightFly);
+      const next = coordinateDefaults(pointerLocked);
       if (hit && hit.view !== '3d') {
         const camera = orthoCamera(hit.view);
         if (camera) {
@@ -315,7 +314,7 @@ export function EditorShell(props: EditorShellProps) {
     const tick = (now: number) => {
       frame = null;
       const camera = perspectiveCamera();
-      if (!camera || (!pointerLocked && !rightFly) || flyKeys.size === 0) {
+      if (!camera || !pointerLocked || flyKeys.size === 0) {
         return;
       }
       const seconds = Math.min(0.05, Math.max(0, (now - lastFrameTime) / 1000));
@@ -327,13 +326,13 @@ export function EditorShell(props: EditorShellProps) {
       frame = requestAnimationFrame(tick);
     };
     const ensureMovement = () => {
-      if (frame === null && flyKeys.size > 0 && (pointerLocked || rightFly)) {
+      if (frame === null && flyKeys.size > 0 && pointerLocked) {
         lastFrameTime = performance.now();
         frame = requestAnimationFrame(tick);
       }
     };
     const updateFlyState = () => {
-      const active = pointerLocked || rightFly;
+      const active = pointerLocked;
       setCoordinates(coordinateDefaults(active));
       if (!active) {
         flyKeys.clear();
@@ -462,20 +461,17 @@ export function EditorShell(props: EditorShellProps) {
             void request?.catch(() => {
               app.log(
                 'warning',
-                'Pointer lock failed. Hold the right mouse button to fly instead.',
+                'Pointer lock failed. The 3D camera can only be inspected from its current position.',
               );
             });
           } catch {
-            app.log('warning', 'Pointer lock failed. Hold the right mouse button to fly instead.');
+            app.log(
+              'warning',
+              'Pointer lock failed. The 3D camera can only be inspected from its current position.',
+            );
           }
         }
         return;
-      }
-      if (hit.view === '3d' && event.button === 2) {
-        rightFly = true;
-        viewport.setPointerCapture(event.pointerId);
-        updateFlyState();
-        event.preventDefault();
       }
     };
 
@@ -487,7 +483,7 @@ export function EditorShell(props: EditorShellProps) {
       }
       // Hover tracking: with no buttons held the tools still see the move,
       // so the creation tools can show the snapped cursor and the clip line.
-      if (!pan && !pointerLocked && !rightFly && event.buttons === 0) {
+      if (!pan && !pointerLocked && event.buttons === 0) {
         sendToolEvent('move', event);
       }
       if (pan && event.pointerId === pan.pointerId) {
@@ -505,7 +501,7 @@ export function EditorShell(props: EditorShellProps) {
         }
         pan = { ...pan, lastX: event.clientX, lastY: event.clientY };
       }
-      if ((pointerLocked || rightFly) && (event.movementX !== 0 || event.movementY !== 0)) {
+      if (pointerLocked && (event.movementX !== 0 || event.movementY !== 0)) {
         const camera = perspectiveCamera();
         if (camera) {
           controller.setCamera('3d', lookPerspective(camera, event.movementX, event.movementY));
@@ -525,10 +521,6 @@ export function EditorShell(props: EditorShellProps) {
       }
       if (pan && event.pointerId === pan.pointerId) {
         pan = null;
-      }
-      if (event.button === 2 && rightFly) {
-        rightFly = false;
-        updateFlyState();
       }
     };
 
@@ -586,7 +578,7 @@ export function EditorShell(props: EditorShellProps) {
       if (
         app.activeTool === 'clip' &&
         (event.key === 'Enter' || event.key === 'Tab' || event.key === 'Escape') &&
-        !(pointerLocked || rightFly)
+        !pointerLocked
       ) {
         event.preventDefault();
         const output = app.clipKey(event.key);
@@ -660,7 +652,7 @@ export function EditorShell(props: EditorShellProps) {
           action === 'tool-face' ||
           action === 'tool-texture' ||
           action === 'tool-entity') &&
-        !(pointerLocked || rightFly)
+        !pointerLocked
       ) {
         event.preventDefault();
         app.setToolMode(
@@ -680,7 +672,7 @@ export function EditorShell(props: EditorShellProps) {
         );
         return;
       }
-      if (action && action.startsWith('tool-') && !(pointerLocked || rightFly)) {
+      if (action && action.startsWith('tool-') && !pointerLocked) {
         event.preventDefault();
         return;
       }
@@ -691,10 +683,7 @@ export function EditorShell(props: EditorShellProps) {
         return;
       }
       const key = event.key.toLowerCase();
-      if (
-        (key === 'w' || key === 'a' || key === 's' || key === 'd') &&
-        (pointerLocked || rightFly)
-      ) {
+      if ((key === 'w' || key === 'a' || key === 's' || key === 'd') && pointerLocked) {
         flyKeys.add(key);
         event.preventDefault();
         ensureMovement();
@@ -708,7 +697,6 @@ export function EditorShell(props: EditorShellProps) {
     };
     const blur = () => {
       flyKeys.clear();
-      rightFly = false;
       pan = null;
       toolPointer = null;
       updateFlyState();
