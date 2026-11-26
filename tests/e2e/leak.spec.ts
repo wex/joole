@@ -47,10 +47,25 @@ test('a leaking compile draws the pointfile path and N steps the camera along it
   expect(path).not.toBeNull();
   expect(path!.length).toBeGreaterThan(1);
 
-  // The 3D view shows the magenta leak polyline.
+  // The 3D view shows the magenta leak polyline. The pixel count is the
+  // portable verification: exact screenshots compare the large textured
+  // cube as well, whose filtering depends on the machine's GL rasterizer,
+  // so firefox (which does not use a deterministic software GL) gets a
+  // looser ratio.
+  const canvasPng = await page.locator('[data-testid=viewport-area] canvas').screenshot();
+  const { decodePng, countColor } = await import('./png');
+  const img = decodePng(canvasPng);
+  const magenta = countColor(
+    img,
+    { x: 0, y: 0, width: img.width, height: img.height },
+    (r, g, b) => r > 150 && g < 110 && b > 180,
+  );
+  expect(magenta).toBeGreaterThan(200);
   await expect(page.locator('[data-testid=viewport-area] canvas')).toHaveScreenshot(
     'leak-path.png',
-    { maxDiffPixelRatio: 0.02 },
+    {
+      maxDiffPixelRatio: page.context().browser()?.browserType().name() === 'firefox' ? 0.06 : 0.02,
+    },
   );
 
   // N centers the ortho cameras on successive leak points.
