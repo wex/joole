@@ -53,7 +53,7 @@ top bar, before the dark/light mode toggle._
   Space in a hovered 2D view, assert the camera centers on the group's contents
   (follow the T15.5 e2e in the spec that covers Space).
 
-### T16.3 – Collapsed bottom panel flush with the window (#38)
+### T16.3 – Collapsed bottom panel flush with the window (#38) — DONE
 
 **TODO item:** _There is a gap between bottom panel and app window while it's toggled
 closed - it should be flush with the window._

@@ -21,6 +21,10 @@
   grid-template-rows: minmax(0, 1fr) var(--size-splitter) var(--bottom-panel-height, 160px);
 }
 
+.centerCollapsed {
+  grid-template-rows: minmax(0, 1fr) 0 var(--bottom-panel-height, 160px);
+}
+
 .viewport {
   position: relative;
   min-width: 0;
@@ -166,6 +170,10 @@
   flex-direction: column;
   border-top: 1px solid var(--line);
   background: var(--surface-1);
+  /* Explicit row: when the splitter is absent (collapsed), auto-placement
+     would otherwise shift the panel into the splitter's track and leave the
+     panel track empty at the window's bottom edge (T16.3). */
+  grid-row: 3;
 }
 
 .texturePlaceholder {

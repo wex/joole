@@ -1318,7 +1318,10 @@ export function EditorShell(props: EditorShellProps) {
       </Show>
 
       <div class={styles.main} ref={(el) => (mainElement = el)}>
-        <div class={styles.center} ref={(el) => (centerElement = el)}>
+        <div
+          class={[styles.center, bottomCollapsed() ? styles.centerCollapsed : ''].join(' ')}
+          ref={(el) => (centerElement = el)}
+        >
           <div
             class={styles.viewport}
             tabindex="0"
