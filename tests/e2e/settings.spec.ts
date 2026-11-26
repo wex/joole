@@ -14,7 +14,9 @@ test('the settings dialog opens, applies immediately and persists (T1.15)', asyn
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
 
   // The thumbnail slider writes through.
-  await page.locator('[role=dialog] input[type=range]').fill('96');
+  await page.locator('[role=dialog] input[type=range]').first().fill('96');
+  // The handle size slider (T15.3) persists with the rest.
+  await page.locator('[data-testid=handle-size-slider]').fill('20');
 
   // The focus trap: enough Tabs must keep the focus inside the dialog.
   for (let i = 0; i < 20; i++) await page.keyboard.press('Tab');
@@ -33,6 +35,9 @@ test('the settings dialog opens, applies immediately and persists (T1.15)', asyn
   await page.reload();
   await expect(page.locator('[data-testid=editor-shell]')).toBeVisible();
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+  await page.keyboard.press('Control+,');
+  await expect(page.locator('[data-testid=handle-size-slider]')).toHaveValue('20');
+  await page.keyboard.press('Escape');
 
   // File → Settings… opens the dialog too, and Reset restores the defaults.
   await page.getByRole('button', { name: 'File' }).click();

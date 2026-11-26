@@ -549,12 +549,13 @@ describe('vertex/edge/face absolute grid snapping (T1.11)', () => {
 
   // The editor executes each command right away, so the document the tool
   // reads stays in sync with the drag; the harness does the same.
-  function makeToolHolder(start: MapDocument) {
+  function makeToolHolder(start: MapDocument, handleSize = 14) {
     const holder = { doc: start };
     const tool = new VertexTool(
       () => holder.doc,
       () => 8,
       () => new Set(['target']),
+      () => handleSize,
     );
     const apply = (commands: readonly Command[]) => {
       for (const command of commands) {
@@ -594,6 +595,47 @@ describe('vertex/edge/face absolute grid snapping (T1.11)', () => {
     expect(moved.measure).not.toBeNull();
     expect(moved.measure!.min[0]!).toBeCloseTo(16, 4);
     expect(moved.measure!.max[0]! - moved.measure!.min[0]!).toBeCloseTo(64 - 16, 4);
+  });
+
+  it('the active dot sits on the moved vertex during the drag (T15.3)', () => {
+    const { tool, apply, holder } = makeToolHolder(vertexDocAt([0, 0, 0], [64, 64, 64]));
+    tool.pointer(down(0, 0));
+    const moved = tool.pointer(move(16, 16));
+    const active = moved.handles!.filter((h) => h.state === 2);
+    expect(active).toHaveLength(1);
+    // The dot is at the vertex's new position, not where it was before the
+    // step's command ran.
+    expect(active[0]!.point[0]).toBeCloseTo(16, 6);
+    expect(active[0]!.point[1]).toBeCloseTo(16, 6);
+    // After the command runs, the document's dots agree with the output.
+    apply(moved.commands);
+    const fromDocument = tool.handleDots().filter((h) => h.state === 2);
+    expect(fromDocument[0]!.point).toEqual(active[0]!.point);
+    void holder;
+  });
+
+  it('the edge dot follows the moved edge midpoint (T15.3)', () => {
+    const { tool } = makeToolHolder(vertexDocAt([0, 0, 0], [64, 64, 64]));
+    tool.toggleVertexEdge();
+    // The edge x = 0 along y in the top view has its midpoint at (0, 32).
+    tool.pointer(down(0, 32));
+    const moved = tool.pointer(move(-16, 32));
+    const active = moved.handles!.filter((h) => h.state === 2);
+    expect(active).toHaveLength(1);
+    expect(active[0]!.point[0]).toBeCloseTo(-16, 6);
+    expect(active[0]!.point[1]).toBeCloseTo(32, 6);
+  });
+
+  it('the hit radius is half the handle size (T15.3)', () => {
+    // Tolerance 4 means 1 world unit per CSS px; the default 14 px dot has
+    // a 7 px radius.
+    const near = makeToolHolder(vertexDocAt([0, 0, 0], [64, 64, 64]));
+    expect(near.tool.pointer(down(6, 0)).editing?.has('target')).toBe(true);
+    const far = makeToolHolder(vertexDocAt([0, 0, 0], [64, 64, 64]));
+    expect(far.tool.pointer(down(9, 0)).editing).toBeUndefined();
+    // Doubling the handle size doubles the radius.
+    const large = makeToolHolder(vertexDocAt([0, 0, 0], [64, 64, 64]), 28);
+    expect(large.tool.pointer(down(12, 0)).editing?.has('target')).toBe(true);
   });
 
   it('a rejected step keeps the last valid measure and up clears both', () => {

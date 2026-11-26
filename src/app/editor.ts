@@ -90,6 +90,7 @@ import {
   SelectTool,
   TextureTool,
   VertexTool,
+  DEFAULT_HANDLE_SIZE,
   type ToolOutput,
   type ToolPointerEvent,
   EntityTool,
@@ -251,6 +252,7 @@ export class EditorApp {
       () => this.document,
       () => this.gridSize,
       () => this.selection,
+      () => this.handleSizePx,
     );
     this.textureTool = new TextureTool(
       () => this.document,
@@ -822,9 +824,27 @@ export class EditorApp {
   }
 
   private csgGroupingEnabled = true;
+  private handleSizePx = DEFAULT_HANDLE_SIZE;
 
   setCsgGrouping(value: boolean): void {
     this.csgGroupingEnabled = value;
+  }
+
+  /** The idle handle dot diameter in CSS px; the hit radius follows it (T15.3). */
+  setHandleSize(value: number): void {
+    this.handleSizePx = value;
+  }
+
+  /**
+   * The vertex/edge/face handle dots of the current document and selection
+   * (T15.3), so the views can refresh them after undo, redo or a tool change
+   * without waiting for a pointer event. Empty outside the vertex and face
+   * tools.
+   */
+  handleDots(): readonly { point: Vec3; state: 0 | 1 | 2 }[] {
+    return this.toolMode === 'vertex' || this.toolMode === 'face'
+      ? this.vertexTool.handleDots()
+      : [];
   }
 
   csgSubtract(): boolean {

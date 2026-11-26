@@ -149,7 +149,7 @@ None of the WPs changes the `.map` or `.joole.json` format. The settings gain ne
 
 **Done when:** S moves the camera backwards in fly mode and still selects the Select tool outside it.
 
-### [ ] T15.3 Larger handle dots that stay on the dragged element (#27, #28) ⇄
+### [x] T15.3 Larger handle dots that stay on the dragged element (#27, #28) ⇄
 
 **Goal:** the vertex, edge and face dots are easier to see and hit, and during a drag the dot sits exactly where the element is.
 
@@ -158,7 +158,7 @@ None of the WPs changes the `.map` or `.joole.json` format. The settings gain ne
 **Design:**
 
 - **Size:** a new persisted setting **`handleSize`**, the idle dot's diameter in CSS px: default **14** (twice today's 7), range 7–28. Hover and active dots are 9/7 of it (18 px by default), as today. The renderer gets the size through a `setHandleSize` call and passes it to the handle shader as a uniform instead of the literals. Settings → General gets a **Handle size** slider that applies at once.
-- **Hit target:** `VertexTool.pickHandle` uses its own pick radius, half the idle dot size, converted to world units with the view's pixel ratio, instead of the generic 4 px tolerance. The shell passes the radius in the tool event (`handleRadius`), so the visible dot and the hit target always match the setting. When two dots overlap, the nearest still wins.
+- **Hit target:** `VertexTool.pickHandle` uses its own pick radius, half the idle dot size, converted to world units with the view's pixel ratio, instead of the generic 4 px tolerance. The tool reads the setting through a getter and converts it with the event's tolerance (4 CSS px in world units), so the visible dot and the hit target always match the setting. When two dots overlap, the nearest still wins.
 - **No lag:** `handleDots` takes an optional replacement brush. During a drag, the move branch builds the dots from the moved brush it has just computed (`result.value`), not from the document that has not yet been changed. The rejected branch keeps returning the last valid dots. **Refresh on every change:** `EditorApp` exposes the active tool's current dots (`handleDots()`, empty outside the vertex and face tools), and the shell sets them after every document, selection and tool event. That covers the end of a drag, undo and redo, and choosing the tool with the pointer outside the views. The hover state still comes from pointer moves.
 - The same "computed from the pre-command document" pattern is checked in the other tools that return previews with commands (SelectTool move/rotate/scale, the clip tool). Any that lag are fixed in this WP and noted in the commit.
 

@@ -212,6 +212,8 @@ export class GeometryCache {
   readonly handles: GpuStore;
   private readonly handleCornerBuffer: WebGLBuffer;
   private handleKey = '';
+  /** The current handle dots, for the test hook. */
+  handleList: readonly { point: Vec3; state: 0 | 1 | 2 }[] = [];
   private readonly faceHighlightIndex: number;
   private facePolygons: readonly (readonly Vec3[])[] = [];
   readonly faceHighlight: GpuStore;
@@ -409,6 +411,7 @@ export class GeometryCache {
       return false;
     }
     this.handleKey = key;
+    this.handleList = handles;
     if (handles.length === 0) {
       this.handles.remove('__handles');
       return true;

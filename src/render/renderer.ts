@@ -103,6 +103,7 @@ const HANDLE_UNIFORMS = [
   'uViewProjection',
   'uViewportSize',
   'uScale',
+  'uSize',
   'uIdleColor',
   'uHoverColor',
   'uBorderColor',
@@ -158,6 +159,7 @@ export class Renderer {
     VIEW_ORDER.map((view) => [view, defaultCamera(view)]),
   );
   private colors: ViewportColors;
+  private handleSize = 14;
   private doc: Readonly<MapDocument> | null = null;
   private mode3d: Mode3d = 'textured';
   private toolFaces: ToolFaceMode = 'dim';
@@ -281,6 +283,19 @@ export class Renderer {
     if (this.cache.setEditing(ids)) {
       this.invalidate();
     }
+  }
+
+  /** The idle handle dot diameter in CSS px; hover and active are 9/7 of it (T15.3). */
+  setHandleSize(size: number): void {
+    if (size !== this.handleSize) {
+      this.handleSize = size;
+      this.invalidate();
+    }
+  }
+
+  /** The handle dots being drawn (for tests). */
+  handleDots(): readonly { point: Vec3; state: 0 | 1 | 2 }[] {
+    return this.cache.handleList;
   }
 
   /** The vertex/edge/face handle dots, drawn as screen-space squares. */
@@ -515,6 +530,7 @@ export class Renderer {
     gl.uniformMatrix4fv(u.uViewProjection, false, toGlMatrix(vp, this.matrix));
     gl.uniform2f(u.uViewportSize, w, h);
     gl.uniform1f(u.uScale, this.backingRatio());
+    gl.uniform1f(u.uSize, this.handleSize);
     gl.uniform4fv(u.uIdleColor, this.colors['vp-handle']);
     gl.uniform4fv(u.uHoverColor, this.colors['vp-select']);
     gl.uniform4fv(u.uBorderColor, this.colors['vp-bg']);

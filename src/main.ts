@@ -181,6 +181,8 @@ renderer.setDocument(app.document);
 updateTargetLinks();
 document.documentElement.dataset.theme = settings.theme;
 app.setCsgGrouping(settings.groupCsgResults);
+app.setHandleSize(settings.handleSize);
+renderer.setHandleSize(settings.handleSize);
 if (typeof settings?.gridSize === 'number') app.setGridSize(settings.gridSize);
 renderer.setGridSize(app.gridSize);
 
@@ -266,6 +268,7 @@ declare global {
       texture: (name?: string) => string;
       faces: () => number;
       faceHighlight: () => number;
+      handles: () => { point: number[]; state: number }[];
     };
   }
 }
@@ -300,6 +303,7 @@ window.joole = {
   },
   faces: () => app.faceSelectionCount,
   faceHighlight: () => app.faceHighlightPolygons().length,
+  handles: () => renderer.handleDots().map((h) => ({ point: [...h.point], state: h.state })),
 };
 
 mountEditorShell(
@@ -319,6 +323,7 @@ mountEditorShell(
       mouseLookSensitivity: settings.mouseLookSensitivity,
       showToolOverlay: settings.showToolOverlay,
       groupCsgResults: settings.groupCsgResults,
+      handleSize: settings.handleSize,
     },
     onSettingsChange: queueSettingsSave,
   },

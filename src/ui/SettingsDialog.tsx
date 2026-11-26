@@ -10,6 +10,7 @@ export interface SettingsDialogValues {
   readonly thumbSize: number;
   readonly showToolOverlay: boolean;
   readonly groupCsgResults: boolean;
+  readonly handleSize: number;
 }
 
 export interface SettingsDialogProps {
@@ -107,6 +108,19 @@ export function SettingsDialog(props: SettingsDialogProps) {
               type="checkbox"
               checked={props.values.showToolOverlay}
               onChange={(event) => props.onChange({ showToolOverlay: event.currentTarget.checked })}
+            />
+          </label>
+          <label class={styles.row}>
+            <span class={styles.label}>Handle size</span>
+            <input
+              type="range"
+              min="7"
+              max="28"
+              step="1"
+              value={props.values.handleSize}
+              aria-valuetext={`${props.values.handleSize} px`}
+              data-testid="handle-size-slider"
+              onInput={(event) => props.onChange({ handleSize: Number(event.currentTarget.value) })}
             />
           </label>
           <label class={styles.row}>

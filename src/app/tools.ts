@@ -1,4 +1,12 @@
-import type { Command, FaceTexture, Id, MapDocument, Patch, Vec3 } from '@core/types/index';
+import type {
+  BrushNode,
+  Command,
+  FaceTexture,
+  Id,
+  MapDocument,
+  Patch,
+  Vec3,
+} from '@core/types/index';
 import {
   analyzeBrush,
   BrushBvh,
@@ -455,6 +463,9 @@ function handlePoint(handle: { positions: Vec3[] }): Vec3 {
  * recomputes the touching planes through `moveVertices`; a rejected edit
  * applies nothing and shows the drag as dashed `vp-invalid` segments.
  */
+/** The default idle handle dot diameter in CSS px (T15.3). */
+export const DEFAULT_HANDLE_SIZE = 14;
+
 export class VertexTool {
   submode: VertexSubmode = 'vertex';
   private drag: VertexDrag | null = null;
@@ -464,6 +475,8 @@ export class VertexTool {
     private readonly getDocument: () => Readonly<MapDocument>,
     private readonly gridSize: () => number,
     private readonly getSelection: () => ReadonlySet<Id>,
+    /** The idle dot diameter in CSS px (T15.3); the hit radius is half of it. */
+    private readonly handleSize: () => number = () => DEFAULT_HANDLE_SIZE,
   ) {}
 
   toggleVertexEdge(): void {
@@ -479,11 +492,16 @@ export class VertexTool {
     return node?.kind === 'brush' ? node : null;
   }
 
-  /** Handle positions of the selected brushes for the current submode. */
-  handles(): { brush: Id; positions: Vec3[]; kind: VertexSubmode }[] {
+  /**
+   * Handle positions of the selected brushes for the current submode. A
+   * moved brush replaces its document version: a drag step's dots come from
+   * the brush the step produces, not from the document before the step's
+   * command runs (T15.3).
+   */
+  handles(moved: BrushNode | null = null): { brush: Id; positions: Vec3[]; kind: VertexSubmode }[] {
     const out: { brush: Id; positions: Vec3[]; kind: VertexSubmode }[] = [];
     for (const id of this.getSelection()) {
-      const brush = this.brushAt(id);
+      const brush = moved?.id === id ? moved : this.brushAt(id);
       if (!brush) continue;
       const analysis = analyzeBrush(brush);
       if (this.submode === 'vertex') {
@@ -517,7 +535,10 @@ export class VertexTool {
    * same delta the commands apply, so they still match the recomputed
    * handles of the moved brush.
    */
-  handleDots(hover: { brush: Id; positions: Vec3[]; kind: VertexSubmode } | null = null): readonly {
+  handleDots(
+    hover: { brush: Id; positions: Vec3[]; kind: VertexSubmode } | null = null,
+    moved: BrushNode | null = null,
+  ): readonly {
     point: Vec3;
     state: 0 | 1 | 2;
   }[] {
@@ -536,7 +557,7 @@ export class VertexTool {
             Math.abs(q[2] - p[2]) < 1e-6,
         ),
       );
-    return this.handles().map((handle) => {
+    return this.handles(moved).map((handle) => {
       let state: 0 | 1 | 2 = 0;
       if (
         this.drag &&
@@ -560,6 +581,9 @@ export class VertexTool {
     const axes = planeAxes(event.view) as readonly [number, number];
     let best: { brush: Id; positions: Vec3[]; kind: VertexSubmode } | null = null;
     let bestDistance = Infinity;
+    // The hit radius is half the visible dot (T15.3). The event tolerance
+    // is 4 CSS px in world units, which gives the world size of a pixel.
+    const radius = (event.tolerance / 4) * (this.handleSize() / 2);
     for (const handle of this.handles()) {
       // Every hit target is the fixed-size dot (T1.8): the vertex itself,
       // the edge midpoint or the face centroid.
@@ -573,7 +597,7 @@ export class VertexTool {
         best = handle;
       }
     }
-    return bestDistance <= event.tolerance ? best : null;
+    return bestDistance <= radius ? best : null;
   }
 
   pointer(event: ToolPointerEvent): ToolOutput {
@@ -684,7 +708,7 @@ export class VertexTool {
         : null;
       return {
         invalid: [],
-        handles: this.handleDots(),
+        handles: this.handleDots(null, result.value),
         cursor,
         measure: this.drag.measure,
         commands: [

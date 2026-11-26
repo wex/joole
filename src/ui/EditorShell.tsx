@@ -57,6 +57,7 @@ export interface EditorShellProps {
     readonly mouseLookSensitivity: number;
     readonly showToolOverlay: boolean;
     readonly groupCsgResults: boolean;
+    readonly handleSize: number;
   };
   readonly onSettingsChange?: (partial: Record<string, unknown>) => void;
 }
@@ -163,6 +164,7 @@ export function EditorShell(props: EditorShellProps) {
   const [groupCsgResults, setGroupCsgResults] = createSignal(
     initialSettings?.groupCsgResults ?? true,
   );
+  const [handleSize, setHandleSize] = createSignal(initialSettings?.handleSize ?? 14);
   /** Applies one dialog change immediately: signals, side effects, persistence. */
   const applySettingsChange = (partial: Record<string, unknown>) => {
     if (typeof partial['theme'] === 'string') {
@@ -181,6 +183,11 @@ export function EditorShell(props: EditorShellProps) {
     if (typeof partial['groupCsgResults'] === 'boolean') {
       setGroupCsgResults(partial['groupCsgResults']);
       app.setCsgGrouping(partial['groupCsgResults']);
+    }
+    if (typeof partial['handleSize'] === 'number') {
+      setHandleSize(partial['handleSize']);
+      app.setHandleSize(partial['handleSize']);
+      renderer.setHandleSize(partial['handleSize']);
     }
     if (typeof partial['gridSize'] === 'number') app.setGridSize(partial['gridSize']);
     if (typeof partial['rightWidth'] === 'number') {
@@ -944,7 +951,6 @@ export function EditorShell(props: EditorShellProps) {
       } else if (event.type === 'tool') {
         renderer.setToolPreview([]);
         renderer.setEditing(new Set());
-        renderer.setHandles([]);
         clearToolFeedback();
         setActiveTool(app.activeTool);
         setBrushPrimitive(app.brushPrimitive);
@@ -962,6 +968,11 @@ export function EditorShell(props: EditorShellProps) {
         event.type === 'game'
       ) {
         setPanelVersion((v) => v + 1);
+      }
+      // The handle dots follow every document, selection and tool change
+      // (T15.3): the end of a drag, undo and redo, choosing the tool.
+      if (event.type === 'document' || event.type === 'selection' || event.type === 'tool') {
+        renderer.setHandles(app.handleDots());
       }
       if (event.type === 'recovery') {
         setRecoveryAvailable(app.recoveryProject !== null);
@@ -1450,6 +1461,7 @@ export function EditorShell(props: EditorShellProps) {
             thumbSize: thumbSize(),
             showToolOverlay: showToolOverlay(),
             groupCsgResults: groupCsgResults(),
+            handleSize: handleSize(),
           }}
           onChange={applySettingsChange}
           onReset={() => applySettingsChange({ ...DEFAULT_SETTINGS })}

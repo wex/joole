@@ -27,6 +27,8 @@ export interface EditorSettings {
   readonly showToolOverlay: boolean;
   /** Hollow and Subtract group their fragments (T1.14). */
   readonly groupCsgResults: boolean;
+  /** The idle vertex/edge/face handle dot diameter in CSS pixels (T15.3). */
+  readonly handleSize: number;
   readonly [key: string]: unknown;
 }
 
@@ -43,6 +45,7 @@ export const DEFAULT_SETTINGS: EditorSettings = {
   mouseLookSensitivity: 0.15,
   showToolOverlay: true,
   groupCsgResults: true,
+  handleSize: 14,
 };
 
 function num(min: number, max: number) {
@@ -63,6 +66,7 @@ const checks: Record<string, (value: unknown) => boolean> = {
   mouseLookSensitivity: num(0.02, 1),
   showToolOverlay: (value) => typeof value === 'boolean',
   groupCsgResults: (value) => typeof value === 'boolean',
+  handleSize: num(7, 28),
 };
 
 /**
