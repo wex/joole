@@ -47,11 +47,10 @@ test('a leaking compile draws the pointfile path and N steps the camera along it
   expect(path).not.toBeNull();
   expect(path!.length).toBeGreaterThan(1);
 
-  // The 3D view shows the magenta leak polyline. The pixel count is the
-  // portable verification: exact screenshots compare the large textured
-  // cube as well, whose filtering depends on the machine's GL rasterizer,
-  // so firefox (which does not use a deterministic software GL) gets a
-  // looser ratio.
+  // The 3D view shows the magenta leak polyline, verified portably by its
+  // pixel count. The tool overlay is transient (it fades away 2.5 s after
+  // a tool change), so it is masked out of the baseline like in the
+  // texture spec.
   const canvasPng = await page.locator('[data-testid=viewport-area] canvas').screenshot();
   const { decodePng, countColor } = await import('./png');
   const img = decodePng(canvasPng);
@@ -63,9 +62,7 @@ test('a leaking compile draws the pointfile path and N steps the camera along it
   expect(magenta).toBeGreaterThan(200);
   await expect(page.locator('[data-testid=viewport-area] canvas')).toHaveScreenshot(
     'leak-path.png',
-    {
-      maxDiffPixelRatio: page.context().browser()?.browserType().name() === 'firefox' ? 0.06 : 0.02,
-    },
+    { maxDiffPixelRatio: 0.02, mask: [page.locator('[data-testid=tool-hint]')] },
   );
 
   // N centers the ortho cameras on successive leak points.
