@@ -32,6 +32,14 @@ TODO phases 2 (projects, layouts, undo/redo, `.qle`, BSP import) and 3 (desktop 
   - The renderer accepts only core types (rule 8).
   - Every document change goes through the `CommandBus` (rule 7).
 
+## Implementation notes
+
+Operational facts learned while building this phase:
+
+- **Kill the stale preview server before every local Playwright run.** `reuseExistingServer` keeps an old `vite preview` on port 4173 serving an old `dist/`, so changes silently do not reach the tests. `ss -tlnp | grep 4173`, kill the pid, then run the test — the server command rebuilds. The dev server on 5173 serves live sources and can stay.
+- **Browsers report `button` as -1 on every `pointermove`** (verified in Chromium). Tools must never filter move events by button; drag state lives in the tool's own mode. T1.2 fixed this for the brush and clip tools.
+- Playwright probes (one-off debug specs) go in `tests/e2e/` temporarily and are deleted after use; never commit them.
+
 ## Clarified requirements (26.11.2026)
 
 The owner answered these questions before planning. Each WP records its answer in the spec's _Decisions_ section when it merges.
