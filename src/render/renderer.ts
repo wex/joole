@@ -88,6 +88,7 @@ const LINE_UNIFORMS = [
   'uWidth',
   'uPass',
   'uEntitiesOnly',
+  'uSelectedOnly',
   'uState',
   'uBrushColor',
   'uEntityColor',
@@ -257,6 +258,13 @@ export class Renderer {
   /** The snapped-cursor cross of the creation tools (null hides it). */
   setCursor(point: Vec3 | null): void {
     if (this.cache.setCursor(point)) {
+      this.invalidate();
+    }
+  }
+
+  /** The brushes a drag is currently editing, drawn in the selection style. */
+  setEditing(ids: ReadonlySet<Id>): void {
+    if (this.cache.setEditing(ids)) {
       this.invalidate();
     }
   }
@@ -465,7 +473,13 @@ export class Renderer {
     gl.drawArrays(gl.TRIANGLES, 0, 3);
   }
 
-  private drawLines(vp: Mat4, w: number, h: number, entitiesOnly: boolean): void {
+  private drawLines(
+    vp: Mat4,
+    w: number,
+    h: number,
+    entitiesOnly: boolean,
+    selectedOnly = false,
+  ): void {
     const count = this.cache.lines.drawCount;
     if (count === 0) {
       return;
@@ -477,6 +491,7 @@ export class Renderer {
     gl.uniform2f(u.uViewportSize, w, h);
     gl.uniform1f(u.uWidth, this.lineWidth * this.backingRatio());
     gl.uniform1i(u.uEntitiesOnly, entitiesOnly ? 1 : 0);
+    gl.uniform1i(u.uSelectedOnly, selectedOnly ? 1 : 0);
     gl.uniform1i(u.uState, STATE_UNIT);
     gl.uniform4fv(u.uBrushColor, this.colors['vp-brush']);
     gl.uniform4fv(u.uEntityColor, this.colors['vp-entity']);
@@ -550,8 +565,11 @@ export class Renderer {
     gl.depthMask(true);
     gl.disable(gl.BLEND);
     gl.disable(gl.CULL_FACE);
-    // Point entity boxes, hidden behind the walls in front of them.
-    this.drawLines(vp, w, h, true);
+    // Lines in the textured view: pass 0 keeps only the point entity boxes,
+    // pass 1 draws every selected line — selected and editing brush
+    // outlines, the paint ghost, the clip line, handles and the cursor —
+    // depth-tested so walls in front still hide them.
+    this.drawLines(vp, w, h, false, true);
     gl.disable(gl.DEPTH_TEST);
   }
 

@@ -56,6 +56,8 @@ export interface ToolOutput {
   readonly pickedTexture?: string;
   /** The snapped world point under the cursor, when the tool tracks it. */
   readonly cursor?: Vec3 | null;
+  /** The brushes this drag is editing (T1.7), drawn in the selection style. */
+  readonly editing?: ReadonlySet<Id>;
   /** The size box of the in-progress edit, when the tool has one. */
   readonly measure?: { readonly min: Vec3; readonly max: Vec3 } | null;
 }
@@ -569,7 +571,7 @@ export class VertexTool {
         last: event.point,
         view: event.view,
       };
-      return { commands: [] };
+      return { commands: [], editing: new Set([handle.brush]) };
     }
     if (event.type === 'move') {
       if (!this.drag) return { commands: [], preview: this.handlePreview(event.tolerance) };
@@ -637,7 +639,7 @@ export class VertexTool {
     }
     const hadDrag = this.drag !== null;
     this.drag = null;
-    return hadDrag ? { commands: [], invalid: [] } : { commands: [] };
+    return hadDrag ? { commands: [], invalid: [], editing: new Set() } : { commands: [] };
   }
 }
 
@@ -744,7 +746,7 @@ export class SelectTool {
         corner[2] === bounds.min[2] ? bounds.max[2] : bounds.min[2],
       ];
       this.mode = { kind: 'scale', anchor, start: corner, view: event.view, key };
-      return { commands: [] };
+      return { commands: [], editing: new Set(this.selected) };
     }
     if (!hit) {
       if (event.view !== '3d') {
@@ -785,7 +787,11 @@ export class SelectTool {
         this.mode = { kind: 'move', last: event.point, view: event.view, key };
       }
     }
-    return { commands: [], ...(selectionChanged ? { selection: this.selected } : {}) };
+    return {
+      commands: [],
+      ...(selectionChanged ? { selection: this.selected } : {}),
+      editing: new Set(this.selected),
+    };
   }
 
   private nearCorner(event: ToolPointerEvent, bounds: Aabb): Vec3 | null {
@@ -920,7 +926,7 @@ export class SelectTool {
       return { commands: [], selection, preview: [] };
     }
     this.mode = { kind: 'idle' };
-    return { commands: [] };
+    return { commands: [], editing: new Set() };
   }
 
   private boxSelection(start: Vec3, end: Vec3, view: PickAxis): Set<Id> {

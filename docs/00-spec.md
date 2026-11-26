@@ -477,6 +477,8 @@ The implementation proceeds in five phases. Each phase ends with a usable versio
 
 **Decisions 26.11.2026:**
 
+- **Editing highlight and the 3D overlay pass (26.11.2026):** while a drag edits brushes, the tools report the edited ids in `ToolOutput.editing`, and the renderer marks them with the state bit `STATE_EDITING` (32), which the line and face shaders treat exactly like `STATE_SELECTED` — the edited brushes are drawn in `vp-select` in every view without pretending to change the selection. In the textured 3D view the line pass no longer draws only point entities: pass 0 keeps the entity boxes and pass 1 draws every selected line — selected and editing outlines, the paint ghost, the clip line, handles and the snapped cursor — depth-tested, so walls in front still hide them. This is one extra instanced draw of the existing line buffer, not a new geometry path.
+
 - **Face navigation (26.11.2026):** in the texture tool the Properties panel shows a ◀ ▶ row that steps through the anchor brush and each of its faces in document face order, wrapping at both ends. The anchor is the face picks' brush or the single selected brush; faces with an empty derived polygon are skipped. Stepping to the brush clears the face picks, so the texture targets become the whole brush. There is no keyboard shortcut yet.
 
 - **Texture-tool face highlight (26.11.2026):** the picked faces are drawn as a translucent `vp-select` fill at 35 % opacity in the 3D view (polygon-offset, depth-tested) and as `vp-select` polygon outlines in the 2D views, because the per-node selection state cannot mark a single face. The polygons are recomputed by the app on document and tool events; the renderer receives core types only.

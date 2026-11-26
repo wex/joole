@@ -19,8 +19,9 @@ void main() {
   if (uShaded) {
     color *= vShade;
   }
-  // Bit 1 is the selection tint; bit 8 dims faces outside the entered scope.
-  if ((vSelected & 1u) != 0u) {
+  // Bits 1 and 32 are the selection and editing tints; bit 8 dims faces
+  // outside the entered scope.
+  if ((vSelected & 33u) != 0u) {
     color = mix(color, uSelectColor.rgb, 0.5);
   }
   if ((vSelected & 8u) != 0u) {

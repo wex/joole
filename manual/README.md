@@ -241,7 +241,7 @@ The Select tool picks and transforms whole brushes.
 
 **Transforms:**
 
-- Drag a selected brush to move it in the two axes of the orthographic view. Movement snaps to the grid.
+- Drag a selected brush to move it in the two axes of the orthographic view. Movement snaps to the grid. While a drag moves, rotates, resizes or reshapes brushes, they stay highlighted in red in every view, the 3D view included, so you can see exactly what the edit is changing.
 - `Ctrl+drag` (`Cmd+drag` on macOS) rotates around the selection center in that view's plane.
 - Drag close to a projected selection bounding-box corner to scale around the opposite corner.
 - Multi-brush selections move and rotate as one unit.

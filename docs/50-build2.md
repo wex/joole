@@ -320,7 +320,7 @@ Each milestone can ship as its own minor release. Tag the releases as the owner 
 
 ## M2 – Editing precision
 
-### [ ] T1.7 Brushes under edit are highlighted (#9)
+### [x] T1.7 Brushes under edit are highlighted (#9)
 
 - **Goal:** while a drag edits brushes (move, rotate, resize, vertex/edge/face drag, or brush paint), the brushes it changes are drawn in the selection style in every view, including 3D.
 - **First step: audit.** List the drags where the edited brush is not visibly highlighted today. The review found these:

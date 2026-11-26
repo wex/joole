@@ -53,6 +53,7 @@ export const STATE_INVALID = 4;
 export const STATE_DIMMED = 8;
 export const STATE_LEAK = 16;
 export const STATE_HANDLE = 64;
+export const STATE_EDITING = 32;
 
 /** The state texture is this many texels wide, one byte per node index. */
 const STATE_WIDTH = 1024;
@@ -194,6 +195,7 @@ export class GeometryCache {
   private readonly freeIndices: number[] = [];
   private nextIndex = 1;
   private selected = new Set<Id>();
+  private editing = new Set<Id>();
   private toolSegments: readonly LineSegment[] = [];
   private linkSegments: readonly LineSegment[] = [];
   private invalidSegments: readonly LineSegment[] = [];
@@ -307,7 +309,7 @@ export class GeometryCache {
   private refreshStates(): void {
     for (const [id, record] of this.records) {
       const dimmed = this.scopeId !== null && !this.scopeMembers.has(id);
-      this.setState(record.index, record.kind, this.selected.has(id), dimmed);
+      this.setState(record.index, record.kind, this.selected.has(id), dimmed, this.editing.has(id));
     }
     this.stateDirty = true;
   }
@@ -331,11 +333,40 @@ export class GeometryCache {
       const record = this.records.get(id);
       if (record) {
         const dimmed = this.scopeId !== null && !this.scopeMembers.has(id);
-        this.setState(record.index, record.kind, selected.has(id), dimmed);
+        this.setState(record.index, record.kind, selected.has(id), dimmed, this.editing.has(id));
       }
     }
     this.selected = selected;
     this.rebuildOverlay();
+  }
+
+  /**
+   * The brushes a drag is currently editing (T1.7): their lines and faces
+   * draw in the selection style in every view. Returns false when nothing
+   * changed. Editing is transient and never affects the document.
+   */
+  setEditing(ids: ReadonlySet<Id>): boolean {
+    let same = ids.size === this.editing.size;
+    if (same) {
+      for (const id of ids) {
+        if (!this.editing.has(id)) {
+          same = false;
+          break;
+        }
+      }
+    }
+    if (same) {
+      return false;
+    }
+    for (const id of new Set([...this.editing, ...ids])) {
+      const record = this.records.get(id);
+      if (record) {
+        const dimmed = this.scopeId !== null && !this.scopeMembers.has(id);
+        this.setState(record.index, record.kind, this.selected.has(id), dimmed, ids.has(id));
+      }
+    }
+    this.editing = new Set(ids);
+    return true;
   }
 
   /** Replaces the transient editing preview: brush ghosts and drag rectangles. */
@@ -635,7 +666,7 @@ export class GeometryCache {
         aabb: mesh.aabb,
         batchKeys: mesh.parts.map((part) => part.key),
       });
-      this.setState(index, 'brush', this.selected.has(node.id));
+      this.setState(index, 'brush', this.selected.has(node.id), false, this.editing.has(node.id));
       return;
     }
     // A point entity: an entity without brushes, drawn as a box at its origin.
@@ -667,7 +698,7 @@ export class GeometryCache {
     const segments = arrow ? [...edges, ...arrow] : edges;
     this.lines.write(node.id, writeLines(segments, index), segments.length);
     this.records.set(node.id, { kind: 'entity', index, aabb: box, batchKeys: [] });
-    this.setState(index, 'entity', this.selected.has(node.id));
+    this.setState(index, 'entity', this.selected.has(node.id), false, this.editing.has(node.id));
     this.setEntityColor(index, this.entityColorOf(node));
   }
 
@@ -722,11 +753,13 @@ export class GeometryCache {
     kind: NodeRecord['kind'],
     selected: boolean,
     dimmed = false,
+    editing = false,
   ): void {
     this.state[index * 4] =
       (kind === 'entity' ? STATE_ENTITY : 0) |
       (selected ? STATE_SELECTED : 0) |
-      (dimmed ? STATE_DIMMED : 0);
+      (dimmed ? STATE_DIMMED : 0) |
+      (editing ? STATE_EDITING : 0);
     this.stateDirty = true;
   }
 

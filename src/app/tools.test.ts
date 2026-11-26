@@ -414,3 +414,62 @@ describe('BrushTool grid lock and feedback (T1.2)', () => {
     expect(out.measure ?? null).toBeNull();
   });
 });
+
+describe('editing feedback (T1.7)', () => {
+  it('a select move drag reports the dragged brushes from down to up', () => {
+    const doc = documentWithBrushes();
+    const tool = new SelectTool(() => doc, 8);
+    const downOut = tool.pointer(down(32, 32));
+    expect(downOut.editing?.has('a')).toBe(true);
+    const upOut = tool.pointer(up(32, 32));
+    expect(upOut.editing?.size).toBe(0);
+  });
+
+  it('a scale drag reports the selection and clears on up', () => {
+    const doc = documentWithBrushes();
+    const tool = new SelectTool(() => doc, 8);
+    tool.setSelection(['a']);
+    const downOut = tool.pointer(down(64, 64));
+    expect(downOut.editing?.has('a')).toBe(true);
+    expect(tool.pointer(up(64, 64)).editing?.size).toBe(0);
+  });
+
+  it('a box-select drag reports no editing', () => {
+    const doc = documentWithBrushes();
+    const tool = new SelectTool(() => doc, 8);
+    const downOut = tool.pointer(down(-10, -10));
+    expect(downOut.editing).toBeUndefined();
+  });
+
+  it('a vertex drag reports the edited brush and clears on up', () => {
+    let doc = createEmptyDocument();
+    doc = applyPatch(
+      doc,
+      addNodePatch(doc, doc.worldspawn, brush('target', [0, 0, 0], [64, 64, 64])),
+    );
+    const tool = new VertexTool(
+      () => doc,
+      () => 8,
+      () => new Set(['target']),
+    );
+    const downOut = tool.pointer(down(2, 2));
+    expect(downOut.editing?.has('target')).toBe(true);
+    const upOut = tool.pointer(up(2, 2));
+    expect(upOut.editing?.size).toBe(0);
+  });
+
+  it('a vertex down on empty space reports no editing', () => {
+    let doc = createEmptyDocument();
+    doc = applyPatch(
+      doc,
+      addNodePatch(doc, doc.worldspawn, brush('target', [0, 0, 0], [64, 64, 64])),
+    );
+    const tool = new VertexTool(
+      () => doc,
+      () => 8,
+      () => new Set(['target']),
+    );
+    const downOut = tool.pointer(down(400, 400));
+    expect(downOut.editing).toBeUndefined();
+  });
+});

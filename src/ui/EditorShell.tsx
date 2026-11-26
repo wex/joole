@@ -398,6 +398,9 @@ export function EditorShell(props: EditorShellProps) {
           renderer.setCursor(next as [number, number, number] | null);
         }
       }
+      if (output.editing !== undefined) {
+        renderer.setEditing(output.editing);
+      }
       if (output.measure !== undefined) {
         const next = output.measure ?? null;
         if (!sameBox(measure(), next)) {
@@ -741,6 +744,7 @@ export function EditorShell(props: EditorShellProps) {
         setGridSize(app.gridSize);
       } else if (event.type === 'tool') {
         renderer.setToolPreview([]);
+        renderer.setEditing(new Set());
         clearToolFeedback();
         setActiveTool(app.activeTool);
         setBrushPrimitive(app.brushPrimitive);
