@@ -59,7 +59,12 @@ import type { PrefabStore } from '@platform/index';
 import { parseMd2, parsePts, type Md2Wireframe } from '@core/formats/index';
 import { CLASS_MODELS } from '@game/q2/models';
 import { mapTextToPastePatch, removeSelectionPatch, selectionToMapText } from './clipboard';
-import { hollowSelectionPatch, intersectSelectionPatch, subtractSelectionPatch } from './csg';
+import {
+  hollowSelectionPatch,
+  intersectSelectionPatch,
+  subtractSelectionPatch,
+  withCsgGrouping,
+} from './csg';
 import {
   readSurfaceState,
   toggleBitPatch,
@@ -811,6 +816,17 @@ export class EditorApp {
   }
 
   /** Qoole semantics: selected brushes are cutters; overlapping unselected brushes are targets. */
+  /** Whether Hollow and Subtract group their fragments (T1.14/T1.15). */
+  get csgGrouping(): boolean {
+    return this.csgGroupingEnabled;
+  }
+
+  private csgGroupingEnabled = true;
+
+  setCsgGrouping(value: boolean): void {
+    this.csgGroupingEnabled = value;
+  }
+
   csgSubtract(): boolean {
     const result = subtractSelectionPatch(this.document, this.selection);
     if (!result) {
@@ -818,11 +834,17 @@ export class EditorApp {
       return false;
     }
     try {
-      this.executeCommand({ label: 'CSG Subtract', run: () => result.patch });
-      this.setSelection(result.ids);
+      const grouped = this.csgGroupingEnabled
+        ? withCsgGrouping(this.document, result, 'subtract')
+        : { ...result, groups: [] as string[] };
+      this.executeCommand({ label: 'CSG Subtract', run: () => grouped.patch });
+      // With group-pick mode on, the new groups are the natural selection.
+      this.setSelection(
+        this.groupPickMode && grouped.groups.length > 0 ? grouped.groups : result.ids,
+      );
       this.log(
         'ok',
-        `CSG Subtract cut ${plural(result.targets, 'target')} into ${plural(result.ids.length, 'fragment')}.`,
+        `CSG Subtract cut ${plural(result.targets, 'target')} into ${plural(result.ids.length, 'fragment')}${grouped.groups.length > 0 ? ' (grouped)' : ''}.`,
       );
       return true;
     } catch (error) {
@@ -906,11 +928,15 @@ export class EditorApp {
       return false;
     }
     try {
-      this.executeCommand({ label: `Hollow ${direction}`, run: () => result.patch });
-      this.setSelection(result.ids);
+      const grouped = this.csgGroupingEnabled
+        ? withCsgGrouping(this.document, result, 'hollow')
+        : { ...result, groups: [] as string[] };
+      this.executeCommand({ label: `Hollow ${direction}`, run: () => grouped.patch });
+      // Hollow selects the new group so the shell can move as one piece.
+      this.setSelection(grouped.groups.length > 0 ? grouped.groups : result.ids);
       this.log(
         'ok',
-        `Hollowed one brush ${direction} into ${plural(result.ids.length, 'fragment')}.`,
+        `Hollowed one brush ${direction} into ${plural(result.ids.length, 'fragment')}${grouped.groups.length > 0 ? ' (grouped)' : ''}.`,
       );
       return true;
     } catch (error) {

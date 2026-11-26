@@ -201,7 +201,7 @@ The next two icon buttons are shortcuts for common geometry operations:
 - **CSG Subtract** — identical to **Edit → CSG Subtract**.
 - **Hollow** — identical to **Edit → Hollow Inward**. Outward hollowing is available only in the Edit menu.
 
-Both require a suitable brush selection; otherwise they write an explanatory warning to the log.
+Both require a suitable brush selection; otherwise they write an explanatory warning to the log. When an operation splits a brush into two or more fragments, the fragments are put into one group named `subtract` or `hollow` — one undo step covers both the cut and the grouping. Fragments produced inside an existing group stay in that group instead of nesting a new one, so repeated cuts on the same wall keep a flat structure.
 
 ### Grid control
 

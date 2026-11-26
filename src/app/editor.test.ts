@@ -217,7 +217,12 @@ describe('EditorApp', () => {
     });
     app.setSelection(['target']);
     expect(app.hollowSelection('inward')).toBe(true);
-    expect(app.selection.size).toBeGreaterThan(1);
+    // The fragments group automatically (T1.14), and the group is selected.
+    expect(app.selection.size).toBe(1);
+    const selected = app.document.nodes.get([...app.selection][0]!);
+    expect(selected?.kind).toBe('group');
+    expect((selected as { name: string }).name).toBe('hollow');
+    expect((selected as { children: string[] }).children.length).toBeGreaterThan(1);
     expect(app.undo()).toBe(true);
     expect(app.document.nodes.get('target')).toEqual(target);
   });

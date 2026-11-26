@@ -595,7 +595,7 @@ These three items are one WP because they rebuild the same panel. Splitting them
 - **Depends on:** –
 - **Done when:** the unit and E2E tests pass, and the mode is visible in all four views.
 
-### [ ] T1.14 Hollow and Subtract group their fragments (#22)
+### [x] T1.14 Hollow and Subtract group their fragments (#22)
 
 - **Goal:** Hollow and CSG Subtract put their results into a group when an operation produces more than one brush.
 - **Design (the owner's answer: only when there is more than one fragment):**

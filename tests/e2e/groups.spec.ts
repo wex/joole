@@ -165,3 +165,23 @@ test('G toggles group-pick mode, Ctrl+G groups and Shift+G ungroups (T1.13)', as
   await page.keyboard.press('g');
   await expect(page.locator('[data-testid=group-pick-chip]')).toHaveCount(0);
 });
+
+test('hollow groups its fragments into one named group (T1.14)', async ({ page }) => {
+  await openEmptyEditor(page);
+  await page.keyboard.press('b');
+  await drawBrush(page, [-64, -64, 0], [64, 64, 64]);
+
+  // Hollow Inward from the Edit menu: the shell fragments group automatically.
+  await page.getByRole('button', { name: 'Edit' }).click();
+  await page.getByRole('menuitem', { name: 'Hollow Inward' }).click();
+  await page.evaluate(() => (window as unknown as JooleWindow).joole!.whenIdle());
+  const project = await projectJson(page);
+  const groups = project.document.nodes.filter((n) => n.kind === 'group');
+  expect(groups.length).toBe(1);
+  expect(groups[0]!.name).toBe('hollow');
+  expect(groups[0]!.children!.length).toBeGreaterThanOrEqual(2);
+
+  // The tree shows the group with its fragments.
+  await page.locator('#bottom-tab-tree').click();
+  await expect(page.locator('[role=treeitem]', { hasText: 'hollow' })).toHaveCount(1);
+});
