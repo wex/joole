@@ -1,4 +1,5 @@
 import { analyzeBrush } from '@core/geom/index';
+import { stepTextureFocus as stepFocus, textureFocus as resolveFocus } from './textureFocus';
 import { reparentNodePatch, addNodePatch, createEmptyDocument, createId } from '@core/doc/index';
 import {
   mergeEntityDefs,
@@ -1326,6 +1327,26 @@ export class EditorApp {
         }
       }
     }
+    this.emit({ type: 'tool' });
+  }
+
+  /** The texture tool's focus navigation state (T1.6), for the Properties row. */
+  textureFocus() {
+    return resolveFocus(
+      this.document,
+      this.selection,
+      this.textureTool.faceSelection.map((ref) => ({ brush: ref.brush, face: ref.face })),
+    );
+  }
+
+  /** Steps the texture focus one face forward or back, wrapping around. */
+  stepTextureFocus(direction: 1 | -1): void {
+    const focus = this.textureFocus();
+    if (!focus.brush) {
+      return;
+    }
+    const target = stepFocus(focus, direction);
+    this.textureTool.setFaceSelection(target === -1 ? [] : [{ brush: focus.brush, face: target }]);
     this.emit({ type: 'tool' });
   }
 

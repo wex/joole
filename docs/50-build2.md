@@ -285,7 +285,7 @@ Each milestone can ship as its own minor release. Tag the releases as the owner 
 - **Depends on:** T1.4, which touches the same handlers. If the two are built in parallel, merge T1.4 first.
 - **Done when:** the wheel moves the 3D camera forward and back, and the unit and E2E tests pass.
 
-### [ ] T1.6 Brush and face navigation in Properties (#8)
+### [x] T1.6 Brush and face navigation in Properties (#8)
 
 - **Goal:** in the texture tool, with a brush or a face selected, ◀ and ▶ buttons in Properties step through the brush as a whole and then each of its faces.
 - **Design:**

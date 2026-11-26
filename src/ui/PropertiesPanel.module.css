@@ -139,3 +139,36 @@
   font: var(--text-ui-body);
   padding: 2px 4px;
 }
+
+/* The texture tool's brush/face navigation row (T1.6). */
+.focusRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  margin-bottom: var(--space-md);
+}
+
+.focusButton {
+  flex: none;
+  width: 24px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid var(--line-strong);
+  background: var(--surface-2);
+  color: var(--ink);
+  font-size: 10px;
+  cursor: pointer;
+}
+
+.focusButton:hover {
+  background: var(--surface-3);
+}
+
+.focusLabel {
+  flex: 1;
+  text-align: center;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

@@ -187,3 +187,62 @@ test('the texture tool highlights the picked face (T1.3)', async ({ page }) => {
   await page.keyboard.press('s');
   expect(await highlight()).toBe(0);
 });
+
+test('the focus buttons step through the brush and its faces (T1.6)', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.locator('[data-testid=editor-shell]')).toBeVisible();
+
+  // Draw a box and pick it as the texture target.
+  await page.getByRole('button', { name: 'Brush (B)' }).click();
+  const top = await page.evaluate(() => {
+    const joole = (
+      window as unknown as {
+        joole: {
+          camera(name: string): { center: [number, number, number]; zoom: number };
+          viewRects(): Record<string, { x: number; y: number; width: number; height: number }>;
+        };
+      }
+    ).joole;
+    const camera = joole.camera('top');
+    const rect = joole.viewRects()['top']!;
+    const canvas = document.querySelector('canvas')!.getBoundingClientRect();
+    const ratio = window.devicePixelRatio || 1;
+    const toScreen = (wx: number, wy: number) => ({
+      x: canvas.left + rect.x + (wx - camera.center[0]) * (camera.zoom / ratio) + rect.width / 2,
+      y: canvas.top + rect.y - (wy - camera.center[1]) * (camera.zoom / ratio) + rect.height / 2,
+    });
+    return { a: toScreen(0, 0), b: toScreen(64, 64) };
+  });
+  await page.mouse.move(top.a.x, top.a.y);
+  await page.mouse.down();
+  await page.mouse.move(top.b.x, top.b.y, { steps: 4 });
+  await page.mouse.up();
+
+  await page.keyboard.press('t');
+  const row = page.locator('[data-testid=texture-focus]');
+  await expect(row).toBeVisible();
+  await expect(row).toContainText('Brush (6 faces)');
+
+  // Seven steps forward cycle through faces 1–6 and back to the brush.
+  for (const label of [
+    'Face 1 of 6',
+    'Face 2 of 6',
+    'Face 3 of 6',
+    'Face 4 of 6',
+    'Face 5 of 6',
+    'Face 6 of 6',
+    'Brush (6 faces)',
+  ]) {
+    await page.getByRole('button', { name: 'Next face' }).click();
+    await expect(row).toContainText(label);
+  }
+  // Backward from the brush wraps to the last face.
+  await page.getByRole('button', { name: 'Previous face' }).click();
+  await expect(row).toContainText('Face 6 of 6');
+  // The face picks follow: one face picked, highlight active.
+  expect(
+    await page.evaluate(() =>
+      (window as unknown as { joole: { faceHighlight(): number } }).joole.faceHighlight(),
+    ),
+  ).toBe(1);
+});

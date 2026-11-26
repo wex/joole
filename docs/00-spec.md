@@ -335,14 +335,14 @@ The default layout has four views in a 2×2 grid (3D, top, front, side), a prope
 
 **Tool modes** (one at a time, shortcut in parentheses):
 
-| Mode                                                   | Behaviour                                                                                                                      | Qoole equivalent                            |
-| ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------- |
-| Select (S)                                             | click, Shift adds to the selection, box drag, move by dragging, handles for scaling, Ctrl+drag rotates                         | `OpSelect*`, `OpSelectionMove/Rotate/Scale` |
-| Brush (B)                                              | dragging in a 2D view creates the chosen primitive                                                                             | prefabs, `QPrefbVw`                         |
-| Entity (E)                                             | a click creates an entity of the chosen class. A brush class (`func_*`, `trigger_*`) turns the selected brushes into an entity | `QEntSel`                                   |
-| Clip (C)                                               | two points in a 2D view, Enter clips, Tab switches the side to keep                                                            | `OpPlaneClip` (scissors icon)               |
-| Vertex and edge (V, pressing again switches), face (F) | handles for the derived elements, dragging snaps to the grid                                                                   | `MoveVertex`, `MoveEdge`, `MoveFace`        |
-| Texture (T)                                            | selecting a face in the 3D view, setting and adjusting its texture; the picked faces are highlighted in every view             | `QPropSrf`, `QPropTex`                      |
+| Mode                                                   | Behaviour                                                                                                                                                                                           | Qoole equivalent                            |
+| ------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------- |
+| Select (S)                                             | click, Shift adds to the selection, box drag, move by dragging, handles for scaling, Ctrl+drag rotates                                                                                              | `OpSelect*`, `OpSelectionMove/Rotate/Scale` |
+| Brush (B)                                              | dragging in a 2D view creates the chosen primitive                                                                                                                                                  | prefabs, `QPrefbVw`                         |
+| Entity (E)                                             | a click creates an entity of the chosen class. A brush class (`func_*`, `trigger_*`) turns the selected brushes into an entity                                                                      | `QEntSel`                                   |
+| Clip (C)                                               | two points in a 2D view, Enter clips, Tab switches the side to keep                                                                                                                                 | `OpPlaneClip` (scissors icon)               |
+| Vertex and edge (V, pressing again switches), face (F) | handles for the derived elements, dragging snaps to the grid                                                                                                                                        | `MoveVertex`, `MoveEdge`, `MoveFace`        |
+| Texture (T)                                            | selecting a face in the 3D view, setting and adjusting its texture; the picked faces are highlighted in every view, and the Properties panel steps through the brush and its faces with ◀ ▶ buttons | `QPropSrf`, `QPropTex`                      |
 
 **Commands in menus and as shortcuts:** cut, copy, paste and duplicate (as `.map` text on the clipboard, so transfer to another editor works). Also CSG subtract, CSG intersect, hollow inwards and outwards, mirror X/Y/Z, rotate 90°, group and ungroup, hide and show, lock, and grid size \[ and \]. The views have a right-click context menu with Add Brush, Add Entity and Apply Entity → category → class.
 
@@ -476,6 +476,8 @@ The implementation proceeds in five phases. Each phase ends with a usable versio
 5. **Compilation and polish.** WASM tools in the browser (qbsp3, qvis3 and qrad3 in workers, threads), the leak path, compile profiles, PWA, the performance targets and Firefox/Safari support. _Done when_ the targets in the performance table are met and a map compiles to a playable BSP file without leaving the browser.
 
 **Decisions 26.11.2026:**
+
+- **Face navigation (26.11.2026):** in the texture tool the Properties panel shows a ◀ ▶ row that steps through the anchor brush and each of its faces in document face order, wrapping at both ends. The anchor is the face picks' brush or the single selected brush; faces with an empty derived polygon are skipped. Stepping to the brush clears the face picks, so the texture targets become the whole brush. There is no keyboard shortcut yet.
 
 - **Texture-tool face highlight (26.11.2026):** the picked faces are drawn as a translucent `vp-select` fill at 35 % opacity in the 3D view (polygon-offset, depth-tested) and as `vp-select` polygon outlines in the 2D views, because the per-node selection state cannot mark a single face. The polygons are recomputed by the app on document and tool events; the renderer receives core types only.
 
