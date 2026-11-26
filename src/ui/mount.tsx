@@ -3,7 +3,7 @@ import type { EditorApp } from '@app/index';
 import type { Renderer } from '@render/index';
 import { createSignal } from 'solid-js';
 import { registerAppServiceWorker } from '@platform/pwa';
-import { EditorShell, type PwaUpdateFlow } from './EditorShell';
+import { EditorShell, type EditorShellProps, type PwaUpdateFlow } from './EditorShell';
 
 export type { PwaUpdateFlow };
 
@@ -12,6 +12,8 @@ export interface MountEditorShellOptions {
   readonly renderer: Renderer;
   readonly canvas: HTMLCanvasElement;
   readonly pwa?: PwaUpdateFlow;
+  readonly settings?: EditorShellProps['settings'];
+  readonly onSettingsChange?: EditorShellProps['onSettingsChange'];
 }
 
 export function mountEditorShell(options: MountEditorShellOptions, root: HTMLElement): () => void {
@@ -38,6 +40,8 @@ export function mountEditorShell(options: MountEditorShellOptions, root: HTMLEle
         app={options.app}
         renderer={options.renderer}
         canvas={options.canvas}
+        settings={options.settings}
+        onSettingsChange={options.onSettingsChange}
         pwa={flow}
       />
     ),

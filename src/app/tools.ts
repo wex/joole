@@ -676,7 +676,9 @@ export class VertexTool {
         (p) => [p[0] - delta[0], p[1] - delta[1], p[2] - delta[2]] as Vec3,
       );
       const measure = analyzeBrush(result.value).aabb;
-      this.drag.measure = measure ? { min: [...measure.min] as Vec3, max: [...measure.max] as Vec3 } : null;
+      this.drag.measure = measure
+        ? { min: [...measure.min] as Vec3, max: [...measure.max] as Vec3 }
+        : null;
       return {
         invalid: [],
         handles: this.handleDots(),

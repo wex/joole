@@ -484,7 +484,7 @@ Each milestone can ship as its own minor release. Tag the releases as the owner 
 
 ## M3 – Panels, groups and settings
 
-### [ ] T1.12 Right dock: collapsible Properties, the texture list and a thumbnail slider (#17, #18, #19)
+### [x] T1.12 Right dock: collapsible Properties, the texture list and a thumbnail slider (#17, #18, #19)
 
 These three items are one WP because they rebuild the same panel. Splitting them would mean three passes over the same layout, CSS and E2E tests.
 

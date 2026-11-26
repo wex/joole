@@ -2,10 +2,9 @@ import { For } from 'solid-js';
 import type { ViewId } from '@render/index';
 import styles from './PanelTabs.module.css';
 
-export type BottomTab = 'textures' | 'tree' | 'prefabs' | 'log';
+export type BottomTab = 'tree' | 'prefabs' | 'log';
 
 const contentTabs: readonly { id: BottomTab; label: string }[] = [
-  { id: 'textures', label: 'Textures' },
   { id: 'tree', label: 'Tree' },
   { id: 'prefabs', label: 'Prefabs' },
   { id: 'log', label: 'Log' },
@@ -30,7 +29,9 @@ export function PanelTabs(props: PanelTabsProps) {
       return;
     }
     event.preventDefault();
-    const next = props.selected === 'textures' ? 'log' : 'textures';
+    const index = contentTabs.findIndex((tab) => tab.id === props.selected);
+    const step = event.key === 'ArrowRight' ? 1 : -1;
+    const next = contentTabs[(index + step + contentTabs.length) % contentTabs.length]!.id;
     props.onSelect(next);
     queueMicrotask(() => document.getElementById(`bottom-tab-${next}`)?.focus());
   };

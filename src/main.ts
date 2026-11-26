@@ -3,6 +3,7 @@ import type { Vec3 } from '@core/types/index';
 import '../docs/design-system/tokens.css';
 import '@ui/global.css';
 import { EditorApp } from '@app/index';
+import { parseSettings, updateSettings } from '@app/settings';
 import {
   browserInflate,
   collectFromHandle,
@@ -27,7 +28,18 @@ if (!root) {
 const textureCache = await TextureCache.openLocal().catch(() => null);
 const projectStore = await ProjectStore.openLocal().catch(() => null);
 const prefabStore = await PrefabStore.openLocal().catch(() => null);
-const settings = (await projectStore?.loadSettings()) ?? null;
+let settings = parseSettings(await projectStore?.loadSettings());
+// Settings writes are debounced and merge into the stored object, so one
+// change never overwrites the rest (T1.12).
+let settingsSaveTimer: ReturnType<typeof setTimeout> | null = null;
+function queueSettingsSave(partial: Record<string, unknown>): void {
+  settings = updateSettings(settings, partial);
+  if (settingsSaveTimer !== null) clearTimeout(settingsSaveTimer);
+  settingsSaveTimer = setTimeout(() => {
+    settingsSaveTimer = null;
+    void projectStore?.saveSettings({ ...settings });
+  }, 500);
+}
 const textureClient = new TextureClient();
 
 async function pickMapFile(): Promise<File | null> {
@@ -167,6 +179,7 @@ setInterval(() => void app.autosave(), 30000);
 window.addEventListener('pagehide', () => void app.autosave());
 renderer.setDocument(app.document);
 updateTargetLinks();
+document.documentElement.dataset.theme = settings.theme;
 if (typeof settings?.gridSize === 'number') app.setGridSize(settings.gridSize);
 renderer.setGridSize(app.gridSize);
 
@@ -228,7 +241,7 @@ app.subscribe((event) => {
     renderer.reloadTextures();
   } else if (event.type === 'grid') {
     renderer.setGridSize(app.gridSize);
-    void projectStore?.saveSettings({ gridSize: app.gridSize });
+    queueSettingsSave({ gridSize: app.gridSize });
   }
 });
 
@@ -282,4 +295,21 @@ window.joole = {
   faceHighlight: () => app.faceHighlightPolygons().length,
 };
 
-mountEditorShell({ app, renderer, canvas }, root);
+mountEditorShell(
+  {
+    app,
+    renderer,
+    canvas,
+    settings: {
+      rightWidth: settings.rightWidth,
+      bottomHeight: settings.bottomHeight,
+      dockSplit: settings.dockSplit,
+      propertiesCollapsed: settings.propertiesCollapsed,
+      texturesCollapsed: settings.texturesCollapsed,
+      thumbSize: settings.thumbSize,
+      theme: settings.theme,
+    },
+    onSettingsChange: queueSettingsSave,
+  },
+  root,
+);

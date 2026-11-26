@@ -285,7 +285,7 @@ Editing feedback uses the same incremental GPU cache as document edits: selected
 
 Clipboard editing serialises the selected brushes in clipboard mode (full float precision). Pasted brushes always receive fresh nanoids; duplicate offsets the copy by one grid step in X and Y. The interoperability check is at the format level in this phase: the emitted text is canonical Q2 `.map`, and the automated round trip parses it back without loss.
 
-Project saving is implemented as versioned `joole-project` JSON with exact JSON float round trips and a migration chain entry point. Ctrl+S uses the File System Access save picker in Chromium and the download path elsewhere or when the picker is unavailable; grid settings and recent-file metadata are persisted in OPFS. Exporting `.map` remains a separate writer path with integer-point warnings.
+Project saving is implemented as versioned `joole-project` JSON with exact JSON float round trips and a migration chain entry point. Ctrl+S uses the File System Access save picker in Chromium and the download path elsewhere or when the picker is unavailable; the editor settings (grid size, panel layout, thumbnail size, theme) and recent-file metadata are persisted in OPFS as one merge-safe object — a partial update never overwrites the other keys. Exporting `.map` remains a separate writer path with integer-point warnings.
 
 Autosave writes the current project to OPFS every 30 seconds once a command has made it dirty, and again on `pagehide`. The dirty flag is cleared only by an explicit project save/download. On start-up, a dirty autosave produces a recovery prompt; accepting loads it as `recovered.joole.json`, and discarding clears the recovery metadata.
 
@@ -331,7 +331,7 @@ The values were verified on 24.11.2026 against Quake-2-Tools' `common/qfiles.h`,
 
 ## Editor features and UI
 
-The default layout has four views in a 2×2 grid (3D, top, front, side), a properties panel on the right, and a texture browser and log pane at the bottom. The top of the properties panel shows the selection's texture (or "Multiple textures"). The panel borders can be moved, and a single view can be maximised to fill the workspace with F1–F4 (3D, Top, Front, Side); the same key restores the grid. Qoole's MFC docking (`Interface2/`) is replaced by CSS Grid. The panels are Solid 2 components. The views are one canvas that the UI library does not render. The UI's look, components, colours, and language and voice are defined in the design system ([design-system/README.md](design-system/README.md)), and the UI text is in English.
+The default layout has four views in a 2×2 grid (3D, top, front, side), a dock on the right with collapsible Properties and Textures sections — the texture list has a thumbnail-size slider — and a bottom panel with the Tree, Prefabs and Log tabs. The top of the properties panel shows the selection's texture (or "Multiple textures"). The panel borders can be moved, and a single view can be maximised to fill the workspace with F1–F4 (3D, Top, Front, Side); the same key restores the grid. Qoole's MFC docking (`Interface2/`) is replaced by CSS Grid. The panels are Solid 2 components. The views are one canvas that the UI library does not render. The UI's look, components, colours, and language and voice are defined in the design system ([design-system/README.md](design-system/README.md)), and the UI text is in English.
 
 **Tool modes** (one at a time, shortcut in parentheses):
 
@@ -477,6 +477,7 @@ The implementation proceeds in five phases. Each phase ends with a usable versio
 
 **Decisions 26.11.2026:**
 
+- **The right dock (26.11.2026):** the right panel is a dock of two collapsible sections, Properties and Textures, and the texture thumbnails are sized by a slider from 32 to 128 px. The bottom panel keeps the Tree, Prefabs and Log tabs. The dock layout, the thumbnail size, the grid size and the theme persist as one merge-safe settings object, so a partial update never overwrites the other keys (T1.12).
 - **Vertex, edge and face snapping (26.11.2026):** drags snap the grabbed point — the vertex, the edge endpoint or the face vertex nearest the cursor — to absolute grid positions rather than moving by grid-sized steps, so an element that starts off the grid joins it with the first step. 'The grabbed point snaps' is the rule because it is the easiest to predict when dragging by a dot. During the drag the snapped target shows as the T1.2 cursor cross and the edited brush's size box follows the T1.2 measurement overlay; a rejected step keeps the last valid size next to the dashed invalid preview.
 
 - **Resize snapping (26.11.2026):** the Select tool's corner resize snaps the dragged corner to the grid on the view axes. The target is computed from the original corner every step and the command scales from the current corner to the target, so float error does not build up. The corner can neither cross the anchor nor come closer than one grid step — mirroring stays its own command. When the anchor is off the grid, the moved faces still land on the grid while the anchored faces keep their positions.

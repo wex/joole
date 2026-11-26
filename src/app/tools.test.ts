@@ -610,4 +610,3 @@ describe('vertex/edge/face absolute grid snapping (T1.11)', () => {
     expect(upOut.measure).toBeNull();
   });
 });
-

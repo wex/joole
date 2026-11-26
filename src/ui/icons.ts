@@ -1,6 +1,7 @@
 import boxIcon from 'lucide-static/icons/box.svg?raw';
 import brushIcon from 'lucide-static/icons/brush.svg?raw';
 import chevronDownIcon from 'lucide-static/icons/chevron-down.svg?raw';
+import chevronRightIcon from 'lucide-static/icons/chevron-right.svg?raw';
 import circleUserIcon from 'lucide-static/icons/circle-user.svg?raw';
 import fileInputIcon from 'lucide-static/icons/file-input.svg?raw';
 import folderOpenIcon from 'lucide-static/icons/folder-open.svg?raw';
@@ -34,6 +35,7 @@ export const icons = {
   box: normalize(boxIcon),
   brush: normalize(brushIcon),
   chevronDown: normalize(chevronDownIcon),
+  chevronRight: normalize(chevronRightIcon),
   circleUser: normalize(circleUserIcon),
   clip: normalize(clipIcon),
   csgSubtract: normalize(csgSubtractIcon),

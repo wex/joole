@@ -22,6 +22,7 @@ import { PanelTabs, type BottomTab } from './PanelTabs';
 import { TreeView } from './TreeView';
 import { PrefabBrowser } from './PrefabBrowser';
 import { PropertiesPanel } from './PropertiesPanel';
+import { DockSection } from './DockSection';
 import { TextureBrowser } from './TextureBrowser';
 import { Toolbar } from './Toolbar';
 import styles from './EditorShell.module.css';
@@ -37,6 +38,17 @@ export interface EditorShellProps {
   readonly renderer: Renderer;
   readonly canvas: HTMLCanvasElement;
   readonly pwa?: PwaUpdateFlow;
+  /** The persisted settings, loaded at startup; the shell reports changes back. */
+  readonly settings?: {
+    readonly rightWidth: number;
+    readonly bottomHeight: number;
+    readonly dockSplit: number;
+    readonly propertiesCollapsed: boolean;
+    readonly texturesCollapsed: boolean;
+    readonly thumbSize: number;
+    readonly theme: 'dark' | 'light';
+  };
+  readonly onSettingsChange?: (partial: Record<string, unknown>) => void;
 }
 
 const viewLabels: Record<ViewId, string> = {
@@ -57,10 +69,10 @@ const functionKeys: Record<string, ViewId> = {
   F4: 'side',
 };
 
-const initialRightWidth = 224;
+const initialRightWidth = 320;
 const initialBottomHeight = 160;
 const minRightWidth = 168;
-const maxRightWidth = 480;
+const maxRightWidth = 640;
 const minBottomHeight = 88;
 const maxBottomHeight = 420;
 
@@ -99,6 +111,8 @@ interface HitView {
 
 export function EditorShell(props: EditorShellProps) {
   const app = untrack(() => props.app);
+  // The persisted settings are the initial values only; the shell owns them afterwards.
+  const initialSettings = untrack(() => props.settings);
   const renderer = untrack(() => props.renderer);
   const canvasElement = untrack(() => props.canvas);
   const [mapName, setMapName] = createSignal(app.mapName);
@@ -110,11 +124,25 @@ export function EditorShell(props: EditorShellProps) {
   const [activeView, setActiveView] = createSignal<ViewId>('3d');
   const [maximizedView, setMaximizedView] = createSignal<ViewId | null>(null);
   const [compileMenuOpen, setCompileMenuOpen] = createSignal(false);
-  const [bottomTab, setBottomTab] = createSignal<BottomTab>('textures');
-  const [theme, setTheme] = createSignal<'dark' | 'light'>('dark');
+  const [bottomTab, setBottomTab] = createSignal<BottomTab>('tree');
+  const [theme, setTheme] = createSignal<'dark' | 'light'>(initialSettings?.theme ?? 'dark');
   const [coordinates, setCoordinates] = createSignal(coordinateDefaults(false));
-  const [rightWidth, setRightWidth] = createSignal(initialRightWidth);
-  const [bottomHeight, setBottomHeight] = createSignal(initialBottomHeight);
+  const [rightWidth, setRightWidth] = createSignal(
+    initialSettings?.rightWidth ?? initialRightWidth,
+  );
+  const [bottomHeight, setBottomHeight] = createSignal(
+    initialSettings?.bottomHeight ?? initialBottomHeight,
+  );
+  // The right dock (T1.12): two collapsible sections split vertically.
+  const [dockSplit, setDockSplit] = createSignal(initialSettings?.dockSplit ?? 0.5);
+  const [propertiesCollapsed, setPropertiesCollapsed] = createSignal(
+    initialSettings?.propertiesCollapsed ?? false,
+  );
+  const [texturesCollapsed, setTexturesCollapsed] = createSignal(
+    initialSettings?.texturesCollapsed ?? false,
+  );
+  const [thumbSize, setThumbSize] = createSignal(initialSettings?.thumbSize ?? 64);
+  const reportSetting = (key: string, value: unknown) => props.onSettingsChange?.({ [key]: value });
   const [viewMenu, setViewMenu] = createSignal<{
     x: number;
     y: number;
@@ -151,6 +179,7 @@ export function EditorShell(props: EditorShellProps) {
   const [cursor, setCursor] = createSignal<readonly number[] | null>(null);
 
   let viewportElement: HTMLDivElement | undefined;
+  let dockElement: HTMLElement | undefined;
   let mainElement: HTMLDivElement | undefined;
   let centerElement: HTMLDivElement | undefined;
   let gameInput: HTMLInputElement | undefined;
@@ -165,11 +194,13 @@ export function EditorShell(props: EditorShellProps) {
     const next = clamp(Math.round(width), minRightWidth, maxRightWidth);
     setRightWidth(next);
     mainElement?.style.setProperty('--right-panel-width', `${next}px`);
+    reportSetting('rightWidth', next);
   };
   const setPanelHeight = (height: number) => {
     const next = clamp(Math.round(height), minBottomHeight, maxBottomHeight);
     setBottomHeight(next);
     centerElement?.style.setProperty('--bottom-panel-height', `${next}px`);
+    reportSetting('bottomHeight', next);
   };
 
   const hitView = (clientX: number, clientY: number): HitView | null => {
@@ -227,6 +258,7 @@ export function EditorShell(props: EditorShellProps) {
     setTheme(next);
     document.documentElement.dataset.theme = next;
     renderer.refreshColors();
+    reportSetting('theme', next);
   };
 
   const stepGrid = (direction: -1 | 1) => {
@@ -272,6 +304,36 @@ export function EditorShell(props: EditorShellProps) {
       event.preventDefault();
       setPanelHeight(bottomHeight() + (event.key === 'ArrowUp' ? step : -step));
     }
+  };
+
+  // The dock's inner splitter stores a fraction of the dock's height (T1.12).
+  const setDockFraction = (fraction: number) => {
+    const next = clamp(fraction, 0.15, 0.85);
+    setDockSplit(next);
+    reportSetting('dockSplit', next);
+  };
+  const beginDockSplitterDrag = (event: PointerEvent): void => {
+    if (event.button !== 0 || !dockElement) return;
+    event.preventDefault();
+    const target = event.currentTarget as HTMLElement;
+    target.setPointerCapture(event.pointerId);
+    const bounds = dockElement.getBoundingClientRect();
+    const move = (moveEvent: PointerEvent) => {
+      setDockFraction((moveEvent.clientY - bounds.top) / bounds.height);
+    };
+    const up = () => {
+      target.removeEventListener('pointermove', move);
+      target.removeEventListener('pointerup', up);
+      target.removeEventListener('pointercancel', up);
+    };
+    target.addEventListener('pointermove', move);
+    target.addEventListener('pointerup', up);
+    target.addEventListener('pointercancel', up);
+  };
+  const dockSplitterKey = (event: KeyboardEvent): void => {
+    if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
+    event.preventDefault();
+    setDockFraction(dockSplit() + (event.key === 'ArrowDown' ? 0.05 : -0.05));
   };
 
   onSettled(() => {
@@ -1112,24 +1174,6 @@ export function EditorShell(props: EditorShellProps) {
             <Show when={bottomTab() === 'log'}>
               <LogPanel entries={entries()} />
             </Show>
-            <Show when={bottomTab() === 'textures'}>
-              <Show
-                when={gameOpen()}
-                fallback={
-                  <div class={styles.texturePlaceholder} data-testid="texture-placeholder">
-                    Open a game folder to index textures.
-                  </div>
-                }
-              >
-                <TextureBrowser
-                  entries={textureList()}
-                  inUse={() => app.texturesInUse()}
-                  selected={() => currentTexture()}
-                  onSelect={(name) => app.chooseTexture(name)}
-                  load={(name) => app.loadTexture(name)}
-                />
-              </Show>
-            </Show>
           </section>
         </div>
         <div
@@ -1142,12 +1186,107 @@ export function EditorShell(props: EditorShellProps) {
           onPointerDown={(event) => beginSplitterDrag(event, 'vertical')}
           onKeyDown={(event) => splitterKey(event, 'vertical')}
         />
-        <PropertiesPanel
-          app={app}
-          mapName={mapName()}
-          gameOpen={gameOpen()}
-          version={panelVersion}
-        />
+        <aside
+          class={styles.dock}
+          aria-label="Properties and textures"
+          ref={(el) => (dockElement = el)}
+        >
+          <div
+            class={styles.dockProperties}
+            style={
+              propertiesCollapsed()
+                ? undefined
+                : texturesCollapsed()
+                  ? { flex: '1' }
+                  : { height: `${dockSplit() * 100}%` }
+            }
+          >
+            <DockSection
+              title="Properties"
+              testId="dock-properties"
+              collapsed={propertiesCollapsed()}
+              onToggle={() => {
+                const next = !propertiesCollapsed();
+                setPropertiesCollapsed(next);
+                reportSetting('propertiesCollapsed', next);
+              }}
+            >
+              <PropertiesPanel
+                app={app}
+                mapName={mapName()}
+                gameOpen={gameOpen()}
+                version={panelVersion}
+              />
+            </DockSection>
+          </div>
+          <Show when={!propertiesCollapsed() && !texturesCollapsed()}>
+            <div
+              class={[styles.splitter, styles.horizontalSplitter]}
+              role="separator"
+              aria-orientation="horizontal"
+              aria-label="Resize dock sections"
+              aria-valuenow={Math.round(dockSplit() * 100)}
+              tabindex="0"
+              onPointerDown={beginDockSplitterDrag}
+              onKeyDown={dockSplitterKey}
+            />
+          </Show>
+          <div
+            class={styles.dockTextures}
+            style={
+              texturesCollapsed() ? undefined : propertiesCollapsed() ? { flex: '1' } : undefined
+            }
+            data-testid="dock-textures-wrap"
+          >
+            <DockSection
+              title="Textures"
+              testId="dock-textures"
+              collapsed={texturesCollapsed()}
+              onToggle={() => {
+                const next = !texturesCollapsed();
+                setTexturesCollapsed(next);
+                reportSetting('texturesCollapsed', next);
+              }}
+            >
+              <div class={styles.textureControls}>
+                <label class={styles.textureSliderLabel}>
+                  Thumbnail size
+                  <input
+                    type="range"
+                    min="32"
+                    max="128"
+                    step="16"
+                    value={thumbSize()}
+                    aria-label="Thumbnail size"
+                    data-testid="thumb-size-slider"
+                    onInput={(event) => {
+                      const next = Number(event.currentTarget.value);
+                      setThumbSize(next);
+                      reportSetting('thumbSize', next);
+                    }}
+                  />
+                </label>
+              </div>
+              <Show
+                when={gameOpen()}
+                fallback={
+                  <div class={styles.texturePlaceholder} data-testid="texture-placeholder">
+                    Open a game folder to index textures.
+                  </div>
+                }
+              >
+                <TextureBrowser
+                  entries={textureList()}
+                  inUse={() => app.texturesInUse()}
+                  selected={() => currentTexture()}
+                  thumbSize={thumbSize}
+                  onSelect={(name) => app.chooseTexture(name)}
+                  load={(name) => app.loadTexture(name)}
+                />
+              </Show>
+            </DockSection>
+          </div>
+        </aside>
       </div>
       <Show when={recoveryAvailable()}>
         <div
