@@ -348,3 +348,69 @@ describe('VertexTool event scripts', () => {
     expect(moved.commands).toHaveLength(1);
   });
 });
+
+describe('BrushTool grid lock and feedback (T1.2)', () => {
+  function makeTool(grid: number) {
+    const doc = createEmptyDocument();
+    return {
+      doc,
+      tool: new BrushTool(
+        () => doc,
+        () => grid,
+      ),
+    };
+  }
+
+  it('reports the snapped cursor on idle moves in a 2D view', () => {
+    const { tool } = makeTool(8);
+    const out = tool.pointer({ ...move(5, 13), point: [5, 13, 0] });
+    expect(out.cursor).toEqual([8, 16, 0]);
+  });
+
+  it('reports no cursor in the 3D view', () => {
+    const { tool } = makeTool(8);
+    const out = tool.pointer({ ...move(5, 13), view: '3d', point: [5, 13, 0] });
+    expect(out.cursor ?? null).toBeNull();
+  });
+
+  it('reports the measure box while drawing', () => {
+    const { tool } = makeTool(8);
+    tool.pointer(down(0, 0));
+    const out = tool.pointer({ ...move(70, 40), point: [70, 40, 0] });
+    expect(out.measure).toEqual({ min: [0, 0, -32], max: [72, 40, 32] });
+  });
+
+  it('every bound of a painted brush is a grid multiple at large grid sizes', () => {
+    for (const grid of [8, 64, 128]) {
+      const { doc, tool } = makeTool(grid);
+      // Deliberately off-grid pointer positions.
+      const commands = runScript(tool, [
+        { ...down(3, 3), point: [3, 3, 0] },
+        { ...move(101, 69), point: [101, 69, 0] },
+        { ...up(101, 69), point: [101, 69, 0] },
+      ]);
+      expect(commands).toHaveLength(1);
+      const patched = applyPatch(doc, commands[0]!.run(doc));
+      const created = [...patched.nodes.values()].find((node) => node.kind === 'brush');
+      expect(created?.kind).toBe('brush');
+      if (created?.kind === 'brush') {
+        const box = analyzeBrush(created).aabb!;
+        for (const axis of [0, 1, 2] as const) {
+          expect((box.min[axis]! / grid) % 1, `min axis ${axis} grid ${grid}`).toBeCloseTo(0, 9);
+          expect((box.max[axis]! / grid) % 1, `max axis ${axis} grid ${grid}`).toBeCloseTo(0, 9);
+        }
+        // The depth is at least 64 even at large grids.
+        expect(box.max[2]! - box.min[2]!).toBeGreaterThanOrEqual(64);
+      }
+    }
+  });
+
+  it('clears cursor and measure when the tool is cancelled', () => {
+    const { tool } = makeTool(8);
+    tool.pointer(down(0, 0));
+    tool.pointer({ ...move(64, 64), point: [64, 64, 0] });
+    tool.cancel();
+    const out = tool.pointer({ ...move(64, 64), view: '3d', point: [64, 64, 0] });
+    expect(out.measure ?? null).toBeNull();
+  });
+});

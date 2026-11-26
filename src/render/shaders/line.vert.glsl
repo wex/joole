@@ -18,6 +18,7 @@ uniform vec4 uBrushColor;
 uniform vec4 uEntityColor;
 uniform vec4 uSelectColor;
 uniform vec4 uInvalidColor;
+uniform vec4 uHandleColor;
 uniform vec4 uLeakColor;
 
 out vec4 vColor;
@@ -35,11 +36,12 @@ void main() {
   bool invalid = (state & 4u) != 0u;
   bool dimmed = (state & 8u) != 0u;
   bool leak = (state & 16u) != 0u;
+  bool handle = (state & 64u) != 0u;
   vec4 a = uViewProjection * vec4(aA, 1.0);
   vec4 b = uViewProjection * vec4(aB, 1.0);
   vec4 classColor = vec4(vec3(texel.gba) / 255.0, 1.0);
   bool hasClassColor = entity && (texel.g + texel.b + texel.a) > 0u;
-  vColor = invalid ? uInvalidColor : selected ? uSelectColor : entity ? (hasClassColor ? classColor : uEntityColor) : uBrushColor;
+  vColor = handle ? uHandleColor : invalid ? uInvalidColor : selected ? uSelectColor : entity ? (hasClassColor ? classColor : uEntityColor) : uBrushColor;
   if (dimmed) {
     vColor = vec4(vColor.rgb * 0.35, vColor.a);
   }

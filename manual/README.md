@@ -261,7 +261,7 @@ The Brush tool creates new convex primitives.
 3. Drag a rectangle in Top, Front or Side.
 4. Release to create the brush. It becomes the selection.
 
-The two dragged axes snap to the grid. In the current implementation the axis perpendicular to the view receives a fixed 64-unit depth centered on the view plane; resize or clip the brush in another orthographic view afterwards. Brush creation is not available in the 3D view.
+The two dragged axes snap to the grid, and a small cross marks the snapped point under the cursor before the button is pressed. While dragging, a red box shows the brush in every orthographic view, with its in-plane extents labelled next to the edges and the full `W × D × H` size in the active view's title bar. The axis perpendicular to the view receives a depth of at least 64 units — the smallest multiple of the grid that reaches 64 — placed so that both faces lie on grid lines. Every bound of a painted brush is therefore a grid multiple at any grid size. Brush creation is not available in the 3D view.
 
 New brushes are created with Qoole's default texture, `e2u1/mine10_1`; choosing another texture in the browser does not change brushes that are already drawn.
 
@@ -729,7 +729,6 @@ Quake texture axes cannot represent every transformed orientation exactly. A war
 - Save, Undo and Redo toolbar icons are disabled placeholders; the keyboard shortcuts work.
 - The Entity and Texture toolbar icons do not currently activate their tools when clicked; use `E` and `T`.
 - `Ctrl+H` and `Ctrl+L` are reserved but currently do not invoke hide/lock commands.
-- Brush creation always starts with a 64-unit depth perpendicular to the drawing view.
 - Entity placement is intended for orthographic views; 3D placement does not project onto a ground plane.
 - `S` does not currently move the 3D fly camera backward because the key is intercepted before fly movement is recorded.
 - There is no group rename field in the current Tree UI.

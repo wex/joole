@@ -94,6 +94,7 @@ const LINE_UNIFORMS = [
   'uSelectColor',
   'uInvalidColor',
   'uLeakColor',
+  'uHandleColor',
 ] as const;
 const GRID_UNIFORMS = [
   'uViewportOrigin',
@@ -248,8 +249,16 @@ export class Renderer {
     segments: readonly (readonly [Vec3, Vec3])[],
     invalid: readonly (readonly [Vec3, Vec3])[] = [],
   ): void {
-    this.cache.setToolPreview(segments, invalid);
-    this.invalidate();
+    if (this.cache.setToolPreview(segments, invalid)) {
+      this.invalidate();
+    }
+  }
+
+  /** The snapped-cursor cross of the creation tools (null hides it). */
+  setCursor(point: Vec3 | null): void {
+    if (this.cache.setCursor(point)) {
+      this.invalidate();
+    }
   }
 
   /** Persistent target–targetname link lines in the 2D views. */
@@ -466,6 +475,7 @@ export class Renderer {
     gl.uniform4fv(u.uEntityColor, this.colors['vp-entity']);
     gl.uniform4fv(u.uSelectColor, this.colors['vp-select']);
     gl.uniform4fv(u.uInvalidColor, this.colors['vp-invalid']);
+    gl.uniform4fv(u.uHandleColor, this.colors['vp-handle']);
     gl.uniform4fv(u.uLeakColor, this.colors['vp-leak']);
     gl.bindVertexArray(this.cache.lines.vao);
     for (const pass of [0, 1]) {

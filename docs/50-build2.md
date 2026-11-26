@@ -167,7 +167,7 @@ Each milestone can ship as its own minor release. Tag the releases as the owner 
 - **Depends on:** –
 - **Done when:** a single click textures the selected brush, or the picked faces in the texture tool, it can be undone in one step, and the E2E test passes.
 
-### [ ] T1.2 Brush painting: size box and grid lock (#3, #4)
+### [x] T1.2 Brush painting: size box and grid lock (#3, #4)
 
 - **Goal:**
   - While the user paints a brush, a box shows its current size in every view.

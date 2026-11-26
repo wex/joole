@@ -24,6 +24,7 @@ import { clipPlaneFromPoints } from '@core/geom/csg';
 import { moveVertices } from '@core/geom/vertexEdit';
 import { createPointEntityPatch } from './entities';
 import { extractWireframe } from '@core/geom/brush';
+import { snap, snapAxes, snapDepthExtent } from './snap';
 
 export type ToolView = PickAxis | '3d';
 
@@ -53,6 +54,10 @@ export interface ToolOutput {
   readonly faces?: readonly { brush: Id; face: number }[];
   /** Texture name picked by the eyedropper. */
   readonly pickedTexture?: string;
+  /** The snapped world point under the cursor, when the tool tracks it. */
+  readonly cursor?: Vec3 | null;
+  /** The size box of the in-progress edit, when the tool has one. */
+  readonly measure?: { readonly min: Vec3; readonly max: Vec3 } | null;
 }
 
 function boxSegments(min: Vec3, max: Vec3): PreviewSegment[] {
@@ -65,6 +70,29 @@ function boxSegments(min: Vec3, max: Vec3): PreviewSegment[] {
   for (const x of [0, 1]) for (const z of [0, 1]) out.push([v[at(x, 0, z)]!, v[at(x, 1, z)]!]);
   for (const y of [0, 1]) for (const z of [0, 1]) out.push([v[at(0, y, z)]!, v[at(1, y, z)]!]);
   return out;
+}
+
+/** The four edges of a 2D drag rectangle in its view plane. */
+function rectSegments(start: Vec3, current: Vec3, view: ToolView): PreviewSegment[] {
+  const [axis0, axis1] = planeAxes(view);
+  const depth = depthAxis(view);
+  const at = (a: number, b: number): Vec3 => {
+    const point = [...start] as Vec3;
+    point[axis0] = a;
+    point[axis1] = b;
+    point[depth] = start[depth]!;
+    return point;
+  };
+  const x0 = Math.min(start[axis0]!, current[axis0]!);
+  const x1 = Math.max(start[axis0]!, current[axis0]!);
+  const y0 = Math.min(start[axis1]!, current[axis1]!);
+  const y1 = Math.max(start[axis1]!, current[axis1]!);
+  return [
+    [at(x0, y0), at(x1, y0)],
+    [at(x1, y0), at(x1, y1)],
+    [at(x1, y1), at(x0, y1)],
+    [at(x0, y1), at(x0, y0)],
+  ];
 }
 
 export interface BoxPreview {
@@ -89,11 +117,6 @@ function planeAxes(view: ToolView): [0 | 1 | 2, 0 | 1 | 2] {
 
 function depthAxis(view: ToolView): 0 | 1 | 2 {
   return view === 'xy' ? 2 : view === 'xz' ? 1 : view === 'yz' ? 0 : 2;
-}
-
-function snap(value: number, grid: number): number {
-  const snapped = Math.round(value / grid) * grid;
-  return snapped === 0 ? 0 : snapped;
 }
 
 function boundsOf(doc: Readonly<MapDocument>, ids: ReadonlySet<Id>): Aabb | null {
@@ -179,50 +202,45 @@ export class BrushTool {
   ) {}
 
   pointer(event: ToolPointerEvent): ToolOutput {
-    if (event.button !== 0 || event.view === '3d') {
+    if (event.view === '3d') {
+      return { commands: [], cursor: null };
+    }
+    // Move events carry button -1 in the browser; the drag state lives in
+    // this.mode, so only the down event is filtered by button.
+    if (event.type === 'down' && event.button !== 0) {
       return { commands: [] };
     }
     const grid = this.getGridSize();
     const [axis0, axis1] = planeAxes(event.view);
-    const depth = depthAxis(event.view);
     const point = [...event.point] as Vec3;
     point[axis0] = snap(point[axis0], grid);
     point[axis1] = snap(point[axis1], grid);
 
     if (event.type === 'down') {
       this.mode = { kind: 'draw', start: point, view: event.view };
-      return { commands: [] };
+      return { commands: [], cursor: point };
     }
     if (event.type === 'move') {
-      if (this.mode.kind !== 'draw') return { commands: [] };
-      const start = this.mode.start;
-      const min: Vec3 = [...point] as Vec3;
-      const max: Vec3 = [...point] as Vec3;
-      for (const axis of [axis0, axis1]) {
-        min[axis] = Math.min(start[axis], point[axis]);
-        max[axis] = Math.max(start[axis], point[axis]);
-      }
-      min[depth] = snap(start[depth], grid) - 32;
-      max[depth] = snap(start[depth], grid) + 32;
-      return { commands: [], preview: boxSegments(min, max) };
+      if (this.mode.kind !== 'draw') return { commands: [], cursor: point, measure: null };
+      const [min, max] = this.box(point);
+      return {
+        commands: [],
+        preview: boxSegments(min, max),
+        measure: { min, max },
+        cursor: point,
+      };
     }
     if (event.type !== 'up' || this.mode.kind !== 'draw') {
       return { commands: [] };
     }
 
-    const start = this.mode.start;
+    const [min, max] = this.box(point);
     this.mode = { kind: 'idle' };
-    const min: Vec3 = [...point] as Vec3;
-    const max: Vec3 = [...point] as Vec3;
     for (const axis of [axis0, axis1]) {
-      min[axis] = Math.min(start[axis], point[axis]);
-      max[axis] = Math.max(start[axis], point[axis]);
       if (min[axis] === max[axis]) {
-        return { commands: [] };
+        return { commands: [], measure: null, cursor: point };
       }
     }
-    min[depth] = snap(start[depth], grid) - 32;
-    max[depth] = snap(start[depth], grid) + 32;
 
     const result = createPrimitiveBrush(this.primitive, {
       id: createId(),
@@ -243,7 +261,28 @@ export class BrushTool {
         },
       ],
       selection: new Set([brush.id]),
+      measure: null,
+      cursor: point,
     };
+  }
+
+  /** The box of the in-progress draw: in-plane snapped, depth on the grid. */
+  private box(point: Vec3): [Vec3, Vec3] {
+    if (this.mode.kind !== 'draw') return [point, point];
+    const grid = this.getGridSize();
+    const start = this.mode.start;
+    const [axis0, axis1] = planeAxes(this.mode.view);
+    const depth = depthAxis(this.mode.view);
+    const min: Vec3 = [...point] as Vec3;
+    const max: Vec3 = [...point] as Vec3;
+    for (const axis of [axis0, axis1]) {
+      min[axis] = Math.min(start[axis], point[axis]);
+      max[axis] = Math.max(start[axis], point[axis]);
+    }
+    const [depthMin, depthMax] = snapDepthExtent(snap(start[depth], grid), grid);
+    min[depth] = depthMin;
+    max[depth] = depthMax;
+    return [min, max];
   }
 
   cancel(): void {
@@ -279,10 +318,7 @@ export class ClipTool {
   }
 
   private snapped(point: Vec3, view: PickAxis): Vec3 {
-    const out = [...point] as Vec3;
-    const grid = this.gridSize();
-    for (const axis of planeAxes(view)) out[axis] = snap(out[axis], grid);
-    return out;
+    return snapAxes(point, planeAxes(view), this.gridSize());
   }
 
   private previewSegments(): PreviewSegment[] {
@@ -292,7 +328,9 @@ export class ClipTool {
   }
 
   pointer(event: ToolPointerEvent): ToolOutput {
-    if (event.button !== 0 || event.view === '3d') return { commands: [] };
+    if (event.view === '3d' || (event.type === 'down' && event.button !== 0)) {
+      return { commands: [] };
+    }
     const point = this.snapped(event.point, event.view);
     if (event.type === 'down') {
       if (this.mode.kind === 'first') {
@@ -575,6 +613,7 @@ export class VertexTool {
         (p) => [p[0] - delta[0], p[1] - delta[1], p[2] - delta[2]] as Vec3,
       );
       return {
+        invalid: [],
         commands: [
           {
             label: `Move ${this.drag.kind}`,
@@ -596,8 +635,9 @@ export class VertexTool {
         ],
       };
     }
+    const hadDrag = this.drag !== null;
     this.drag = null;
-    return { commands: [] };
+    return hadDrag ? { commands: [], invalid: [] } : { commands: [] };
   }
 }
 
@@ -782,7 +822,7 @@ export class SelectTool {
         start: this.mode.start,
         current: event.point,
       };
-      return { commands: [] };
+      return { commands: [], preview: rectSegments(this.mode.start, event.point, this.mode.view) };
     }
     if (this.mode.kind === 'move') {
       const axes = planeAxes(this.mode.view);
@@ -877,7 +917,7 @@ export class SelectTool {
       this.selected = selection;
       this.mode = { kind: 'idle' };
       this.preview = null;
-      return { commands: [], selection };
+      return { commands: [], selection, preview: [] };
     }
     this.mode = { kind: 'idle' };
     return { commands: [] };
@@ -1065,7 +1105,7 @@ export class EntityTool {
     const classname = this.currentClass();
     if (!classname) return { commands: [] };
     const grid = this.gridSize();
-    const snapped = event.point.map((value) => Math.round(value / grid) * grid) as Vec3;
+    const snapped = event.point.map((value) => snap(value, grid)) as Vec3;
     const doc = this.getDocument();
     let placement: { patch: Patch; id: Id };
     try {

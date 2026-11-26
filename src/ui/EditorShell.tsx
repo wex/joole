@@ -1,5 +1,5 @@
 import { createSignal, For, onSettled, Show, untrack } from 'solid-js';
-import type { EditorApp, LogEntry, ToolPointerEvent } from '@app/index';
+import type { EditorApp, LogEntry, ToolOutput, ToolPointerEvent } from '@app/index';
 import { shortcutAction } from '@app/index';
 import type { OrthoCamera, PerspectiveCamera, Renderer, ViewId, ViewRect } from '@render/index';
 import { VIEW_ORDER } from '@render/index';
@@ -16,6 +16,7 @@ import {
 } from './cameras';
 import { Icon } from './Icon';
 import { LogPanel } from './LogPanel';
+import { MeasureOverlay, type MeasureBox } from './MeasureOverlay';
 import { PanelTabs, type BottomTab } from './PanelTabs';
 import { TreeView } from './TreeView';
 import { PrefabBrowser } from './PrefabBrowser';
@@ -145,6 +146,8 @@ export function EditorShell(props: EditorShellProps) {
   const [textureLock, setTextureLock] = createSignal(app.textureLockEnabled);
   const [recoveryAvailable, setRecoveryAvailable] = createSignal(app.recoveryProject !== null);
   const [panelVersion, setPanelVersion] = createSignal(0);
+  const [measure, setMeasure] = createSignal<MeasureBox | null>(null);
+  const [cursor, setCursor] = createSignal<readonly number[] | null>(null);
 
   let viewportElement: HTMLDivElement | undefined;
   let mainElement: HTMLDivElement | undefined;
@@ -376,13 +379,50 @@ export function EditorShell(props: EditorShellProps) {
       };
     };
 
+    const sameVec = (a: readonly number[] | null, b: readonly number[] | null) =>
+      (a === null && b === null) ||
+      (a !== null && b !== null && a[0] === b[0] && a[1] === b[1] && a[2] === b[2]);
+    const sameBox = (a: MeasureBox | null, b: MeasureBox | null) =>
+      (a === null && b === null) ||
+      (a !== null && b !== null && sameVec(a.min, b.min) && sameVec(a.max, b.max));
+
+    const applyToolFeedback = (output: ToolOutput) => {
+      // undefined means the tool said nothing; [] and null are explicit clears.
+      if (output.preview !== undefined || output.invalid !== undefined) {
+        renderer.setToolPreview(output.preview ?? [], output.invalid ?? []);
+      }
+      if (output.cursor !== undefined) {
+        const next = output.cursor ?? null;
+        if (!sameVec(cursor(), next)) {
+          setCursor(next);
+          renderer.setCursor(next as [number, number, number] | null);
+        }
+      }
+      if (output.measure !== undefined) {
+        const next = output.measure ?? null;
+        if (!sameBox(measure(), next)) {
+          setMeasure(next);
+        }
+      }
+    };
+
+    const clearToolFeedback = () => {
+      setMeasure(null);
+      setCursor((previous) => {
+        if (previous !== null) {
+          renderer.setCursor(null);
+        }
+        return null;
+      });
+    };
+
     const sendToolEvent = (type: 'down' | 'move' | 'up', event: PointerEvent) => {
       const hit = hitView(event.clientX, event.clientY);
       if (!hit || (toolPointer && hit.view !== toolPointer.view)) {
         return false;
       }
       const output = app.selectPointer(toolEvent(hit, type, event));
-      renderer.setToolPreview(output.preview ?? [], output.invalid ?? []);
+      applyToolFeedback(output);
       return true;
     };
 
@@ -444,6 +484,11 @@ export function EditorShell(props: EditorShellProps) {
         sendToolEvent('move', event);
         event.preventDefault();
         return;
+      }
+      // Hover tracking: with no buttons held the tools still see the move,
+      // so the creation tools can show the snapped cursor and the clip line.
+      if (!pan && !pointerLocked && !rightFly && event.buttons === 0) {
+        sendToolEvent('move', event);
       }
       if (pan && event.pointerId === pan.pointerId) {
         const camera = orthoCamera(pan.view);
@@ -671,6 +716,7 @@ export function EditorShell(props: EditorShellProps) {
 
     viewport.addEventListener('pointerdown', pointerDown);
     viewport.addEventListener('pointermove', pointerMove);
+    viewport.addEventListener('pointerleave', clearToolFeedback);
     viewport.addEventListener('pointerup', pointerEnd);
     viewport.addEventListener('pointercancel', pointerEnd);
     viewport.addEventListener('wheel', wheel, { passive: false });
@@ -695,6 +741,7 @@ export function EditorShell(props: EditorShellProps) {
         setGridSize(app.gridSize);
       } else if (event.type === 'tool') {
         renderer.setToolPreview([]);
+        clearToolFeedback();
         setActiveTool(app.activeTool);
         setBrushPrimitive(app.brushPrimitive);
         setBrushSides(app.brushSides);
@@ -722,6 +769,7 @@ export function EditorShell(props: EditorShellProps) {
       unsubscribe();
       viewport.removeEventListener('pointerdown', pointerDown);
       viewport.removeEventListener('pointermove', pointerMove);
+      viewport.removeEventListener('pointerleave', clearToolFeedback);
       viewport.removeEventListener('pointerup', pointerEnd);
       viewport.removeEventListener('pointercancel', pointerEnd);
       viewport.removeEventListener('wheel', wheel);
@@ -860,7 +908,11 @@ export function EditorShell(props: EditorShellProps) {
                     data-testid={`view-title-${view}`}
                   >
                     <span>{viewLabels[view]}</span>
-                    <span class={styles.coordinates}>{coordinates()[view]}</span>
+                    <span class={styles.coordinates}>
+                      {measure() && view === activeView()
+                        ? `${Math.round(measure()!.max[0]! - measure()!.min[0]!)} × ${Math.round(measure()!.max[1]! - measure()!.min[1]!)} × ${Math.round(measure()!.max[2]! - measure()!.min[2]!)}`
+                        : coordinates()[view]}
+                    </span>
                     <span class={styles.titleSpacer} />
                     <button
                       type="button"
@@ -1013,6 +1065,12 @@ export function EditorShell(props: EditorShellProps) {
                 </div>
               )}
             </Show>
+            <MeasureOverlay
+              measure={measure}
+              camera={orthoCamera}
+              rects={() => renderer.viewRects()}
+              ratio={() => renderer.backingRatio()}
+            />
           </div>
           <div
             class={[styles.splitter, styles.horizontalSplitter]}

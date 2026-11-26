@@ -20,11 +20,24 @@ import {
 import { unionAabb, type Aabb } from './camera';
 
 /** Bits of a node's byte in the state texture, read by the shaders. */
+function sameSegments(a: readonly LineSegment[], b: readonly LineSegment[]): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    const [a0, a1] = a[i]!;
+    const [b0, b1] = b[i]!;
+    for (let k = 0; k < 3; k++) {
+      if (a0[k] !== b0[k] || a1[k] !== b1[k]) return false;
+    }
+  }
+  return true;
+}
+
 export const STATE_SELECTED = 1;
 export const STATE_ENTITY = 2;
 export const STATE_INVALID = 4;
 export const STATE_DIMMED = 8;
 export const STATE_LEAK = 16;
+export const STATE_HANDLE = 64;
 
 /** The state texture is this many texels wide, one byte per node index. */
 const STATE_WIDTH = 1024;
@@ -171,7 +184,9 @@ export class GeometryCache {
   private invalidSegments: readonly LineSegment[] = [];
   private readonly invalidIndex: number;
   private readonly leakIndex: number;
+  private readonly cursorIndex: number;
   private leakSegments: readonly LineSegment[] = [];
+  private cursorPoint: readonly [number, number, number] | null = null;
 
   constructor(
     private readonly gl: WebGL2RenderingContext,
@@ -190,6 +205,8 @@ export class GeometryCache {
     this.state[this.invalidIndex * 4] = STATE_SELECTED | STATE_INVALID;
     this.leakIndex = this.takeIndex();
     this.state[this.leakIndex * 4] = STATE_SELECTED | STATE_LEAK;
+    this.cursorIndex = this.takeIndex();
+    this.state[this.cursorIndex * 4] = STATE_SELECTED | STATE_HANDLE;
     this.cornerBuffer = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, this.cornerBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([0, -1, 0, 1, 1, -1, 1, 1]), gl.STATIC_DRAW);
@@ -302,10 +319,29 @@ export class GeometryCache {
   }
 
   /** Replaces the transient editing preview: brush ghosts and drag rectangles. */
-  setToolPreview(segments: readonly LineSegment[], invalid: readonly LineSegment[] = []): void {
+  setToolPreview(segments: readonly LineSegment[], invalid: readonly LineSegment[] = []): boolean {
+    if (sameSegments(segments, this.toolSegments) && sameSegments(invalid, this.invalidSegments)) {
+      return false;
+    }
     this.toolSegments = segments;
     this.invalidSegments = invalid;
     this.rebuildOverlay();
+    return true;
+  }
+
+  /** The snapped-cursor cross of the creation tools (null hides it). */
+  setCursor(point: readonly [number, number, number] | null): boolean {
+    const same =
+      (point === null && this.cursorPoint === null) ||
+      (point !== null &&
+        this.cursorPoint !== null &&
+        point[0] === this.cursorPoint[0] &&
+        point[1] === this.cursorPoint[1] &&
+        point[2] === this.cursorPoint[2]);
+    if (same) return false;
+    this.cursorPoint = point;
+    this.rebuildOverlay();
+    return true;
   }
 
   /** Persistent target–targetname link lines, recomputed by the app on document changes. */
@@ -369,6 +405,27 @@ export class GeometryCache {
         writeLines(this.leakSegments, this.leakIndex),
         this.leakSegments.length,
       );
+    }
+    if (this.cursorPoint === null) {
+      this.lines.remove('__overlayCursor');
+    } else {
+      const [cx, cy, cz] = this.cursorPoint;
+      const arm = 4;
+      const cross: LineSegment[] = [
+        [
+          [cx - arm, cy, cz],
+          [cx + arm, cy, cz],
+        ],
+        [
+          [cx, cy - arm, cz],
+          [cx, cy + arm, cz],
+        ],
+        [
+          [cx, cy, cz - arm],
+          [cx, cy, cz + arm],
+        ],
+      ];
+      this.lines.write('__overlayCursor', writeLines(cross, this.cursorIndex), cross.length);
     }
     this.state[0] = STATE_SELECTED;
     this.stateDirty = true;
