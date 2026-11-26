@@ -47,10 +47,12 @@ test('a leaking compile draws the pointfile path and N steps the camera along it
   expect(path).not.toBeNull();
   expect(path!.length).toBeGreaterThan(1);
 
-  // The 3D view shows the magenta leak polyline, verified portably by its
-  // pixel count. The tool overlay is transient (it fades away 2.5 s after
-  // a tool change), so it is masked out of the baseline like in the
-  // texture spec.
+  // The 3D view shows the magenta leak polyline, verified by its pixel
+  // count. The exact screenshot is only a secondary check: the large
+  // textured cube's rasterization depends on the machine's GL stack (a
+  // GPU-accelerated WSL machine versus CI's software renderer differ by
+  // about five percent of pixels), so the ratio is loose and the tool
+  // overlay, which is transient, is masked out.
   const canvasPng = await page.locator('[data-testid=viewport-area] canvas').screenshot();
   const { decodePng, countColor } = await import('./png');
   const img = decodePng(canvasPng);
@@ -62,7 +64,7 @@ test('a leaking compile draws the pointfile path and N steps the camera along it
   expect(magenta).toBeGreaterThan(200);
   await expect(page.locator('[data-testid=viewport-area] canvas')).toHaveScreenshot(
     'leak-path.png',
-    { maxDiffPixelRatio: 0.02, mask: [page.locator('[data-testid=tool-hint]')] },
+    { maxDiffPixelRatio: 0.08, mask: [page.locator('[data-testid=tool-hint]')] },
   );
 
   // N centers the ortho cameras on successive leak points.
