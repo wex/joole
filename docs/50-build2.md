@@ -717,10 +717,10 @@ These three items are one WP because they rebuild the same panel. Splitting them
 
 **[ ] Gate T1:**
 
-- All 24 TODO phase-1 items are accepted by the owner in the running editor.
-- `pnpm check` and `pnpm e2e` (Chromium, Firefox, WebKit) are green in CI.
-- The manual has been updated with new screenshots.
-- The Gate 5 performance targets are measured again on the reference hardware after T1.7 and T1.8 (the 3D overlay and handle passes) and recorded in the spec's performance section.
+- [ ] All 24 TODO phase-1 items are accepted by the owner in the running editor (owner work).
+- [x] `pnpm check` and `pnpm e2e` (Chromium, Firefox, WebKit) are green in CI.
+- [x] The manual has been updated with new screenshots.
+- [ ] The Gate 5 performance targets are measured again on the reference hardware after T1.7 and T1.8 (the 3D overlay and handle passes) and recorded in the spec's performance section (owner work — the development machine cannot use the host GPU; the CPU-bound opening re-measurement is recorded in the spec and shows no regression).
 
 ## Documentation impact summary
 
