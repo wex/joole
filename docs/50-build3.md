@@ -14,6 +14,8 @@ Status: draft, 27.11.2026. The normative sources are unchanged: [00-spec.md](00-
 
 ## Implementation notes
 
+**Continuation state (27.11.2026):** T15.1–T15.6 and T15.8 are done and committed on `feature/build3-phase1.5`. Remaining: T15.7, T15.9, T15.10, then the gate (`pnpm check`, full e2e `--workers=2`). Package anchors: T15.7 — the face-highlight fill is drawn in `src/render/renderer.ts` in `vp-select` at 35% over the texture pass; add the `vp-face` yellow token to `src/render/colors.ts` (`VIEWPORT_COLOR_TOKENS`), `tokens.json`, `tokens.css` (both themes) and `bundle.css` by hand, and use it for the fill and the 2D wireframe. T15.9 — bottom height is persisted as `bottomHeight`; tabs are Tree/Prefabs/Log; persist the collapsed state; the Log tab shows an error marker with a count while collapsed. T15.10 — settings in `src/app/settings.ts`, dialog in `src/ui/SettingsDialog.tsx`; overrides are inline custom properties on the root element, stored per theme; the renderer re-reads them through `readViewportColors`/`refreshColors` in `src/render/colors.ts`. The focus-rule helper is `viewShortcutAllowed` and the hovered-view signal is `hoveredView`, both in `src/ui/EditorShell.tsx`.
+
 Operational facts carried over from build 2:
 
 - **Kill the stale preview server before every local Playwright run** (`ss -tlnp | grep 4173`, kill the pid). An old `vite preview` on port 4173 serves an old `dist/`.
