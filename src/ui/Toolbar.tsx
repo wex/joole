@@ -15,6 +15,7 @@ export interface ToolbarProps {
   readonly onOpenSinglePak: () => void;
   readonly onOpenMap: () => void;
   readonly onExportMap: () => void;
+  readonly onDelete: () => void;
   readonly onCsgSubtract: () => void;
   readonly onCsgIntersect: () => void;
   readonly onHollow: (direction: 'inward' | 'outward') => void;
@@ -145,6 +146,11 @@ export function Toolbar(props: ToolbarProps) {
         </button>
         <Show when={editOpen()}>
           <ul class={styles.menu} role="menu">
+            <li role="none">
+              <button type="button" role="menuitem" onClick={() => choose(props.onDelete)}>
+                Delete <span class={styles.shortcut}>Del</span>
+              </button>
+            </li>
             <li role="none">
               <button type="button" role="menuitem" onClick={() => choose(props.onCsgSubtract)}>
                 CSG Subtract

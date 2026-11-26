@@ -346,7 +346,7 @@ The default layout has four views in a 2×2 grid (3D, top, front, side), a prope
 
 **Commands in menus and as shortcuts:** cut, copy, paste and duplicate (as `.map` text on the clipboard, so transfer to another editor works). Also CSG subtract, CSG intersect, hollow inwards and outwards, mirror X/Y/Z, rotate 90°, group and ungroup, hide and show, lock, and grid size \[ and \]. The views have a right-click context menu with Add Brush, Add Entity and Apply Entity → category → class.
 
-**Keyboard shortcut map (defined in P2.5):** tool keys are S, B, E, C, V, F and T as above; grid size is \[ and \]; N steps to the next leak point. Platform-convention command shortcuts use Ctrl on Windows/Linux and Cmd on macOS: Ctrl/Cmd+Z undo, Ctrl/Cmd+Shift+Z and Ctrl/Cmd+Y redo, Ctrl/Cmd+S save, Ctrl/Cmd+X cut, Ctrl/Cmd+C copy, Ctrl/Cmd+V paste, Ctrl/Cmd+D duplicate, Ctrl/Cmd+H hide and Ctrl/Cmd+L lock. Plain tool keys do not fire while 3D fly mode owns WASD, and text-entry controls are never intercepted.
+**Keyboard shortcut map (defined in P2.5):** tool keys are S, B, E, C, V, F and T as above; grid size is \[ and \]; N steps to the next leak point. Delete and Backspace delete the selection (26.11.2026). Platform-convention command shortcuts use Ctrl on Windows/Linux and Cmd on macOS: Ctrl/Cmd+Z undo, Ctrl/Cmd+Shift+Z and Ctrl/Cmd+Y redo, Ctrl/Cmd+S save, Ctrl/Cmd+X cut, Ctrl/Cmd+C copy, Ctrl/Cmd+V paste, Ctrl/Cmd+D duplicate, Ctrl/Cmd+H hide and Ctrl/Cmd+L lock. Plain tool keys do not fire while 3D fly mode owns WASD, and text-entry controls are never intercepted.
 
 **Tree view and entering a group.** The side panel's tree shows worldspawn, entities and groups, and nodes can be moved by dragging (Qoole's `QTrView` and `OpTreeViewDragMove`). Double-clicking enters a group, so that selection and new brushes are limited to it and the rest of the map is dimmed. This is Qoole's _scope_ concept (`OpScopeChange`).
 
@@ -476,6 +476,8 @@ The implementation proceeds in five phases. Each phase ends with a usable versio
 5. **Compilation and polish.** WASM tools in the browser (qbsp3, qvis3 and qrad3 in workers, threads), the leak path, compile profiles, PWA, the performance targets and Firefox/Safari support. _Done when_ the targets in the performance table are met and a map compiles to a playable BSP file without leaving the browser.
 
 **Decisions 26.11.2026:**
+
+- **Delete (26.11.2026):** Delete and Backspace delete the whole selection in one undoable step with no confirmation, for every node kind — brushes, point entities, groups and brush entities with their subtrees. Faces picked in the texture tool are not nodes and are not affected. Worldspawn is never deleted. The Edit menu has a Delete item showing the Del shortcut.
 
 - **Editing highlight and the 3D overlay pass (26.11.2026):** while a drag edits brushes, the tools report the edited ids in `ToolOutput.editing`, and the renderer marks them with the state bit `STATE_EDITING` (32), which the line and face shaders treat exactly like `STATE_SELECTED` — the edited brushes are drawn in `vp-select` in every view without pretending to change the selection. In the textured 3D view the line pass no longer draws only point entities: pass 0 keeps the entity boxes and pass 1 draws every selected line — selected and editing outlines, the paint ghost, the clip line, handles and the snapped cursor — depth-tested, so walls in front still hide them. This is one extra instanced draw of the existing line buffer, not a new geometry path.
 

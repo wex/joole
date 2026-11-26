@@ -254,3 +254,31 @@ describe('faceHighlightPolygons (T1.3)', () => {
     expect(app.faceHighlightPolygons()).toHaveLength(0);
   });
 });
+
+describe('deleteSelection (T1.9)', () => {
+  it('deletes a selected brush with no confirmation and undo restores it', () => {
+    const app = makeApp();
+    addBox(app);
+    app.setSelection(new Set(['target']));
+    expect(app.deleteSelection()).toBe(true);
+    expect(app.document.nodes.has('target')).toBe(false);
+    expect(app.selection.size).toBe(0);
+    app.undo();
+    expect(app.document.nodes.has('target')).toBe(true);
+  });
+
+  it('deletes nothing when the selection is empty', () => {
+    const app = makeApp();
+    addBox(app);
+    expect(app.deleteSelection()).toBe(false);
+    expect(app.document.nodes.has('target')).toBe(true);
+  });
+
+  it('never deletes worldspawn', () => {
+    const app = makeApp();
+    addBox(app);
+    app.setSelection(new Set([app.document.worldspawn]));
+    app.deleteSelection();
+    expect(app.document.nodes.has(app.document.worldspawn)).toBe(true);
+  });
+});

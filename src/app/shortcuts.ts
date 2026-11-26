@@ -14,6 +14,7 @@ export type ShortcutAction =
   | 'copy'
   | 'paste'
   | 'duplicate'
+  | 'delete'
   | 'hide'
   | 'lock'
   | 'grid-down'
@@ -53,6 +54,9 @@ export function shortcutAction(input: ShortcutInput): ShortcutAction | null {
     return null;
   }
   switch (key) {
+    case 'Delete':
+    case 'Backspace':
+      return 'delete';
     case 's':
       return 'tool-select';
     case 'b':

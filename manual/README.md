@@ -164,6 +164,7 @@ Their exact behavior is described in [Brush editing commands](#brush-editing-com
 The Save, Undo and Redo toolbar icons are present as disabled placeholders in the current build. Use the implemented keyboard commands instead:
 
 - `Ctrl+S` / `Cmd+S` — save project
+- `Delete` / `Backspace` — delete the selection right away, with no confirmation; undo restores it
 - `Ctrl+Z` / `Cmd+Z` — undo
 - `Ctrl+Shift+Z`, `Ctrl+Y` / macOS equivalents — redo
 
@@ -646,6 +647,7 @@ This example builds and tests a simple room using the features described above.
 
 | Shortcut       | Action                                                         |
 | -------------- | -------------------------------------------------------------- |
+| `Delete`       | delete the selection, no confirmation                          |
 | `Ctrl+Z`       | undo                                                           |
 | `Ctrl+Shift+Z` | redo                                                           |
 | `Ctrl+Y`       | redo                                                           |

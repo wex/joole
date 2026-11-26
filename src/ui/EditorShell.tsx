@@ -646,6 +646,11 @@ export function EditorShell(props: EditorShellProps) {
         void app.saveProject();
         return;
       }
+      if (action === 'delete') {
+        event.preventDefault();
+        app.deleteSelection();
+        return;
+      }
       if (action === 'copy' || action === 'cut' || action === 'paste' || action === 'duplicate') {
         event.preventDefault();
         if (action === 'copy') void app.copySelection();
@@ -797,6 +802,7 @@ export function EditorShell(props: EditorShellProps) {
         onExportMap={() => void app.exportMap()}
         gameOpen={gameOpen()}
         onCompile={() => setCompileMenuOpen((v) => !v)}
+        onDelete={() => app.deleteSelection()}
         onCsgSubtract={() => app.csgSubtract()}
         onCsgIntersect={() => app.csgIntersect()}
         onHollow={(direction) => app.hollowSelection(direction)}

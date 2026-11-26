@@ -850,6 +850,21 @@ export class EditorApp {
     return true;
   }
 
+  /**
+   * Deletes the whole selection in one undoable step, with no confirmation:
+   * brushes, point entities, groups and brush entities, together with their
+   * subtrees (T1.9). Returns false when there is nothing to delete — faces
+   * picked in the texture tool are not nodes and are left alone.
+   */
+  deleteSelection(): boolean {
+    if (this.selection.size === 0) return false;
+    const patch = removeSelectionPatch(this.document, this.selection);
+    if (!patch) return false;
+    this.executeCommand({ label: 'Delete', run: () => patch });
+    this.setSelection([]);
+    return true;
+  }
+
   pasteMapText(text: string, offset: [number, number, number] = [0, 0, 0]): boolean {
     try {
       const pasted = mapTextToPastePatch(this.document, text, offset);

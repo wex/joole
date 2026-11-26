@@ -166,3 +166,11 @@ input:focus-visible {
   background: var(--accent);
   color: var(--on-accent);
 }
+
+/* The keyboard hint on the right side of a menu row, e.g. Del for Delete. */
+.shortcut {
+  margin-left: auto;
+  padding-left: var(--space-lg);
+  color: var(--ink-muted);
+  font-size: 0.85em;
+}

@@ -390,7 +390,7 @@ Each milestone can ship as its own minor release. Tag the releases as the owner 
 - **Depends on:** T1.7 (the 3D overlay pass and the drawing order)
 - **Done when:** the dots are drawn in all three submodes, hover and drag change their state, and grabbing by a dot works in the E2E test.
 
-### [ ] T1.9 Delete deletes the selection without confirmation (#12) ⇄
+### [x] T1.9 Delete deletes the selection without confirmation (#12) ⇄
 
 - **Goal:** Delete (and Backspace on macOS) deletes the selected brushes right away. The action can be undone.
 - **Current state:** no Delete command exists (see the findings).
