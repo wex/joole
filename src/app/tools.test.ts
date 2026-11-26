@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createEmptyDocument, addNodePatch, applyPatch, buildDocument } from '@core/doc/index';
 import { analyzeBrush, extractWireframe, validateBrush } from '@core/geom/index';
-import type { BrushNode, Command, GroupNode, MapDocument, EntityNode } from '@core/types/index';
+import type { BrushNode, Command, EntityNode, MapDocument } from '@core/types/index';
 import { makeBox } from '../core/geom/__tests__/helpers';
 import {
   BrushTool,
