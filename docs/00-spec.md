@@ -477,6 +477,8 @@ The implementation proceeds in five phases. Each phase ends with a usable versio
 
 **Decisions 26.11.2026:**
 
+- **Resize snapping (26.11.2026):** the Select tool's corner resize snaps the dragged corner to the grid on the view axes. The target is computed from the original corner every step and the command scales from the current corner to the target, so float error does not build up. The corner can neither cross the anchor nor come closer than one grid step — mirroring stays its own command. When the anchor is off the grid, the moved faces still land on the grid while the anchored faces keep their positions.
+
 - **Handle dots (26.11.2026):** vertex, edge and face handles are screen-space square dots, not world-space crosses — 7 CSS px idle and 9 px hovered or dragged, in `vp-handle` yellow, turning `vp-select` red on hover and while dragged, with a 1 device px `vp-bg` border so they stand out over wireframes. They are drawn after everything else in every view, the textured 3D view included, without depth testing. Every hit target is the dot: the vertex itself, the edge midpoint or the face centroid, so edges are no longer picked by segment distance. In edge mode the hovered edge is additionally highlighted as a `vp-select` segment. The dots are drawn in 3D for orientation, but picking and dragging stay 2D; 3D handle dragging is out of scope.
 
 - **Delete (26.11.2026):** Delete and Backspace delete the whole selection in one undoable step with no confirmation, for every node kind — brushes, point entities, groups and brush entities with their subtrees. Faces picked in the texture tool are not nodes and are not affected. Worldspawn is never deleted. The Edit menu has a Delete item showing the Del shortcut.

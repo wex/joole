@@ -418,7 +418,7 @@ Each milestone can ship as its own minor release. Tag the releases as the owner 
 - **Depends on:** –
 - **Done when:** the unit and E2E tests pass.
 
-### [ ] T1.10 Resizing snaps to the grid (#13)
+### [x] T1.10 Resizing snaps to the grid (#13)
 
 - **Goal:** resizing with the Select tool's corner handles moves the dragged corner only to grid positions.
 - **Design:**

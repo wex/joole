@@ -113,7 +113,7 @@ type Mode =
   | { kind: 'box'; start: Vec3; view: PickAxis }
   | { kind: 'move'; last: Vec3; view: ToolView; key: string }
   | { kind: 'rotate'; last: Vec3; center: Vec3; view: ToolView; key: string }
-  | { kind: 'scale'; anchor: Vec3; start: Vec3; view: ToolView; key: string };
+  | { kind: 'scale'; anchor: Vec3; start: Vec3; current: Vec3; view: ToolView; key: string };
 
 function planeAxes(view: ToolView): [0 | 1 | 2, 0 | 1 | 2] {
   return view === 'xy' ? [0, 1] : view === 'xz' ? [0, 2] : view === 'yz' ? [1, 2] : [0, 1];
@@ -764,7 +764,7 @@ export class SelectTool {
         corner[1] === bounds.min[1] ? bounds.max[1] : bounds.min[1],
         corner[2] === bounds.min[2] ? bounds.max[2] : bounds.min[2],
       ];
-      this.mode = { kind: 'scale', anchor, start: corner, view: event.view, key };
+      this.mode = { kind: 'scale', anchor, start: corner, current: corner, view: event.view, key };
       return { commands: [], editing: new Set(this.selected) };
     }
     if (!hit) {
@@ -909,25 +909,39 @@ export class SelectTool {
       };
     }
     if (this.mode.kind === 'scale') {
-      const factors: Vec3 = [1, 1, 1];
+      // The dragged corner moves only to grid positions (T1.10): the target
+      // is computed from the original corner every step, and the command
+      // scales from the current corner to the target, so float error does
+      // not build up over a long drag. The corner can neither cross the
+      // anchor nor come closer to it than one grid step.
       const axes = planeAxes(this.mode.view);
+      const grid = this.gridSize();
+      const anchor = this.mode.anchor;
+      const target: Vec3 = [...this.mode.start] as Vec3;
+      for (const axis of axes) {
+        const snapped = snap(event.point[axis]!, grid);
+        const sign = this.mode.start[axis]! >= anchor[axis]! ? 1 : -1;
+        const minimum = anchor[axis]! + sign * grid;
+        target[axis] = sign > 0 ? Math.max(snapped, minimum) : Math.min(snapped, minimum);
+      }
+      const factors: Vec3 = [1, 1, 1];
       let valid = false;
       for (const axis of axes) {
-        const start = this.mode.start[axis]! - this.mode.anchor[axis]!;
-        const now = event.point[axis]! - this.mode.anchor[axis]!;
-        factors[axis] = Math.abs(start) < 1e-9 ? 1 : now / start;
-        valid ||= Math.abs(factors[axis]! - 1) > 1e-9;
+        const current = this.mode.current[axis]! - anchor[axis]!;
+        const next = target[axis]! - anchor[axis]!;
+        factors[axis] = Math.abs(current) < 1e-9 ? 1 : next / current;
+        valid ||= Math.abs(target[axis]! - this.mode.current[axis]!) > 1e-9;
       }
-      if (!valid || factors.some((factor) => Math.abs(factor) < 1e-9)) {
+      if (!valid || factors.some((factor) => !Number.isFinite(factor) || Math.abs(factor) < 1e-9)) {
         return { commands: [] };
       }
-      this.mode.start = event.point;
+      this.mode.current = target;
       return {
         commands: [
           createTransformCommand(
             'Scale selection',
             [...this.selected],
-            around(this.mode.anchor, mat4Scaling(factors)),
+            around(anchor, mat4Scaling(factors)),
             { mergeKey: this.mode.key },
           ),
         ],

@@ -486,3 +486,56 @@ describe('editing feedback (T1.7)', () => {
   });
 });
 
+describe('resize grid snapping (T1.10)', () => {
+  function scaleDrag(grid: number, from: [number, number], to: [number, number], steps = 1) {
+    const doc = documentWithBrushes();
+    const tool = new SelectTool(() => doc, grid);
+    tool.setSelection(['a']);
+    tool.pointer(down(64, 64));
+    const commands: Command[] = [];
+    for (let i = 1; i <= steps; i++) {
+      const x = from[0] + ((to[0] - from[0]) * i) / steps;
+      const y = from[1] + ((to[1] - from[1]) * i) / steps;
+      const out = tool.pointer(move(x, y));
+      commands.push(...out.commands);
+    }
+    tool.pointer(up(to[0], to[1]));
+    let next = doc;
+    for (const command of commands) next = applyPatch(next, command.run(next));
+    return analyzeBrush(next.nodes.get('a') as BrushNode).aabb!;
+  }
+
+  it('the moved corner lands on grid multiples for several grid sizes', () => {
+    for (const grid of [1, 8, 32, 64]) {
+      // Dragging off-grid snaps: (100, 100) at grid 64 becomes (128, 128)
+      // only if 100 rounds to 128 — snap rounds to nearest, so 64 or 128.
+      const box = scaleDrag(grid, [64, 64], [100, 100]);
+      const onGrid = (x: number) => {
+        const rest = Math.abs(x % grid);
+        return rest < 1e-6 || grid - rest < 1e-6;
+      };
+      expect(onGrid(box.max[0]!)).toBe(true);
+      expect(onGrid(box.max[1]!)).toBe(true);
+      // The anchored corner never moves.
+      expect(box.min[0]! + 0).toBe(0);
+      expect(box.min[1]! + 0).toBe(0);
+    }
+  });
+
+  it('the size never shrinks below one grid step and never crosses the anchor', () => {
+    const box = scaleDrag(32, [64, 64], [-500, -500]);
+    expect(box.max[0]! - box.min[0]!).toBeGreaterThanOrEqual(32);
+    expect(box.max[1]! - box.min[1]!).toBeGreaterThanOrEqual(32);
+    expect(box.min[0]! + 0).toBe(0);
+    expect(box.min[1]! + 0).toBe(0);
+  });
+
+  it('a long drag ends within a tolerance of the direct step', () => {
+    const direct = scaleDrag(8, [64, 64], [128, 128], 1);
+    const long = scaleDrag(8, [64, 64], [128, 128], 16);
+    for (const axis of [0, 1, 2]) {
+      expect(Math.abs(long.max[axis]! - direct.max[axis]!)).toBeLessThan(1e-6);
+      expect(Math.abs(long.min[axis]! - direct.min[axis]!)).toBeLessThan(1e-6);
+    }
+  });
+});
