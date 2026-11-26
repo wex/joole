@@ -73,7 +73,7 @@ var(--bottom-panel-height, 160px)` (`EditorShell.module.css` line 21). T15.9
   inner height (follow the T15.9 spec `tests/e2e/dock.spec.ts` or wherever the
   collapse tests live).
 
-### T16.4 – Persist panel widths/heights (#39)
+### T16.4 – Persist panel widths/heights (#39) — DONE
 
 **TODO item:** _App should remember panel widths/heights, when those are resized -
 now resizing Properties/textures-panel is resetted - store in settings._
@@ -83,11 +83,11 @@ now resizing Properties/textures-panel is resetted - store in settings._
 - `bottomHeight` is already persisted. `rightWidth` IS already plumbed in the shell:
   signal at `EditorShell.tsx` line 181, `reportSetting('rightWidth', next)` at line
   351, and `applySettingsPartial` handles it at line 232.
-- **The bug is almost certainly that `rightWidth` is missing from the settings
-  schema** in `src/app/settings.ts` — the grep found only `bottomHeight` there
-  (lines 13, 47, 70). So the width is reported, but dropped when the settings object
-  is validated/saved, and reset on reload. Add `rightWidth` to the type, the defaults
-  and the sanitizer, mirroring `bottomHeight` exactly.
+- **RESOLVED:** the schema was fine — `rightWidth` was persisted correctly all along.
+  The real bug: `--bottom-panel-height` had a reactive effect applying it at startup,
+  but `--right-panel-width` was only written during drags, so the persisted width
+  never reached the CSS variable on reload and the dock always opened at the 224px
+  stylesheet default. Fixed with a mirroring `createEffect` in `EditorShell.tsx`.
 - Check for OTHER resizable panels: are the inner vertical splitters (between the
   Properties and Textures sections inside the right dock, if resizable) and the
   bottom panel height covered? The TODO mentions "Properties/textures -panel" — if

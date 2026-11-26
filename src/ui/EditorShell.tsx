@@ -1228,6 +1228,15 @@ export function EditorShell(props: EditorShellProps) {
       );
     },
   );
+  // The persisted right-dock width must reach the CSS variable on startup as
+  // well, not only during drags: without this effect the panel always opened
+  // at the stylesheet default however it was sized (T16.4).
+  createEffect(
+    () => rightWidth(),
+    () => {
+      mainElement?.style.setProperty('--right-panel-width', `${rightWidth()}px`);
+    },
+  );
   createEffect(
     () => [bottomCollapsed(), bottomTab(), entries()] as const,
     () => {
