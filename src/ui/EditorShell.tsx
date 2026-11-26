@@ -16,6 +16,7 @@ import {
   zoomOrthoAt,
 } from './cameras';
 import { Icon } from './Icon';
+import type { IconName } from './icons';
 import { LogPanel } from './LogPanel';
 import { MeasureOverlay, type MeasureBox } from './MeasureOverlay';
 import { PanelTabs, type BottomTab } from './PanelTabs';
@@ -24,7 +25,9 @@ import { PrefabBrowser } from './PrefabBrowser';
 import { PropertiesPanel } from './PropertiesPanel';
 import { DockSection } from './DockSection';
 import { SettingsDialog } from './SettingsDialog';
+import { ToolHint } from './ToolHint';
 import { DEFAULT_SETTINGS } from '@app/settings';
+import { toolInfo } from '@app/toolInfo';
 import { TextureBrowser } from './TextureBrowser';
 import { Toolbar } from './Toolbar';
 import styles from './EditorShell.module.css';
@@ -133,6 +136,7 @@ export function EditorShell(props: EditorShellProps) {
   const [bottomTab, setBottomTab] = createSignal<BottomTab>('tree');
   const [theme, setTheme] = createSignal<'dark' | 'light'>(initialSettings?.theme ?? 'dark');
   const [coordinates, setCoordinates] = createSignal(coordinateDefaults(false));
+  const [flyActive, setFlyActive] = createSignal(false);
   const [rightWidth, setRightWidth] = createSignal(
     initialSettings?.rightWidth ?? initialRightWidth,
   );
@@ -231,6 +235,45 @@ export function EditorShell(props: EditorShellProps) {
   const [measure, setMeasure] = createSignal<MeasureBox | null>(null);
   const [cursor, setCursor] = createSignal<readonly number[] | null>(null);
   const [groupPick, setGroupPick] = createSignal(app.groupPick);
+
+  // The tool overlay (T1.16): shown for 2.5 s after a user tool change.
+  const [toolHint, setToolHint] = createSignal<{
+    name: string;
+    shortcut: string;
+    description: string;
+    icon: IconName;
+  } | null>(null);
+  let toolHintTimer: ReturnType<typeof setTimeout> | null = null;
+  const toolIcons: Record<string, IconName> = {
+    select: 'mousePointer',
+    brush: 'box',
+    entity: 'circleUser',
+    clip: 'clip',
+    vertex: 'move',
+    edge: 'move',
+    face: 'scan',
+    texture: 'brush',
+  };
+  const showToolHint = () => {
+    // Event-time reads, not a subscription: the overlay never re-fires.
+    if (!untrack(showToolOverlay) || untrack(flyActive)) return;
+    // The vertex tool shows its submode: V toggles vertex and edge editing.
+    const id =
+      app.activeTool === 'vertex' && app.vertexSubmode === 'edge' ? 'edge' : app.activeTool;
+    const info = toolInfo(id);
+    if (!info) return;
+    if (toolHintTimer !== null) clearTimeout(toolHintTimer);
+    setToolHint({
+      name: info.name,
+      shortcut: info.shortcut,
+      description: info.description,
+      icon: toolIcons[id] ?? 'box',
+    });
+    toolHintTimer = setTimeout(() => {
+      toolHintTimer = null;
+      setToolHint(null);
+    }, 2500);
+  };
 
   let viewportElement: HTMLDivElement | undefined;
   let dockElement: HTMLElement | undefined;
@@ -450,6 +493,7 @@ export function EditorShell(props: EditorShellProps) {
     };
     const updateFlyState = () => {
       const active = pointerLocked;
+      setFlyActive(active);
       setCoordinates(coordinateDefaults(active));
       if (!active) {
         flyKeys.clear();
@@ -903,6 +947,9 @@ export function EditorShell(props: EditorShellProps) {
         setBrushSides(app.brushSides);
         setTextureLock(app.textureLockEnabled);
         setCurrentTexture(app.currentTextureName);
+        if (event.source === 'user') {
+          showToolHint();
+        }
       }
       if (
         event.type === 'document' ||
@@ -1238,6 +1285,16 @@ export function EditorShell(props: EditorShellProps) {
               rects={() => renderer.viewRects()}
               ratio={() => renderer.backingRatio()}
             />
+            <Show when={toolHint()}>
+              {(hint) => (
+                <ToolHint
+                  name={hint().name}
+                  shortcut={hint().shortcut}
+                  description={hint().description}
+                  icon={hint().icon}
+                />
+              )}
+            </Show>
           </div>
           <div
             class={[styles.splitter, styles.horizontalSplitter]}

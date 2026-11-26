@@ -1,6 +1,7 @@
 import { createSignal, For, onSettled, Show } from 'solid-js';
 import type { PrimitiveKind } from '@core/geom/index';
 import { Icon } from './Icon';
+import { toolInfo } from '@app/toolInfo';
 import styles from './Toolbar.module.css';
 
 export type ToolbarTool = 'select' | 'brush' | 'clip' | 'vertex' | 'face' | 'texture' | 'entity';
@@ -42,7 +43,7 @@ export interface ToolbarProps {
 }
 
 function tool(
-  id: string,
+  id: ToolbarTool,
   label: string,
   icon: Parameters<typeof Icon>[0]['name'],
   enabled = false,
@@ -50,14 +51,15 @@ function tool(
   return { id, label, icon, enabled };
 }
 
+// The titles come from the one tool-metadata table (T1.16).
 const tools = [
-  tool('select', 'Select (S)', 'mousePointer', true),
-  tool('brush', 'Brush (B)', 'box', true),
-  tool('entity', 'Entity (E)', 'circleUser', true),
-  tool('clip', 'Clip (C)', 'clip', true),
-  tool('vertex', 'Vertex/edge (V)', 'move', true),
-  tool('face', 'Face (F)', 'scan', true),
-  tool('texture', 'Texture (T)', 'brush', true),
+  tool('select', `${toolInfo('select').name} (${toolInfo('select').shortcut})`, 'mousePointer', true),
+  tool('brush', `${toolInfo('brush').name} (${toolInfo('brush').shortcut})`, 'box', true),
+  tool('entity', `${toolInfo('entity').name} (${toolInfo('entity').shortcut})`, 'circleUser', true),
+  tool('clip', `${toolInfo('clip').name} (${toolInfo('clip').shortcut})`, 'clip', true),
+  tool('vertex', `Vertex/edge (${toolInfo('vertex').shortcut})`, 'move', true),
+  tool('face', `${toolInfo('face').name} (${toolInfo('face').shortcut})`, 'scan', true),
+  tool('texture', `${toolInfo('texture').name} (${toolInfo('texture').shortcut})`, 'brush', true),
 ];
 
 const primitives: PrimitiveKind[] = ['box', 'wedge', 'cylinder', 'cone', 'sphere'];
@@ -319,14 +321,7 @@ export function Toolbar(props: ToolbarProps) {
             aria-pressed={props.activeTool === item.id ? 'true' : 'false'}
             disabled={!item.enabled}
             onClick={() => {
-              if (
-                item.id === 'select' ||
-                item.id === 'brush' ||
-                item.id === 'clip' ||
-                item.id === 'vertex' ||
-                item.id === 'face'
-              )
-                props.onTool(item.id);
+              props.onTool(item.id);
             }}
           >
             <Icon name={item.icon} />

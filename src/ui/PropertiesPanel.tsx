@@ -135,7 +135,6 @@ export function PropertiesPanel(props: PropertiesPanelProps) {
 
   return (
     <aside class={styles.panel} aria-label="Properties" data-testid="properties-panel">
-      <header class={styles.titlebar}>Properties</header>
       <div class={styles.body}>
         <EntityPanel app={app} version={props.version} />
         <Show when={focus()?.brush}>

@@ -150,7 +150,7 @@ export type EditorEvent =
   | { readonly type: 'log' }
   | { readonly type: 'grid' }
   | { readonly type: 'selection' }
-  | { readonly type: 'tool' }
+  | { readonly type: 'tool'; readonly source?: 'user' | 'internal' }
   | { readonly type: 'recovery' };
 
 export type EditorListener = (event: EditorEvent) => void;
@@ -1072,12 +1072,12 @@ export class EditorApp {
     return text ? this.pasteMapText(text, [this.gridSize, this.gridSize, 0]) : false;
   }
 
-  setToolMode(mode: EditorToolMode): void {
+  setToolMode(mode: EditorToolMode, source: 'user' | 'internal' = 'user'): void {
     if (mode === this.toolMode) {
       // Pressing V again in vertex mode switches between vertex and edge editing.
       if (mode === 'vertex') {
         this.vertexTool.toggleVertexEdge();
-        this.emit({ type: 'tool' });
+        this.emit({ type: 'tool', source });
       }
       return;
     }
@@ -1098,7 +1098,7 @@ export class EditorApp {
       // operations target whole brushes.
       this.textureTool.clearFaceSelection();
     }
-    this.emit({ type: 'tool' });
+    this.emit({ type: 'tool', source });
   }
 
   setBrushPrimitive(kind: PrimitiveKind, sides = this.brushTool.sides): boolean {

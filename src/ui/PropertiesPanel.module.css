@@ -8,17 +8,6 @@
   color: var(--ink);
 }
 
-.titlebar {
-  display: flex;
-  height: var(--size-titlebar);
-  flex: none;
-  align-items: center;
-  padding: 0 var(--space-sm);
-  border-bottom: 1px solid var(--line);
-  background: var(--surface-2);
-  font: var(--text-ui-title);
-}
-
 .body {
   display: flex;
   min-height: 0;
