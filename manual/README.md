@@ -270,6 +270,8 @@ The Select tool picks and transforms whole brushes.
 
 A drag is merged into one undo step even though intermediate positions are applied continuously. Texture lock affects move and rotate operations when enabled.
 
+**Typing a size:** with brushes selected, point at an orthographic view and press `Enter`. A field opens at the selection's centre with its current size as _width height depth_ of that view — in Front, for example, width is X, height is Z and depth is Y. Type a new size and press `Enter`: the selection is resized around its centre in one undo step. `Escape` cancels. Typed sizes are used exactly and are not snapped to the grid.
+
 View picking is brush-based. Pick point entities, groups and brush-entity containers in the **Tree** tab; their properties then appear in the right panel.
 
 ### Brush (`B`)
@@ -284,6 +286,8 @@ The Brush tool creates new convex primitives.
 4. Release to create the brush. It becomes the selection.
 
 The two dragged axes snap to the grid, and a small cross marks the snapped point under the cursor before the button is pressed. While dragging, a red box shows the brush in every orthographic view, with its in-plane extents labelled next to the edges and the full `W × D × H` size in the active view's title bar. The axis perpendicular to the view receives a depth of at least 64 units — the smallest multiple of the grid that reaches 64 — placed so that both faces lie on grid lines. Every bound of a painted brush is therefore a grid multiple at any grid size. Brush creation is not available in the 3D view.
+
+**Typing a size:** click once in Top, Front or Side without dragging. A field opens at the clicked point; type the size as _width height depth_ of that view, separated by spaces or commas — for example `128 64 32` — and press `Enter`. The brush is created centred on the clicked point (snapped to the grid) and on the same working plane as a dragged brush, with the current primitive and side count. The size is used exactly, so a size that is not a multiple of the grid puts faces off the grid. `Escape` or clicking elsewhere cancels; an invalid entry shows a message and creates nothing. The field remembers the last size as its placeholder.
 
 New brushes are created with Qoole's default texture, `e2u1/mine10_1`; choosing another texture in the browser does not change brushes that are already drawn.
 
@@ -671,20 +675,21 @@ This example builds and tests a simple room using the features described above.
 
 ### Editing commands
 
-| Shortcut       | Action                                                         |
-| -------------- | -------------------------------------------------------------- |
-| `Delete`       | delete the selection, no confirmation                          |
-| `Ctrl+Z`       | undo                                                           |
-| `Ctrl+Shift+Z` | redo                                                           |
-| `Ctrl+Y`       | redo                                                           |
-| `Ctrl+S`       | save `.joole.json` project                                     |
-| `Ctrl+X`       | cut selected brushes as `.map` text                            |
-| `Ctrl+C`       | copy selected brushes as `.map` text                           |
-| `Ctrl+V`       | paste `.map` text                                              |
-| `Ctrl+D`       | duplicate selected brushes, offset by one grid step in X and Y |
-| `[`            | halve grid size                                                |
-| `]`            | double grid size                                               |
-| `N`            | go to the next leak-path point after a leaking compile         |
+| Shortcut       | Action                                                                     |
+| -------------- | -------------------------------------------------------------------------- |
+| `Delete`       | delete the selection, no confirmation                                      |
+| `Enter`        | in Select, type a new size for the selection in the view under the pointer |
+| `Ctrl+Z`       | undo                                                                       |
+| `Ctrl+Shift+Z` | redo                                                                       |
+| `Ctrl+Y`       | redo                                                                       |
+| `Ctrl+S`       | save `.joole.json` project                                                 |
+| `Ctrl+X`       | cut selected brushes as `.map` text                                        |
+| `Ctrl+C`       | copy selected brushes as `.map` text                                       |
+| `Ctrl+V`       | paste `.map` text                                                          |
+| `Ctrl+D`       | duplicate selected brushes, offset by one grid step in X and Y             |
+| `[`            | halve grid size                                                            |
+| `]`            | double grid size                                                           |
+| `N`            | go to the next leak-path point after a leaking compile                     |
 
 `Ctrl+H` and `Ctrl+L` are present in the key map as reserved hide/lock commands, but they currently do not execute an editing command. Use the `H` and `L` buttons on group rows in the Tree tab.
 

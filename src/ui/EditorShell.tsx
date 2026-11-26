@@ -2,7 +2,9 @@ import { createSignal, For, onSettled, Show, untrack } from 'solid-js';
 import type { EditorApp, LogEntry, ToolOutput, ToolPointerEvent } from '@app/index';
 import { shortcutAction } from '@app/index';
 import type { OrthoCamera, PerspectiveCamera, Renderer, ViewId, ViewRect } from '@render/index';
-import { VIEW_ORDER } from '@render/index';
+import { orthoBasis, VIEW_AXES, VIEW_ORDER } from '@render/index';
+import { dot } from '@core/geom/index';
+import type { Vec3 } from '@core/types/index';
 import {
   CameraController,
   dollyPerspective,
@@ -29,6 +31,8 @@ import { SettingsDialog } from './SettingsDialog';
 import { ToolHint } from './ToolHint';
 import { DEFAULT_SETTINGS } from '@app/settings';
 import { toolInfo } from '@app/toolInfo';
+import { parseSizeInput } from '@app/sizeInput';
+import { SizeInput } from './SizeInput';
 import { TextureBrowser } from './TextureBrowser';
 import { Toolbar } from './Toolbar';
 import styles from './EditorShell.module.css';
@@ -98,6 +102,21 @@ function coordinateDefaults(fly: boolean): Record<ViewId, string> {
     front: viewAxes.front,
     side: viewAxes.side,
   };
+}
+
+/**
+ * The focus rule of the view shortcuts (T15.4–T15.6): Space, Enter and Tab
+ * act on the views when the focus is on the page, inside the views, or on a
+ * control the mouse focused. A control focused with the keyboard keeps the
+ * keys, so the panels stay keyboard-operable.
+ */
+function viewShortcutAllowed(
+  target: EventTarget | null,
+  viewport: HTMLElement | undefined,
+): boolean {
+  if (!(target instanceof HTMLElement) || target === document.body) return true;
+  if (viewport?.contains(target)) return true;
+  return !target.matches(':focus-visible');
 }
 
 function isEditableTarget(target: EventTarget | null): boolean {
@@ -334,6 +353,59 @@ export function EditorShell(props: EditorShellProps) {
   const perspectiveCamera = (): PerspectiveCamera | null => {
     const camera = controller.get('3d');
     return camera.kind === 'perspective' ? camera : null;
+  };
+
+  // The view under the pointer (T15.4, T15.5). It keeps the last view when
+  // the pointer leaves; the size input falls back to the last 2D view.
+  let hoveredView: ViewId | null = null;
+  let last2dView: 'top' | 'front' | 'side' = 'top';
+  const trackHover = (view: ViewId) => {
+    hoveredView = view;
+    if (view !== '3d') last2dView = view;
+  };
+  const hovered2dView = () => (hoveredView && hoveredView !== '3d' ? hoveredView : last2dView);
+
+  // The inline size input (T15.4): creating a brush or resizing the selection.
+  const [sizePrompt, setSizePrompt] = createSignal<{
+    mode: 'create' | 'edit';
+    view: 'top' | 'front' | 'side';
+    point: Vec3;
+    initial: string;
+  } | null>(null);
+  /** A world point and the view rectangle in CSS pixels of the views element. */
+  const viewPointCss = (view: 'top' | 'front' | 'side', world: Vec3) => {
+    const camera = orthoCamera(view);
+    const rect = renderer.viewRects().get(view);
+    if (!camera || !rect) return null;
+    const ratio = renderer.backingRatio();
+    const { right, up } = orthoBasis(camera.axis);
+    const zoom = camera.zoom / ratio;
+    const bounds = {
+      x: rect.x / ratio,
+      y: rect.y / ratio,
+      width: rect.width / ratio,
+      height: rect.height / ratio,
+    };
+    return {
+      x: bounds.x + bounds.width / 2 + (dot(world, right) - dot(camera.center, right)) * zoom,
+      y: bounds.y + bounds.height / 2 - (dot(world, up) - dot(camera.center, up)) * zoom,
+      bounds,
+    };
+  };
+  const submitSize = (text: string): string | null => {
+    const prompt = untrack(sizePrompt);
+    if (!prompt) return null;
+    const parsed = parseSizeInput(text);
+    if (!parsed.ok) return parsed.error;
+    const axis = VIEW_AXES[prompt.view];
+    const done =
+      prompt.mode === 'create'
+        ? app.createBrushAt(axis, prompt.point, parsed.value)
+        : app.resizeSelectionTo(axis, parsed.value);
+    if (!done) return 'This size cannot be built';
+    setSizePrompt(null);
+    viewportElement?.focus();
+    return null;
   };
 
   const toggleMaximized = (view: ViewId) => {
@@ -600,6 +672,14 @@ export function EditorShell(props: EditorShellProps) {
       }
       const output = app.selectPointer(toolEvent(hit, type, event));
       applyToolFeedback(output);
+      if (output.sizePrompt && hit.view !== '3d') {
+        setSizePrompt({
+          mode: 'create',
+          view: hit.view,
+          point: [...output.sizePrompt.point] as Vec3,
+          initial: '',
+        });
+      }
       return true;
     };
 
@@ -654,6 +734,8 @@ export function EditorShell(props: EditorShellProps) {
     };
 
     const pointerMove = (event: PointerEvent) => {
+      const hover = hitView(event.clientX, event.clientY);
+      if (hover) trackHover(hover.view);
       if (toolPointer && event.pointerId === toolPointer.pointerId) {
         sendToolEvent('move', event);
         event.preventDefault();
@@ -798,6 +880,26 @@ export function EditorShell(props: EditorShellProps) {
           return;
         }
       }
+      // Enter in Select opens the size input for the selection in the
+      // hovered 2D view (T15.4).
+      if (
+        event.key === 'Enter' &&
+        app.activeTool === 'select' &&
+        !event.ctrlKey &&
+        !event.metaKey &&
+        !event.altKey &&
+        !event.shiftKey &&
+        !pointerLocked &&
+        viewShortcutAllowed(event.target, viewport)
+      ) {
+        const view = hovered2dView();
+        const prompt = app.selectionSizePrompt(VIEW_AXES[view]);
+        if (prompt) {
+          event.preventDefault();
+          setSizePrompt({ mode: 'edit', view, point: prompt.center, initial: prompt.text });
+          return;
+        }
+      }
       const action = shortcutAction({
         key: event.key,
         ctrl: event.ctrlKey || event.metaKey,
@@ -939,6 +1041,7 @@ export function EditorShell(props: EditorShellProps) {
       if (event.type === 'document') {
         setMapName(app.mapName);
         if (!event.patch) {
+          setSizePrompt(null);
           controller.frame(renderer.bounds(), renderer.viewRects());
         }
       } else if (event.type === 'game') {
@@ -952,6 +1055,10 @@ export function EditorShell(props: EditorShellProps) {
         renderer.setToolPreview([]);
         renderer.setEditing(new Set());
         clearToolFeedback();
+        if (untrack(sizePrompt)?.mode === 'create' && app.activeTool !== 'brush')
+          setSizePrompt(null);
+        if (untrack(sizePrompt)?.mode === 'edit' && app.activeTool !== 'select')
+          setSizePrompt(null);
         setActiveTool(app.activeTool);
         setBrushPrimitive(app.brushPrimitive);
         setBrushSides(app.brushSides);
@@ -1300,6 +1407,29 @@ export function EditorShell(props: EditorShellProps) {
               rects={() => renderer.viewRects()}
               ratio={() => renderer.backingRatio()}
             />
+            <Show when={sizePrompt()}>
+              {(prompt) => {
+                const place = untrack(() => viewPointCss(prompt().view, prompt().point));
+                return (
+                  <Show when={place}>
+                    {(at) => (
+                      <SizeInput
+                        x={at().x}
+                        y={at().y}
+                        bounds={at().bounds}
+                        initial={prompt().initial}
+                        placeholder={app.lastBrushSize || '128 128 64'}
+                        onSubmit={submitSize}
+                        onCancel={() => {
+                          setSizePrompt(null);
+                          viewportElement?.focus();
+                        }}
+                      />
+                    )}
+                  </Show>
+                );
+              }}
+            </Show>
             <Show when={toolHint()}>
               {(hint) => (
                 <ToolHint

@@ -176,7 +176,7 @@ None of the WPs changes the `.map` or `.joole.json` format. The settings gain ne
 
 **Done when:** dots are 14 px by default and follow the Handle size setting, the hit target matches the dot, and during and after a drag, undo or redo the active dot is on the element in 2D and 3D.
 
-### [ ] T15.4 Typed brush size: a click in Brush mode, Enter in Select mode (#29)
+### [x] T15.4 Typed brush size: a click in Brush mode, Enter in Select mode (#29)
 
 **Goal:** a brush can be created, or the selection resized, by typing its size.
 

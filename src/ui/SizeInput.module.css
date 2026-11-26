@@ -1,0 +1,37 @@
+/* The inline brush size field (T15.4), over a 2D view. */
+.holder {
+  position: absolute;
+  z-index: 25;
+  width: 168px;
+}
+
+.input {
+  box-sizing: border-box;
+  width: 100%;
+  height: var(--size-control);
+  padding: 0 var(--space-sm);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--ink);
+  font: var(--text-mono-body);
+  box-shadow: var(--shadow-float);
+}
+
+.input:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 1px;
+}
+
+.input[aria-invalid='true'] {
+  border-color: var(--error);
+}
+
+.error {
+  margin-top: 2px;
+  padding: 2px var(--space-xs);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--error);
+  font: var(--text-ui-small);
+}

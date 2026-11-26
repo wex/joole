@@ -91,11 +91,14 @@ import {
   TextureTool,
   VertexTool,
   DEFAULT_HANDLE_SIZE,
+  resizeToCommand,
+  selectionBounds,
   type ToolOutput,
   type ToolPointerEvent,
   EntityTool,
 } from './tools';
-import type { PrimitiveKind } from '@core/geom/index';
+import type { PickAxis, PrimitiveKind } from '@core/geom/index';
+import { formatSize, sizeAxes } from './sizeInput';
 import { entriesFromFileList, entriesFromSinglePak, openGameVfs } from '@platform/index';
 
 export type LogLevel = 'info' | 'ok' | 'warning' | 'error';
@@ -825,9 +828,56 @@ export class EditorApp {
 
   private csgGroupingEnabled = true;
   private handleSizePx = DEFAULT_HANDLE_SIZE;
+  private lastBrushSizeText = '';
 
   setCsgGrouping(value: boolean): void {
     this.csgGroupingEnabled = value;
+  }
+
+  /** The last typed brush size of the session, as text (T15.4). */
+  get lastBrushSize(): string {
+    return this.lastBrushSizeText;
+  }
+
+  /**
+   * Creates a brush of a typed size centred on a point (T15.4): the size is
+   * width, height and depth of the view. One undo step; the brush is
+   * selected.
+   */
+  createBrushAt(view: PickAxis, center: Vec3, size: readonly [number, number, number]): boolean {
+    const output = this.brushTool.createAt(view, center, size);
+    if (output.commands.length === 0) return false;
+    for (const command of output.commands) this.executeCommand(command);
+    if (output.selection) this.setSelection(output.selection);
+    this.lastBrushSizeText = formatSize(size);
+    return true;
+  }
+
+  /**
+   * The size input for the selection in a view (T15.4): its centre and its
+   * current size as width, height and depth of the view. Null when nothing
+   * resizable is selected.
+   */
+  selectionSizePrompt(view: PickAxis): { center: Vec3; text: string } | null {
+    const box = selectionBounds(this.document, this.selection);
+    if (!box) return null;
+    const center: Vec3 = [
+      (box.min[0] + box.max[0]) / 2,
+      (box.min[1] + box.max[1]) / 2,
+      (box.min[2] + box.max[2]) / 2,
+    ];
+    const text = formatSize(sizeAxes(view).map((axis) => box.max[axis]! - box.min[axis]!));
+    return { center, text };
+  }
+
+  /** Resizes the selection to a typed size about its centre, in one undo step (T15.4). */
+  resizeSelectionTo(view: PickAxis, size: readonly [number, number, number]): boolean {
+    const world: [number, number, number] = [0, 0, 0];
+    sizeAxes(view).forEach((axis, i) => (world[axis] = size[i]!));
+    const command = resizeToCommand(this.document, this.selection, world);
+    if (!command) return false;
+    this.executeCommand(command);
+    return true;
   }
 
   /** The idle handle dot diameter in CSS px; the hit radius follows it (T15.3). */

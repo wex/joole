@@ -1,0 +1,57 @@
+<!doctype html>
+<html data-theme="dark">
+  <head>
+    <meta charset="utf-8" />
+    <title>SizeInput preview</title>
+    <link rel="stylesheet" href="../../tokens.css" />
+    <style>
+      body {
+        margin: 0;
+        padding: 48px;
+        background: var(--vp-bg);
+        font-family: sans-serif;
+      }
+      .holder {
+        width: 168px;
+        margin-bottom: 48px;
+      }
+      .input {
+        box-sizing: border-box;
+        width: 100%;
+        height: var(--size-control);
+        padding: 0 var(--space-sm);
+        border: 1px solid var(--line-strong);
+        border-radius: var(--radius-sm);
+        background: var(--surface-2);
+        color: var(--ink);
+        font: var(--text-mono-body);
+        box-shadow: var(--shadow-float);
+      }
+      .input[aria-invalid='true'] {
+        border-color: var(--error);
+      }
+      .error {
+        margin-top: 2px;
+        padding: 2px var(--space-xs);
+        border-radius: var(--radius-sm);
+        background: var(--surface-2);
+        color: var(--error);
+        font: var(--text-ui-small);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="holder">
+      <input class="input" aria-label="Brush size, width height depth" placeholder="128 128 64" />
+    </div>
+    <div class="holder">
+      <input
+        class="input"
+        aria-label="Brush size, width height depth"
+        aria-invalid="true"
+        value="12 x"
+      />
+      <div class="error" role="alert">Enter three sizes, such as 128 64 32</div>
+    </div>
+  </body>
+</html>

@@ -27,6 +27,7 @@ import { createId } from '@core/doc/index';
 import { addNodePatch } from '@core/doc/commands';
 import { DEFAULT_TEXTURE } from '@game/q2/index';
 import { createTransformCommand } from './transformCommands';
+import { sizeAxes } from './sizeInput';
 import { clipSelectionPatch } from './csg';
 import { outermostGroupInScope } from './groups';
 import { clipPlaneFromPoints } from '@core/geom/csg';
@@ -55,6 +56,8 @@ export type PreviewSegment = readonly [Vec3, Vec3];
 
 export interface ToolOutput {
   readonly commands: Command[];
+  /** A click without extent in Brush mode asks for a typed size here (T15.4). */
+  readonly sizePrompt?: { readonly view: PickAxis; readonly point: Vec3 };
   readonly selection?: ReadonlySet<Id>;
   readonly preview?: readonly PreviewSegment[];
   /** Rejected-edit segments, drawn dashed in `vp-invalid`. */
@@ -250,10 +253,17 @@ export class BrushTool {
     }
 
     const [min, max] = this.box(point);
+    const view = this.mode.view;
     this.mode = { kind: 'idle' };
     for (const axis of [axis0, axis1]) {
       if (min[axis] === max[axis]) {
-        return { commands: [], measure: null, cursor: point };
+        // A click: the size is typed instead, centred on the snapped point.
+        return {
+          commands: [],
+          measure: null,
+          cursor: point,
+          sizePrompt: { view, point },
+        };
       }
     }
 
@@ -300,9 +310,76 @@ export class BrushTool {
     return [min, max];
   }
 
+  /**
+   * A brush of a typed size (T15.4), centred on the point on the view's two
+   * axes and on the working plane along the depth — the same plane as a
+   * drag-painted brush. The size is width, height and depth of the view.
+   */
+  createAt(view: PickAxis, center: Vec3, size: readonly [number, number, number]): ToolOutput {
+    const grid = this.getGridSize();
+    const axes = sizeAxes(view);
+    const [depthMin, depthMax] = snapDepthExtent(snap(center[axes[2]], grid), grid);
+    const middle: Vec3 = [...center] as Vec3;
+    middle[axes[2]] = (depthMin + depthMax) / 2;
+    const min: Vec3 = [...middle] as Vec3;
+    const max: Vec3 = [...middle] as Vec3;
+    axes.forEach((axis, i) => {
+      min[axis] = middle[axis] - size[i]! / 2;
+      max[axis] = middle[axis] + size[i]! / 2;
+    });
+    const result = createPrimitiveBrush(this.primitive, {
+      id: createId(),
+      min,
+      max,
+      texture: this.texture,
+      sides: this.sides,
+    });
+    if (!result.ok) return { commands: [] };
+    const brush = result.value;
+    return {
+      commands: [
+        {
+          label: `Add ${this.primitive}`,
+          run: (doc) => addNodePatch(doc, this.getInsertParent?.() ?? doc.worldspawn, brush),
+        },
+      ],
+      selection: new Set([brush.id]),
+    };
+  }
+
   cancel(): void {
     this.mode = { kind: 'idle' };
   }
+}
+
+/** The bounding box of the selected brushes, as the resize handles use it. */
+export function selectionBounds(doc: Readonly<MapDocument>, ids: ReadonlySet<Id>): Aabb | null {
+  return boundsOf(doc, ids);
+}
+
+/**
+ * Resizes the selection's bounding box to a world-axis size about its
+ * centre (T15.4), with the transform command of the resize drag. An axis on
+ * which the selection is flat keeps its size. Null when nothing resizable is
+ * selected.
+ */
+export function resizeToCommand(
+  doc: Readonly<MapDocument>,
+  ids: ReadonlySet<Id>,
+  size: readonly [number, number, number],
+): Command | null {
+  const box = boundsOf(doc, ids);
+  if (!box) return null;
+  const factors: Vec3 = [1, 1, 1];
+  for (let axis = 0; axis < 3; axis++) {
+    const extent = box.max[axis]! - box.min[axis]!;
+    if (extent > 1e-9) factors[axis] = size[axis]! / extent;
+  }
+  return createTransformCommand(
+    'Resize selection',
+    [...ids],
+    around(centerOf(box), mat4Scaling(factors)),
+  );
 }
 
 type ClipMode =
