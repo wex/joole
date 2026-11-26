@@ -130,7 +130,7 @@ Each milestone can ship as its own minor release. Tag the releases as the owner 
 
 ## M1 – Texturing and creation
 
-### [ ] T1.1 Clicking a texture applies it to the selection (#1, #2)
+### [x] T1.1 Clicking a texture applies it to the selection (#1, #2)
 
 - **Goal:**
   - Clicking a tile in the texture list applies that texture to the selected brushes.

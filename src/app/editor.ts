@@ -58,6 +58,7 @@ import {
 import {
   allFacesOf,
   applyTexturePatch,
+  expandBrushIds,
   fitTexturePatch,
   justifyTexturePatch,
   resetTexturePatch,
@@ -951,6 +952,11 @@ export class EditorApp {
     this.textureTool.cancel();
     this.entityTool.cancel();
     this.toolMode = mode;
+    if (mode !== 'texture') {
+      // Face picks belong to the texture tool; outside it the texture
+      // operations target whole brushes.
+      this.textureTool.clearFaceSelection();
+    }
     this.emit({ type: 'tool' });
   }
 
@@ -1278,7 +1284,7 @@ export class EditorApp {
     if (picked.length > 0) {
       return [...picked];
     }
-    return allFacesOf(this.document, this.selection);
+    return allFacesOf(this.document, expandBrushIds(this.document, this.selection));
   }
 
   get faceSelectionCount(): number {
@@ -1292,6 +1298,33 @@ export class EditorApp {
   setCurrentTexture(name: string): void {
     if (!name) return;
     this.currentTexture = name;
+    this.emit({ type: 'tool' });
+  }
+
+  /**
+   * The texture browser's click: sets the current texture and applies it to
+   * the targets — the picked faces in the texture tool, or every face of the
+   * selected brushes including groups and brush entities. Targets that
+   * already carry the texture are skipped, so clicking the active texture
+   * again adds no undo step.
+   */
+  chooseTexture(name: string): void {
+    if (!name) return;
+    this.currentTexture = name;
+    const faces = this.textureTargets().filter((ref) => {
+      const node = this.document.nodes.get(ref.brush);
+      return node?.kind === 'brush' && node.faces[ref.face]?.tex.name !== name;
+    });
+    if (faces.length > 0) {
+      const patch = applyTexturePatch(this.document, faces, name);
+      if (patch) {
+        try {
+          this.executeCommand({ label: 'Apply Texture', run: () => patch });
+        } catch (error) {
+          this.log('warning', errorText(error));
+        }
+      }
+    }
     this.emit({ type: 'tool' });
   }
 

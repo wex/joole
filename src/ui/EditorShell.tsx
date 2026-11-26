@@ -1053,7 +1053,7 @@ export function EditorShell(props: EditorShellProps) {
                   entries={textureList()}
                   inUse={() => app.texturesInUse()}
                   selected={() => currentTexture()}
-                  onSelect={(name) => app.setCurrentTexture(name)}
+                  onSelect={(name) => app.chooseTexture(name)}
                   load={(name) => app.loadTexture(name)}
                 />
               </Show>

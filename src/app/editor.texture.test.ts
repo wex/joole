@@ -140,3 +140,102 @@ describe('texture tools', () => {
     expect(app.textureArrow('ArrowLeft', false)).toBe(false);
   });
 });
+
+describe('chooseTexture (T1.1)', () => {
+  function addSecondBox(app: EditorApp): void {
+    const brush = { ...makeBox([128, 0, 0], [192, 64, 64]), id: 'second' };
+    app.executeCommand({
+      label: 'test',
+      run: () => addNodePatch(app.document, app.document.worldspawn, brush),
+    });
+  }
+
+  it('applies the texture to a selected brush in one undo step', () => {
+    const app = makeApp();
+    addBox(app);
+    app.setSelection(new Set(['target']));
+    app.chooseTexture('e1u1/clicked');
+    expect(app.currentTextureName).toBe('e1u1/clicked');
+    for (const face of brush(app).faces) {
+      expect(face.tex.name).toBe('e1u1/clicked');
+    }
+    app.undo();
+    for (const face of brush(app).faces) {
+      expect(face.tex.name).not.toBe('e1u1/clicked');
+    }
+  });
+
+  it('applies to picked faces only in the texture tool', () => {
+    const app = makeApp();
+    addBox(app);
+    app.setToolMode('texture');
+    clickFace(app);
+    expect(app.faceSelectionCount).toBe(1);
+    app.chooseTexture('e1u1/faceonly');
+    const names = brush(app).faces.map((face) => face.tex.name);
+    expect(names.filter((name) => name === 'e1u1/faceonly')).toHaveLength(1);
+  });
+
+  it('applies to every brush inside a selected group', () => {
+    const app = makeApp();
+    addBox(app);
+    addSecondBox(app);
+    app.setSelection(new Set(['target', 'second']));
+    expect(app.groupSelection()).toBe(true);
+    const groupId = [...app.selection][0]!;
+    expect(app.document.nodes.get(groupId)?.kind).toBe('group');
+    app.chooseTexture('e1u1/grouped');
+    for (const id of ['target', 'second']) {
+      const node = app.document.nodes.get(id) as BrushNode;
+      for (const face of node.faces) {
+        expect(face.tex.name).toBe('e1u1/grouped');
+      }
+    }
+  });
+
+  it('choosing the texture a target already has adds no undo step', () => {
+    const app = makeApp();
+    addBox(app);
+    app.setSelection(new Set(['target']));
+    app.chooseTexture('e1u1/once');
+    expect(brush(app).faces[0]!.tex.name).toBe('e1u1/once');
+    app.chooseTexture('e1u1/once');
+    // A single undo returns to the pre-choose state, so the second click
+    // created no history entry.
+    app.undo();
+    expect(brush(app).faces[0]!.tex.name).not.toBe('e1u1/once');
+    expect(app.document.nodes.get('target')).toBeDefined();
+  });
+
+  it('without a selection only the current texture changes', () => {
+    const app = makeApp();
+    addBox(app);
+    app.chooseTexture('e1u1/idle');
+    expect(app.currentTextureName).toBe('e1u1/idle');
+    for (const face of brush(app).faces) {
+      expect(face.tex.name).not.toBe('e1u1/idle');
+    }
+  });
+
+  it('leaving the texture tool clears the face picks', () => {
+    const app = makeApp();
+    addBox(app);
+    app.setToolMode('texture');
+    clickFace(app);
+    expect(app.faceSelectionCount).toBe(1);
+    app.setToolMode('select');
+    expect(app.faceSelectionCount).toBe(0);
+  });
+
+  it('outside the texture tool the apply targets whole brushes, not stale face picks', () => {
+    const app = makeApp();
+    addBox(app);
+    app.setToolMode('texture');
+    clickFace(app);
+    app.setToolMode('select');
+    app.setSelection(new Set(['target']));
+    app.chooseTexture('e1u1/whole');
+    const names = brush(app).faces.map((face) => face.tex.name);
+    expect(names.filter((name) => name === 'e1u1/whole')).toHaveLength(6);
+  });
+});

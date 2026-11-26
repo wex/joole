@@ -426,15 +426,14 @@ The **Textures** tab appears after game data is opened. It provides:
 - a virtualised thumbnail grid;
 - a footer with the full texture name, pixel dimensions and source package or directory.
 
-Clicking a thumbnail sets the **current texture**. It does not by itself change the map. Use **Apply Texture** or the eyedropper workflow described below.
+Clicking a thumbnail sets the **current texture** and applies it immediately: to the picked faces when the Texture tool has a face selection, or to every face of the selected brushes otherwise. Brushes inside a selected group or brush entity are textured as a whole. The change is one undo step. With nothing selected, clicking only sets the current texture. **Edit → Apply Texture** applies the current texture again without browsing.
 
 Textures are converted lazily in a worker and cached in browser storage. Missing or not-yet-loaded textures use a checker fallback in views.
 
 ### Applying and adjusting textures
 
 1. Pick individual faces with the Texture tool, or select whole brushes with the Select tool.
-2. Pick a texture in the browser, or use `Ctrl+click` on an already textured face as the eyedropper.
-3. Choose **Edit → Apply Texture**.
+2. Click a texture in the browser. The texture is applied in the same step. Alternatively, use `Ctrl+click` on an already textured face as the eyedropper and choose **Edit → Apply Texture**.
 
 The remaining texture commands act on the same target faces:
 

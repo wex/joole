@@ -315,7 +315,7 @@ UV coordinates are computed exactly as in qbsp3, so that the editor's view and t
 
 **UV parity verification (25.11.2026).** P3.11 proved the gate's "textures look the same in the editor and in the game" in both its halves. The automated half compiles `tests/fixtures/uvparity.map` with the qbsp3 wasm oracle, parses the texinfo lump of the `.bsp` and compares its `vecs` with `texAxes` for every source face in both directions; the fixture exercises rotation quadrants, non-uniform and fractional scales, negative offsets, a sloped prism plane and decimal offsets and rotations, so the `atoi` truncation rule decides the match. The manual half compiled `tests/fixtures/parity-room.map` and compared it face by face between the editor's 3D view and q2pro: the rotated floor and ceiling, the stretched and flipped walls and the offset pillar all matched, and parity is proven.**Texture tools** (Qoole's `OpTextureApply`, `ApplyFace`, `FaceManip`, `BrushManip`):
 
-- setting the texture for a whole brush or the selected faces, and picking a texture from a face with an eyedropper
+- setting the texture for a whole brush or the selected faces, and picking a texture from a face with an eyedropper. Clicking a texture in the texture browser sets it as the current texture and applies it immediately: to the picked faces in the texture tool, or to every face of the selected brushes including the brushes inside a selected group or brush entity. Clicking the active texture again adds no undo step (26.11.2026).
 - shifting and rotating with the arrow keys by the grid step, fit to face, justify to an edge, reset to defaults
 - texture browser: a folder tree (`textures/e1u1` …), search by name, an in-use filter, previews and sizes
 
@@ -476,6 +476,8 @@ The implementation proceeds in five phases. Each phase ends with a usable versio
 5. **Compilation and polish.** WASM tools in the browser (qbsp3, qvis3 and qrad3 in workers, threads), the leak path, compile profiles, PWA, the performance targets and Firefox/Safari support. _Done when_ the targets in the performance table are met and a map compiles to a playable BSP file without leaving the browser.
 
 **Decisions 26.11.2026:**
+
+- **Face picks belong to the texture tool:** leaving the texture tool clears the face selection, so the texture operations outside the tool always target whole brushes. The face selection is not part of the document or the undo history, so clearing it loses no data. Texture targets expand groups and brush entities: a selected `func_door` or group is textured as a whole.
 
 - **`style-src` allows `'unsafe-inline'`:** WebKit is the only engine that enforces `style-src` against runtime style-attribute writes, and it blocked the editor's dynamic geometry (virtual scrolling positions, splitter sizes, tree indentation). Replacing continuous per-element geometry with static classes is not feasible, and style-attribute injection carries no script-execution or network vector, so the relaxation is scoped to styles only; `script-src` stays strict. The violations were observed on WebKit 27.2 in CI.
 - **CI runs on `ubuntu-24.04`, not `ubuntu-latest`:** the `ubuntu-latest` image rolled to 26.04, which Playwright's browsers are not built for — Firefox (an ubuntu-24.04 build) could not create WebGL contexts there and every test failed at boot. The pinned image matches the documented development environment.
