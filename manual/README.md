@@ -690,6 +690,7 @@ This example builds and tests a simple room using the features described above.
 | `[`            | halve grid size                                                            |
 | `]`            | double grid size                                                           |
 | `N`            | go to the next leak-path point after a leaking compile                     |
+| `Tab`          | in the texture tool, step to the next face (`Shift+Tab` back)              |
 
 `Ctrl+H` and `Ctrl+L` are present in the key map as reserved hide/lock commands, but they currently do not execute an editing command. Use the `H` and `L` buttons on group rows in the Tree tab.
 

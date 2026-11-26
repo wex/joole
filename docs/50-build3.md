@@ -234,7 +234,7 @@ None of the WPs changes the `.map` or `.joole.json` format. The settings gain ne
 
 **Done when:** Space frames the selection in whichever view is under the pointer, 2D and 3D.
 
-### [ ] T15.6 Tab and Shift+Tab step through the faces in the texture tool (#31) ⇄
+### [x] T15.6 Tab and Shift+Tab step through the faces in the texture tool (#31) ⇄
 
 **Goal:** Tab is a keyboard shortcut for the Properties "next face" button.
 
