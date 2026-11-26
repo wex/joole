@@ -219,6 +219,8 @@ app.subscribe((event) => {
     }
     if (app.mapName) void projectStore?.saveRecentFiles([app.mapName]);
     renderer.setScope(app.scope);
+    const overlay = app.groupOverlay();
+    renderer.setGroupOverlay(overlay.segments, overlay.hover);
     // The leak path appears automatically once a compile finds a leak.
     if (app.leakPath && app.leakPath.length > 1) {
       const segments: [Vec3, Vec3][] = [];
@@ -235,8 +237,12 @@ app.subscribe((event) => {
     renderer.setFaceHighlight(app.faceHighlightPolygons());
   } else if (event.type === 'selection') {
     renderer.setSelection(app.selection);
+    const overlay = app.groupOverlay();
+    renderer.setGroupOverlay(overlay.segments, overlay.hover);
   } else if (event.type === 'tool') {
     renderer.setFaceHighlight(app.faceHighlightPolygons());
+    const overlay = app.groupOverlay();
+    renderer.setGroupOverlay(overlay.segments, overlay.hover);
   } else if (event.type === 'game') {
     renderer.reloadTextures();
   } else if (event.type === 'grid') {

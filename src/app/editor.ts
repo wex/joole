@@ -1,6 +1,13 @@
 import { analyzeBrush } from '@core/geom/index';
 import { stepTextureFocus as stepFocus, textureFocus as resolveFocus } from './textureFocus';
-import { reparentNodePatch, addNodePatch, createEmptyDocument, createId } from '@core/doc/index';
+import {
+  reparentNodePatch,
+  addNodePatch,
+  createEmptyDocument,
+  createId,
+  applyPatch,
+  mergePatches,
+} from '@core/doc/index';
 import {
   mergeEntityDefs,
   parseQuakedBlocks,
@@ -25,8 +32,10 @@ import {
   effectiveGroupState,
   groupNodesPatch,
   setGroupFlagPatch,
+  subtreeIds,
   ungroupNodesPatch,
 } from './groups';
+import { boxSegments, dashedSegment } from './tools';
 import { runCompilePipeline, type CompileProfile, type CompileRunner } from './compile';
 import type { EntityClassDef } from '@core/formats/index';
 import type {
@@ -220,6 +229,8 @@ export class EditorApp {
           'warning',
           `Texture lock error ${errorTexels.toFixed(2)} texels exceeds the 0.5-texel limit on a face.`,
         ),
+      () => this.groupPick,
+      () => this.scopeId,
     );
     this.brushTool = new BrushTool(
       () => this.document,
@@ -400,6 +411,75 @@ export class EditorApp {
     return this.scopeId;
   }
 
+  /** Group-pick mode (T1.13): clicks in the views select whole groups. */
+  get groupPick(): boolean {
+    return this.groupPickMode;
+  }
+
+  private groupPickMode = false;
+
+  /** Toggles group-pick mode. It is session state and is not persisted. */
+  toggleGroupPick(): boolean {
+    this.groupPickMode = !this.groupPickMode;
+    this.emit({ type: 'selection' });
+    return this.groupPickMode;
+  }
+
+  /** The group under the cursor in group-pick mode, reported by the Select tool. */
+  setGroupHover(id: string | null): void {
+    if (this.groupHoverId === id) return;
+    this.groupHoverId = id;
+    this.emit({ type: 'tool' });
+  }
+
+  private groupHoverId: string | null = null;
+
+  /**
+   * The group-pick overlay (T1.13): the dashed bounding box of every visible
+   * group in scope, plus the hovered group's box undashed. Empty when the
+   * mode is off.
+   */
+  groupOverlay(): {
+    segments: (readonly [[number, number, number], [number, number, number]])[];
+    hover: (readonly [[number, number, number], [number, number, number]])[];
+  } {
+    const segments: (readonly [[number, number, number], [number, number, number]])[] = [];
+    const hover: (readonly [[number, number, number], [number, number, number]])[] = [];
+    if (!this.groupPickMode) return { segments, hover };
+    for (const node of this.document.nodes.values()) {
+      if (node.kind !== 'group') continue;
+      if (!this.inScope(node.id)) continue;
+      const state = effectiveGroupState(this.document, node.id);
+      if (state.hidden) continue;
+      // The union of the descendant brushes' bounds.
+      let min: [number, number, number] | null = null;
+      let max: [number, number, number] | null = null;
+      for (const id of subtreeIds(this.document, node.id)) {
+        const child = this.document.nodes.get(id);
+        if (child?.kind !== 'brush') continue;
+        const box = analyzeBrush(child).aabb;
+        if (!box) continue;
+        if (!min) {
+          min = [...box.min] as [number, number, number];
+          max = [...box.max] as [number, number, number];
+        } else {
+          for (let axis = 0; axis < 3; axis++) {
+            min[axis] = Math.min(min[axis]!, box.min[axis]!);
+            max![axis] = Math.max(max![axis]!, box.max[axis]!);
+          }
+        }
+      }
+      if (!min || !max) continue;
+      const edges = boxSegments(min, max);
+      if (node.id === this.groupHoverId) {
+        hover.push(...edges);
+      } else {
+        for (const [a, b] of edges) segments.push(...dashedSegment(a, b));
+      }
+    }
+    return { segments, hover };
+  }
+
   private scopeId: string | null = null;
 
   /** A node is inside the scope when it is the scope or one of its descendants. */
@@ -458,19 +538,37 @@ export class EditorApp {
     }
   }
 
-  /** Dissolves the selected group, moving its children to its parent. */
+  /** Dissolves every selected group in one undo step (T1.13), deepest first. */
   ungroupSelection(): boolean {
-    const groupId = [...this.selection].find((id) => this.document.nodes.get(id)?.kind === 'group');
-    if (!groupId) {
+    const groupIds = [...this.selection].filter(
+      (id) => this.document.nodes.get(id)?.kind === 'group',
+    );
+    if (groupIds.length === 0) {
       this.log('warning', 'Ungroup needs a selected group.');
       return false;
     }
     try {
-      const patch = ungroupNodesPatch(this.document, groupId);
-      const children = (this.document.nodes.get(groupId) as { children: string[] }).children;
-      this.executeCommand({ label: 'Ungroup', run: () => patch });
-      this.setSelection(children);
-      this.log('ok', 'Ungrouped.');
+      // Deepest groups first, so a nested selection dissolves inside-out.
+      const depth = (id: string): number => {
+        let n = 0;
+        let at: string | undefined = id;
+        while ((at = this.document.parent.get(at)) !== undefined) n++;
+        return n;
+      };
+      const ordered = [...groupIds].sort((a, b) => depth(b) - depth(a));
+      const children: string[] = [];
+      let patch: Patch | null = null;
+      let doc = this.document;
+      for (const groupId of ordered) {
+        if (!doc.nodes.has(groupId)) continue;
+        const next = ungroupNodesPatch(doc, groupId);
+        children.push(...(doc.nodes.get(groupId) as { children: string[] }).children);
+        patch = patch ? mergePatches(patch, next) : next;
+        doc = applyPatch(doc, next);
+      }
+      this.executeCommand({ label: 'Ungroup', run: () => patch! });
+      this.setSelection(children.filter((id) => this.document.nodes.has(id)));
+      this.log('ok', ordered.length > 1 ? `Ungrouped ${ordered.length} groups.` : 'Ungrouped.');
       return true;
     } catch (error) {
       this.log('warning', `Ungroup failed: ${errorText(error)}`);

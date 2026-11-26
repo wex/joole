@@ -548,7 +548,7 @@ These three items are one WP because they rebuild the same panel. Splitting them
   - The dock state survives a reload.
   - The layout fits at 1280 × 720.
 
-### [ ] T1.13 Group-pick mode (G), Ctrl+G and Shift+G (#20, #21) ⇄
+### [x] T1.13 Group-pick mode (G), Ctrl+G and Shift+G (#20, #21) ⇄
 
 - **Goal:**
   - G toggles a group-pick mode in which clicking in a view selects whole groups.

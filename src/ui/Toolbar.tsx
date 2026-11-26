@@ -16,6 +16,10 @@ export interface ToolbarProps {
   readonly onOpenMap: () => void;
   readonly onExportMap: () => void;
   readonly onDelete: () => void;
+  readonly onGroup: () => void;
+  readonly onUngroup: () => void;
+  readonly onToggleGroupPick: () => void;
+  readonly groupPick: () => boolean;
   readonly onCsgSubtract: () => void;
   readonly onCsgIntersect: () => void;
   readonly onHollow: (direction: 'inward' | 'outward') => void;
@@ -149,6 +153,26 @@ export function Toolbar(props: ToolbarProps) {
             <li role="none">
               <button type="button" role="menuitem" onClick={() => choose(props.onDelete)}>
                 Delete <span class={styles.shortcut}>Del</span>
+              </button>
+            </li>
+            <li role="none">
+              <button type="button" role="menuitem" onClick={() => choose(props.onGroup)}>
+                Group <span class={styles.shortcut}>Ctrl+G</span>
+              </button>
+            </li>
+            <li role="none">
+              <button type="button" role="menuitem" onClick={() => choose(props.onUngroup)}>
+                Ungroup <span class={styles.shortcut}>Shift+G</span>
+              </button>
+            </li>
+            <li role="none">
+              <button
+                type="button"
+                role="menuitemcheckbox"
+                aria-checked={props.groupPick() ? 'true' : 'false'}
+                onClick={() => choose(props.onToggleGroupPick)}
+              >
+                Group Pick Mode <span class={styles.shortcut}>G</span>
               </button>
             </li>
             <li role="none">

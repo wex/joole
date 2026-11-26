@@ -291,3 +291,15 @@
 .textureSliderLabel input[type='range'] {
   flex: 1;
 }
+
+/* The group-pick mode chip in each view's title bar (T1.13). */
+.groupChip {
+  margin-left: var(--space-xs);
+  padding: 0 var(--space-xs);
+  border-radius: 2px;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: var(--font-size-s);
+  font-weight: 600;
+  line-height: 1.4;
+}

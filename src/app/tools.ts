@@ -20,6 +20,7 @@ import { addNodePatch } from '@core/doc/commands';
 import { DEFAULT_TEXTURE } from '@game/q2/index';
 import { createTransformCommand } from './transformCommands';
 import { clipSelectionPatch } from './csg';
+import { outermostGroupInScope } from './groups';
 import { clipPlaneFromPoints } from '@core/geom/csg';
 import { moveVertices } from '@core/geom/vertexEdit';
 import { createPointEntityPatch } from './entities';
@@ -62,9 +63,11 @@ export interface ToolOutput {
   readonly handles?: readonly { point: Vec3; state: 0 | 1 | 2 }[];
   /** The size box of the in-progress edit, when the tool has one. */
   readonly measure?: { readonly min: Vec3; readonly max: Vec3 } | null;
+  /** The group under the cursor in group-pick mode (T1.13), null when none. */
+  readonly hover?: Id | null;
 }
 
-function boxSegments(min: Vec3, max: Vec3): PreviewSegment[] {
+export function boxSegments(min: Vec3, max: Vec3): PreviewSegment[] {
   const v: Vec3[] = [];
   for (const x of [min[0], max[0]])
     for (const y of [min[1], max[1]]) for (const z of [min[2], max[2]]) v.push([x, y, z]);
@@ -740,10 +743,24 @@ export class SelectTool {
     gridSize: number | (() => number) = 8,
     private readonly textureLock: () => boolean = () => false,
     private readonly onLockWarning: (errorTexels: number) => void = () => {},
+    private readonly groupPick: () => boolean = () => false,
+    private readonly scope: () => Id | null = () => null,
   ) {
     this.gridSize = typeof gridSize === 'function' ? gridSize : () => gridSize;
     this.doc = getDocument();
     this.rebuild();
+  }
+
+  /**
+   * In group-pick mode (T1.13) a brush hit resolves to the outermost group
+   * below the scope. Locked or hidden groups make the hit unselectable, and
+   * several brushes of one group resolve to the same id.
+   */
+  private resolveHit(id: Id): Id | null {
+    if (!this.groupPick()) return id;
+    const resolved = outermostGroupInScope(this.doc, id, this.scope());
+    if (resolved === 'locked') return null;
+    return resolved ?? id;
   }
 
   /** Rebuilds after a wholesale document open. */
@@ -802,12 +819,17 @@ export class SelectTool {
       event.view === '3d'
         ? this.bvh.rayHits(event.point, event.direction ?? [1, 0, 0]).map((hit) => hit.id)
         : this.bvh.pick2D(event.point, event.view, event.tolerance).map((hit) => hit.id);
-    const selectedHit = hits.find((id) => this.selected.has(id));
+    const resolved: Id[] = [];
+    for (const id of hits) {
+      const mapped = this.resolveHit(id);
+      if (mapped !== null && !resolved.includes(mapped)) resolved.push(mapped);
+    }
+    const selectedHit = resolved.find((id) => this.selected.has(id));
     if (selectedHit !== undefined) {
       return selectedHit;
     }
     const key = event.point.map((x) => Math.round(x / Math.max(1, this.gridSize()))).join(':');
-    return this.cycler.choose(hits, `${event.view}:${key}`);
+    return this.cycler.choose(resolved, `${event.view}:${key}`);
   }
 
   private pointerDown(event: ToolPointerEvent): ToolOutput {
@@ -1005,6 +1027,12 @@ export class SelectTool {
         ],
       };
     }
+    if (this.mode.kind === 'idle' && this.groupPick()) {
+      // Group-pick hover (T1.13): the box of the group under the cursor is
+      // drawn in the selection colour.
+      this.doc = this.getDocument();
+      return { commands: [], hover: this.hit(event) };
+    }
     return { commands: [] };
   }
 
@@ -1039,7 +1067,8 @@ export class SelectTool {
         box.max[axes[1]]! >= minB &&
         box.min[axes[1]]! <= maxB
       ) {
-        out.add(node.id);
+        const mapped = this.resolveHit(node.id);
+        if (mapped !== null) out.add(mapped);
       }
     }
     return out;

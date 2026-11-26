@@ -203,6 +203,10 @@ export class GeometryCache {
   private readonly invalidIndex: number;
   private readonly leakIndex: number;
   private readonly cursorIndex: number;
+  private readonly groupIndex: number;
+  private readonly groupHoverIndex: number;
+  private groupSegments: readonly LineSegment[] = [];
+  private groupHoverSegments: readonly LineSegment[] = [];
   private leakSegments: readonly LineSegment[] = [];
   private cursorPoint: readonly [number, number, number] | null = null;
   readonly handles: GpuStore;
@@ -231,6 +235,10 @@ export class GeometryCache {
     this.state[this.leakIndex * 4] = STATE_SELECTED | STATE_LEAK;
     this.cursorIndex = this.takeIndex();
     this.state[this.cursorIndex * 4] = STATE_SELECTED | STATE_HANDLE;
+    this.groupIndex = this.takeIndex();
+    this.state[this.groupIndex * 4] = STATE_HANDLE;
+    this.groupHoverIndex = this.takeIndex();
+    this.state[this.groupHoverIndex * 4] = STATE_SELECTED;
     this.faceHighlightIndex = this.takeIndex();
     this.faceHighlight = new GpuStore(gl, FACE_STRIDE, (buffer) => this.bindFaceAttributes(buffer));
     this.cornerBuffer = gl.createBuffer();
@@ -500,6 +508,13 @@ export class GeometryCache {
     this.rebuildOverlay();
   }
 
+  /** Group-pick mode boxes (T1.13): every group in scope in the handle colour, the hovered one in the selection colour. */
+  setGroupOverlay(segments: readonly LineSegment[], hover: readonly LineSegment[]): void {
+    this.groupSegments = segments;
+    this.groupHoverSegments = hover;
+    this.rebuildOverlay();
+  }
+
   private rebuildOverlay(): void {
     const segments: LineSegment[] = [...this.toolSegments, ...this.linkSegments];
     // Handles are small world-space crosses at every selected brush's corners.
@@ -570,6 +585,24 @@ export class GeometryCache {
         ],
       ];
       this.lines.write('__overlayCursor', writeLines(cross, this.cursorIndex), cross.length);
+    }
+    if (this.groupSegments.length === 0) {
+      this.lines.remove('__overlayGroup');
+    } else {
+      this.lines.write(
+        '__overlayGroup',
+        writeLines(this.groupSegments, this.groupIndex),
+        this.groupSegments.length,
+      );
+    }
+    if (this.groupHoverSegments.length === 0) {
+      this.lines.remove('__overlayGroupHover');
+    } else {
+      this.lines.write(
+        '__overlayGroupHover',
+        writeLines(this.groupHoverSegments, this.groupHoverIndex),
+        this.groupHoverSegments.length,
+      );
     }
     this.state[0] = STATE_SELECTED;
     this.stateDirty = true;

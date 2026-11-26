@@ -19,7 +19,10 @@ export type ShortcutAction =
   | 'lock'
   | 'grid-down'
   | 'grid-up'
-  | 'next-leak';
+  | 'next-leak'
+  | 'toggle-group-pick'
+  | 'group'
+  | 'ungroup';
 
 export interface ShortcutInput {
   readonly key: string;
@@ -48,9 +51,11 @@ export function shortcutAction(input: ShortcutInput): ShortcutAction | null {
     if (key === 'd' && !input.shift) return 'duplicate';
     if (key === 'h' && !input.shift) return 'hide';
     if (key === 'l' && !input.shift) return 'lock';
+    if (key === 'g' && !input.shift) return 'group';
     return null;
   }
   if (input.shift) {
+    if (key === 'g') return 'ungroup';
     return null;
   }
   switch (key) {
@@ -79,6 +84,8 @@ export function shortcutAction(input: ShortcutInput): ShortcutAction | null {
       return 'grid-up';
     case 'n':
       return 'next-leak';
+    case 'g':
+      return 'toggle-group-pick';
     default:
       return null;
   }

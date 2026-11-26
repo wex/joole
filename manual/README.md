@@ -371,12 +371,15 @@ The texture operations target the picked faces. If no faces are picked, they tar
 
 ### Clipboard and duplication
 
-| Command   | Shortcut           | Behavior                                                                               |
-| --------- | ------------------ | -------------------------------------------------------------------------------------- |
-| Cut       | `Ctrl+X` / `Cmd+X` | copies the selected brushes as `.map` text and removes them                            |
-| Copy      | `Ctrl+C` / `Cmd+C` | copies the selected brushes as canonical `.map` text                                   |
-| Paste     | `Ctrl+V` / `Cmd+V` | parses `.map` text from the clipboard or Joole's in-app clipboard mirror               |
-| Duplicate | `Ctrl+D` / `Cmd+D` | copies and pastes the selected brushes in one step, offset by one grid unit in X and Y |
+| Command            | Shortcut                                                                               | Behavior                                                                      |
+| ------------------ | -------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| Cut                | `Ctrl+X` / `Cmd+X`                                                                     | copies the selected brushes as `.map` text and removes them                   |
+| Copy               | `Ctrl+C` / `Cmd+C`                                                                     | copies the selected brushes as canonical `.map` text                          |
+| Paste              | `Ctrl+V` / `Cmd+V`                                                                     | parses `.map` text from the clipboard or Joole's in-app clipboard mirror      |
+| Duplicate          | `G`                                                                                    | toggle group-pick mode: clicks select whole groups, shown dashed in the views |
+| `Ctrl+G`           | group the selection                                                                    |
+| `Shift+G`          | ungroup every selected group                                                           |
+| `Ctrl+D` / `Cmd+D` | copies and pastes the selected brushes in one step, offset by one grid unit in X and Y |
 
 Because the clipboard payload is ordinary `.map` text, it can be exchanged with other editors that accept that format. Pasted brushes receive fresh ids. Clipboard and prefab copies keep full precision rather than forcing compile-oriented integer plane points. In the current implementation these clipboard commands operate on brushes only, not on point entities, entity containers or groups.
 

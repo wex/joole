@@ -302,6 +302,14 @@ export class Renderer {
     this.cache.setTargetLinks(segments);
   }
 
+  /** Group-pick mode overlay boxes (T1.13). */
+  setGroupOverlay(
+    segments: readonly (readonly [Vec3, Vec3])[],
+    hover: readonly (readonly [Vec3, Vec3])[],
+  ): void {
+    this.cache.setGroupOverlay(segments, hover);
+  }
+
   setCamera(view: ViewId, camera: Camera): void {
     this.cameras.set(view, camera);
     this.invalidate();

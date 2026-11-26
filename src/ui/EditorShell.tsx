@@ -177,6 +177,7 @@ export function EditorShell(props: EditorShellProps) {
   const [panelVersion, setPanelVersion] = createSignal(0);
   const [measure, setMeasure] = createSignal<MeasureBox | null>(null);
   const [cursor, setCursor] = createSignal<readonly number[] | null>(null);
+  const [groupPick, setGroupPick] = createSignal(app.groupPick);
 
   let viewportElement: HTMLDivElement | undefined;
   let dockElement: HTMLElement | undefined;
@@ -466,6 +467,9 @@ export function EditorShell(props: EditorShellProps) {
       if (output.handles !== undefined) {
         renderer.setHandles(output.handles);
       }
+      if (output.hover !== undefined) {
+        app.setGroupHover(output.hover ?? null);
+      }
       if (output.measure !== undefined) {
         const next = output.measure ?? null;
         if (!sameBox(measure(), next)) {
@@ -729,6 +733,22 @@ export function EditorShell(props: EditorShellProps) {
         stepGrid(action === 'grid-down' ? -1 : 1);
         return;
       }
+      if (action === 'group') {
+        // Ctrl+G is the browser's find-next, so it must not fall through.
+        event.preventDefault();
+        app.groupSelection();
+        return;
+      }
+      if (action === 'ungroup') {
+        event.preventDefault();
+        app.ungroupSelection();
+        return;
+      }
+      if (action === 'toggle-group-pick' && !pointerLocked) {
+        event.preventDefault();
+        setGroupPick(app.toggleGroupPick());
+        return;
+      }
       if (
         (action === 'tool-select' ||
           action === 'tool-brush' ||
@@ -869,6 +889,10 @@ export function EditorShell(props: EditorShellProps) {
         gameOpen={gameOpen()}
         onCompile={() => setCompileMenuOpen((v) => !v)}
         onDelete={() => app.deleteSelection()}
+        onGroup={() => app.groupSelection()}
+        onUngroup={() => app.ungroupSelection()}
+        onToggleGroupPick={() => setGroupPick(app.toggleGroupPick())}
+        groupPick={groupPick}
         onCsgSubtract={() => app.csgSubtract()}
         onCsgIntersect={() => app.csgIntersect()}
         onHollow={(direction) => app.hollowSelection(direction)}
@@ -984,6 +1008,11 @@ export function EditorShell(props: EditorShellProps) {
                     data-testid={`view-title-${view}`}
                   >
                     <span>{viewLabels[view]}</span>
+                    <Show when={groupPick()}>
+                      <span class={styles.groupChip} data-testid="group-pick-chip">
+                        Group
+                      </span>
+                    </Show>
                     <span class={styles.coordinates}>
                       {measure() && view === activeView()
                         ? `${Math.round(measure()!.max[0]! - measure()!.min[0]!)} × ${Math.round(measure()!.max[1]! - measure()!.min[1]!)} × ${Math.round(measure()!.max[2]! - measure()!.min[2]!)}`

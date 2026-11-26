@@ -122,3 +122,46 @@ test('groups brushes in the tree, round-trips project and map export', async ({ 
   project = await projectJson(page);
   expect(project.document.nodes.filter((n) => n.kind === 'group').length).toBe(0);
 });
+
+test('G toggles group-pick mode, Ctrl+G groups and Shift+G ungroups (T1.13)', async ({ page }) => {
+  await openEmptyEditor(page);
+  const center = await page.evaluate(() => {
+    const rect = (window as unknown as JooleWindow).joole!.viewRects()['top']!;
+    return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
+  });
+  // Paint two brushes side by side in the top view.
+  await page.keyboard.press('b');
+  for (const dx of [-48, 48]) {
+    await page.mouse.move(center.x + dx - 16, center.y - 16);
+    await page.mouse.down();
+    await page.mouse.move(center.x + dx + 16, center.y + 16, { steps: 3 });
+    await page.mouse.up();
+  }
+  // Box-select both in the select tool, then Ctrl+G groups them.
+  await page.keyboard.press('s');
+  await page.mouse.move(center.x - 90, center.y - 40);
+  await page.mouse.down();
+  await page.mouse.move(center.x + 90, center.y + 40, { steps: 3 });
+  await page.mouse.up();
+  await page.keyboard.press('Control+g');
+  await expect
+    .poll(() => page.evaluate(() => (window as unknown as JooleWindow).joole!.selection().length))
+    .toBe(1);
+  // G toggles the mode: the chip appears in the view titles.
+  await page.keyboard.press('g');
+  await expect(page.locator('[data-testid=group-pick-chip]').first()).toBeVisible();
+  // Clicking one brush of the group keeps the whole group selected.
+  await page.mouse.move(center.x - 48, center.y);
+  await page.mouse.down();
+  await page.mouse.up();
+  await expect
+    .poll(() => page.evaluate(() => (window as unknown as JooleWindow).joole!.selection().length))
+    .toBe(1);
+  // Shift+G ungroups again, and G turns the mode back off.
+  await page.keyboard.press('Shift+G');
+  await expect
+    .poll(() => page.evaluate(() => (window as unknown as JooleWindow).joole!.selection().length))
+    .toBe(2);
+  await page.keyboard.press('g');
+  await expect(page.locator('[data-testid=group-pick-chip]')).toHaveCount(0);
+});
