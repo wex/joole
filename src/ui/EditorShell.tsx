@@ -1035,14 +1035,10 @@ export function EditorShell(props: EditorShellProps) {
           } else {
             const rect = renderer.viewRects().get(view);
             if (rect) {
-              const ratio = renderer.backingRatio();
-              const framed = frameOrtho(
-                VIEW_AXES[view],
-                box,
-                rect.width / ratio,
-                rect.height / ratio,
-                0.5,
-              );
+              // The rects are backing-store pixels, the same unit the ortho
+              // zoom works in; dividing by the pixel ratio would shrink the
+              // fill on high-density displays.
+              const framed = frameOrtho(VIEW_AXES[view], box, rect.width, rect.height, 0.5);
               // The depth coordinate stays, so the working plane for new
               // brushes does not jump.
               const camera = orthoCamera(view);

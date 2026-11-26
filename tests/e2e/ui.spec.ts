@@ -101,6 +101,8 @@ test('the shell has the workspace, file menu, panels, splitters, theme and view 
   await vertical.focus();
   await page.keyboard.press('ArrowLeft');
   expect(Number(await vertical.getAttribute('aria-valuenow'))).toBe(widthBefore + 8);
+  // The bottom panel starts collapsed (T15.9): expand it to reach the splitter.
+  await page.getByRole('button', { name: 'Expand bottom panel' }).click();
   const horizontal = page.getByRole('separator', { name: 'Resize bottom panel' });
   const heightBefore = Number(await horizontal.getAttribute('aria-valuenow'));
   await horizontal.focus();
