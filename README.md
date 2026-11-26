@@ -6,6 +6,7 @@ The project is licensed under GNU GPL v2.0 or later (`GPL-2.0-or-later`).
 
 ## Documentation
 
+- [User manual](manual/README.md)
 - [Technical specification](docs/00-spec.md)
 - [Technology stack](docs/10-stack.md)
 - [Sources](docs/20-sources.md)
