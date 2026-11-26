@@ -325,6 +325,7 @@ mountEditorShell(
       groupCsgResults: settings.groupCsgResults,
       handleSize: settings.handleSize,
       bottomCollapsed: settings.bottomCollapsed,
+      colors: settings.colors,
     },
     onSettingsChange: queueSettingsSave,
   },

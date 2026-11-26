@@ -22,6 +22,7 @@ import { Icon } from './Icon';
 import type { IconName } from './icons';
 import { LogPanel } from './LogPanel';
 import { MeasureOverlay, type MeasureBox } from './MeasureOverlay';
+import { COLOR_TOKENS } from '@app/colors';
 import { countNewErrors, newestLogId } from '@app/logErrors';
 import { PanelTabs, type BottomTab } from './PanelTabs';
 import { TreeView } from './TreeView';
@@ -64,6 +65,10 @@ export interface EditorShellProps {
     readonly groupCsgResults: boolean;
     readonly handleSize: number;
     readonly bottomCollapsed: boolean;
+    readonly colors: {
+      readonly dark: Record<string, string>;
+      readonly light: Record<string, string>;
+    };
   };
   readonly onSettingsChange?: (partial: Record<string, unknown>) => void;
 }
@@ -164,8 +169,33 @@ export function EditorShell(props: EditorShellProps) {
   // counted on the tab while the panel is collapsed or another tab is up.
   const [logSeenId, setLogSeenId] = createSignal(0);
   const [theme, setTheme] = createSignal<'dark' | 'light'>(initialSettings?.theme ?? 'dark');
+  const [colors, setColors] = createSignal<{
+    dark: Record<string, string>;
+    light: Record<string, string>;
+  }>({
+    dark: { ...((initialSettings?.colors?.dark as Record<string, string> | undefined) ?? {}) },
+    light: { ...((initialSettings?.colors?.light as Record<string, string> | undefined) ?? {}) },
+  });
   const [coordinates, setCoordinates] = createSignal(coordinateDefaults(false));
   const [flyActive, setFlyActive] = createSignal(false);
+  // Colour overrides (T15.10): the current theme's changed tokens are written
+  // as inline custom properties on the root element; everything reading the
+  // design-system variables follows at once, and the renderer re-reads its
+  // colours. Removing an override removes the property, so the token file's
+  // value returns.
+  createEffect(
+    () => [theme(), colors()] as const,
+    () => {
+      const root = document.documentElement;
+      for (const token of COLOR_TOKENS) {
+        root.style.removeProperty(`--${token.name}`);
+      }
+      for (const [token, value] of Object.entries(colors()[theme()])) {
+        root.style.setProperty(`--${token}`, value);
+      }
+      renderer.refreshColors();
+    },
+  );
   createEffect(
     () => [bottomCollapsed(), bottomHeight()] as const,
     () => {
@@ -240,6 +270,13 @@ export function EditorShell(props: EditorShellProps) {
     }
     if (typeof partial['bottomCollapsed'] === 'boolean') {
       setBottomCollapsed(partial['bottomCollapsed'] as boolean);
+    }
+    if (partial['colors'] && typeof partial['colors'] === 'object') {
+      const next = partial['colors'] as {
+        dark: Record<string, string>;
+        light: Record<string, string>;
+      };
+      setColors({ dark: { ...next.dark }, light: { ...next.light } });
     }
     if (typeof partial['bottomHeight'] === 'number') {
       setBottomHeight(partial['bottomHeight'] as number);
@@ -1713,8 +1750,10 @@ export function EditorShell(props: EditorShellProps) {
             groupCsgResults: groupCsgResults(),
             handleSize: handleSize(),
           }}
+          colors={colors()}
           onChange={applySettingsChange}
           onReset={() => applySettingsChange({ ...DEFAULT_SETTINGS })}
+          onResetColors={() => applySettingsChange({ colors: { dark: {}, light: {} } })}
           onClose={() => setSettingsOpen(false)}
         />
       </Show>

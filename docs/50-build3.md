@@ -336,7 +336,7 @@ None of the WPs changes the `.map` or `.joole.json` format. The settings gain ne
 
 **Done when:** the panel starts collapsed, expands and collapses by button or tab, remembers its state, and marks new errors on the Log tab.
 
-### [ ] T15.10 Settings tabs, colour overrides and Reset colours (#35)
+### [x] T15.10 Settings tabs, colour overrides and Reset colours (#35)
 
 **Goal:** every colour of the editor can be changed in Settings and reset to the defaults.
 

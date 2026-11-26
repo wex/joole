@@ -353,7 +353,7 @@ The Vertex/edge tool edits the derived geometry of selected brushes without chan
 
 - Press `V` for vertex/edge editing. The tool restores its last vertex or edge submode.
 - Press `V` again while already in the tool to switch between vertex and edge handles. Returning from Face mode starts again in vertex mode.
-- Every handle is a fixed-size square dot: yellow when idle, red when hovered or dragged. Vertices sit on the corners, edge dots sit at the edge midpoints and face dots at the face centres. The dots show in the 3D view too, but dragging works in the orthographic views. **Settings → Handle size** makes the dots larger or smaller; the area you can click grows with them.
+- Every handle is a fixed-size square dot: yellow when idle, red when hovered or dragged. Vertices sit on the corners, edge dots sit at the edge midpoints and face dots at the face centres. The dots show in the 3D view too, but dragging works in the orthographic views. **Settings → Colors** changes any colour of the editor per theme; Reset colours restores the defaults. **Settings → Handle size** makes the dots larger or smaller; the area you can click grows with them.
 - Drag a handle in an orthographic view. The grabbed point snaps onto the grid, so a vertex that started off the grid joins it with the first step. A small cross marks the snapped target and the brush's current size shows in the view's title bar while you drag.
 - Connected planes are recomputed so the brush remains convex.
 
