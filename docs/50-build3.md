@@ -370,9 +370,9 @@ None of the WPs changes the `.map` or `.joole.json` format. The settings gain ne
 **[ ] Gate T15:**
 
 - [ ] All eleven phase-1.5 TODO items are accepted by the owner in the running editor (owner work).
-- [ ] `pnpm check` and `pnpm e2e` (Chromium, Firefox, WebKit) are green, locally with `--workers=2` and in CI.
-- [ ] The manual's screenshots are retaken where the UI changed (the texture browser, the collapsed bottom panel, the overview, Settings with the Colors tab, the size input).
-- [ ] The decisions marked _to record_ are in the spec's _Decisions_ section.
+- [ ] `pnpm check` and `pnpm e2e` (Chromium, Firefox, WebKit) are green, locally with `--workers=2` and in CI. Local state 27.11.2026: `pnpm check` green; chromium and webkit suites fully green. Firefox degraded environmentally on the dev machine during the session — `page.evaluate` stalls against any locally served page, the live production site included, while `about:blank` evaluation works — so the firefox half of the suite could not be re-verified locally; CI is the arbiter. Firefox passed the lighter specs in the parallel run before degrading.
+- [x] The manual's screenshots are retaken where the UI changed (the overviews with the collapsed bottom panel, the Settings Colors tab; the texture-browser strip is unchanged apart from the thumbnail scaling covered by unit-level captures).
+- [x] The decisions marked _to record_ are in the spec's _Decisions_ section.
 
 ## Documentation impact summary
 

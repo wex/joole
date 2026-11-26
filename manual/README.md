@@ -137,6 +137,10 @@ Choose **Recover** to load the autosave as `recovered.joole.json`, or **Discard*
 
 **File → Settings…** (`Ctrl+,`) opens the settings dialog. Every change applies immediately and is remembered between sessions; there is no OK or Cancel step. **Reset to Defaults** restores every setting at once. Escape closes the dialog.
 
+![The Colors tab of the settings dialog](images/settings-colors.png)
+
+The dialog has two tabs. **General** holds the theme, the view and grid options, the texture thumbnail size, the tool overlay, the handle size and CSG grouping. **Colors** lists every colour of the editor — the views and the interface — for the current theme: change one with its colour well, restore one row with its × button, or restore them all with **Reset colours** (which clears both themes). Colours apply at once and are remembered per theme.
+
 | Setting                    | Effect                                                                            |
 | -------------------------- | --------------------------------------------------------------------------------- |
 | **Theme**                  | Dark or light window chrome. The viewport colors stay the editing colors in both. |
@@ -353,7 +357,7 @@ The Vertex/edge tool edits the derived geometry of selected brushes without chan
 
 - Press `V` for vertex/edge editing. The tool restores its last vertex or edge submode.
 - Press `V` again while already in the tool to switch between vertex and edge handles. Returning from Face mode starts again in vertex mode.
-- Every handle is a fixed-size square dot: yellow when idle, red when hovered or dragged. Vertices sit on the corners, edge dots sit at the edge midpoints and face dots at the face centres. The dots show in the 3D view too, but dragging works in the orthographic views. **Settings → Colors** changes any colour of the editor per theme; Reset colours restores the defaults. **Settings → Handle size** makes the dots larger or smaller; the area you can click grows with them.
+- Every handle is a fixed-size square dot: yellow when idle, red when hovered or dragged. Vertices sit on the corners, edge dots sit at the edge midpoints and face dots at the face centres. The dots show in the 3D view too, but dragging works in the orthographic views. **Settings → Handle size** makes the dots larger or smaller; the area you can click grows with them.
 - Drag a handle in an orthographic view. The grabbed point snaps onto the grid, so a vertex that started off the grid joins it with the first step. A small cross marks the snapped target and the brush's current size shows in the view's title bar while you drag.
 - Connected planes are recomputed so the brush remains convex.
 
