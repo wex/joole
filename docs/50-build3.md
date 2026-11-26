@@ -19,7 +19,7 @@ Operational facts carried over from build 2:
 - **Kill the stale preview server before every local Playwright run** (`ss -tlnp | grep 4173`, kill the pid). An old `vite preview` on port 4173 serves an old `dist/`.
 - **Run the local suite with `--workers=2`.** The default worker count on a many-core machine starves the software-GL browsers and produces timeouts that are not regressions. CI's runners use two workers.
 - **Browsers report `button` as -1 on every `pointermove`.** Tools never filter move events by button.
-- **Playwright's WebKit denies pointer lock.** Fly-mode assertions run only when the lock engages; logic that must be tested everywhere is pulled into pure functions.
+- **Fly mode in E2E runs on a Pointer Lock stand-in** (an init script in the `ui.spec.ts` fly test that fakes `pointerLockElement`, `requestPointerLock` and `pointerlockchange`). Playwright's WebKit denies the real lock, and headless Chromium starves Playwright's input and `evaluate` calls while the real lock is held (verified 27.11.2026: held keys, clicks and evaluations time out). Reuse the stand-in for any new fly-mode test.
 - Playwright 1.65 has `page.clock.fastForward`, not `tick`. Solid 2 has `Element` (not `JSX.Element`) and `onSettled` (not `onMount`); values read once from props go through `untrack`.
 - **`tokens.css` and `components/bundle.css` say "generated from tokens.json", but the repository has no generator script.** A token change edits `tokens.json`, `tokens.css` and `bundle.css` by hand, in step.
 - One-off probe and screenshot-capture specs go in `tests/e2e/` temporarily and are deleted before committing.
@@ -124,7 +124,7 @@ None of the WPs changes the `.map` or `.joole.json` format. The settings gain ne
 
 **Done when:** at every slider position the images fill their cells, sharp and centred, in all three browsers.
 
-### [ ] T15.2 S moves the fly camera backwards (#26) ⇄
+### [x] T15.2 S moves the fly camera backwards (#26) ⇄
 
 **Goal:** W, A, S and D all move the camera in pointer-lock fly mode.
 
@@ -141,7 +141,7 @@ None of the WPs changes the `.map` or `.joole.json` format. The settings gain ne
 **Tests:**
 
 - Unit: `flyKey` returns the key for w/a/s/d (either case) when locked and `null` when not locked. `shortcutAction` still maps S to `tool-select` without a lock.
-- E2E (`ui.spec.ts`, inside the existing `lockEngaged` branch): hold S, release, and check that the camera position moved backwards along its forward axis.
+- E2E (`ui.spec.ts`): hold W, then S, and check that the S step is opposite to the W step. The fly test now runs on a Pointer Lock stand-in in every browser (see _Implementation notes_).
 
 **Docs:** manual — remove the S entry from _Current UI gaps_; spec shortcut map note.
 

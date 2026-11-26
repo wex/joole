@@ -262,3 +262,17 @@ export class CameraController {
     }
   }
 }
+
+/** The fly-movement keys of pointer-lock mode. */
+export type FlyKey = 'w' | 'a' | 's' | 'd';
+
+/**
+ * The fly key an event means, or null. In pointer-lock fly mode W, A, S and
+ * D belong to the camera and are checked before any shortcut, so S moves
+ * backwards instead of being taken by the Select tool (T15.2).
+ */
+export function flyKey(key: string, pointerLocked: boolean): FlyKey | null {
+  if (!pointerLocked) return null;
+  const lower = key.toLowerCase();
+  return lower === 'w' || lower === 'a' || lower === 's' || lower === 'd' ? lower : null;
+}

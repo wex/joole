@@ -13,6 +13,7 @@ interface JooleWindow {
     };
     selection(): string[];
     autosave(): Promise<boolean>;
+    camera(view: string): unknown;
   };
 }
 
@@ -136,6 +137,29 @@ test('opens the fixture game folder and map and reports them in the log', async 
 });
 
 test('2D pan and zoom and 3D fly change the rendered views', async ({ page }) => {
+  // Fly mode runs on a stand-in for the Pointer Lock API. The app sees the
+  // same document.pointerLockElement and pointerlockchange events, but the
+  // browser's real lock is avoided: Playwright's WebKit denies it, and
+  // headless Chromium starves its input and evaluation channels while the
+  // pointer is locked.
+  await page.addInitScript(() => {
+    const lock: { element: Element | null } = { element: null };
+    const changed = () =>
+      queueMicrotask(() => document.dispatchEvent(new Event('pointerlockchange')));
+    Object.defineProperty(Document.prototype, 'pointerLockElement', {
+      configurable: true,
+      get: () => lock.element,
+    });
+    Element.prototype.requestPointerLock = function (this: Element) {
+      lock.element = this;
+      changed();
+      return Promise.resolve();
+    } as Element['requestPointerLock'];
+    Document.prototype.exitPointerLock = function () {
+      lock.element = null;
+      changed();
+    };
+  });
   const errors = consoleErrors(page);
   await openFixtureMap(page);
 
@@ -186,31 +210,40 @@ test('2D pan and zoom and 3D fly change the rendered views', async ({ page }) =>
   const dollied = await canvasScreenshot(page);
   expect(dollied.equals(zoomed)).toBe(false);
 
-  // Mouse-look and WASD work in pointer-lock mode (middle-click). Some
-  // environments deny the lock — Playwright's WebKit does — and the app
-  // handles that by design, so the fly assertions run only when the lock
-  // actually engages.
+  // Mouse-look and WASD work in pointer-lock mode (middle-click).
   await page.mouse.move(fly.x, fly.y);
   await page.mouse.down({ button: 'middle' });
   await page.mouse.up({ button: 'middle' });
-  await page.waitForTimeout(300);
-  const lockEngaged = await page.evaluate(() => document.pointerLockElement !== null);
-  if (lockEngaged) {
-    await expect(page.locator('[data-testid=view-title-3d]')).toContainText('Fly');
-    await page.mouse.move(fly.x + 48, fly.y + 8, { steps: 3 });
-    await page.keyboard.down('w');
-    await page.waitForTimeout(350);
-    await page.keyboard.up('w');
-    await page.mouse.down({ button: 'middle' });
-    await page.mouse.up({ button: 'middle' });
-    await expect(page.locator('[data-testid=view-title-3d]')).toContainText('Textured');
-    await page.evaluate(() => (window as unknown as JooleWindow).joole!.whenIdle());
-    const flown = await canvasScreenshot(page);
-    expect(flown.equals(zoomed)).toBe(false);
-  } else {
-    // The lock was denied: the view must stay exactly as it was.
-    await expect(page.locator('[data-testid=view-title-3d]')).toContainText('Textured');
-  }
+  await expect(page.locator('[data-testid=view-title-3d]')).toContainText('Fly');
+  await page.mouse.move(fly.x + 48, fly.y + 8, { steps: 3 });
+  // Copied inside the page: the moved camera is not a plain object.
+  const position = () =>
+    page.evaluate(() => {
+      const camera = (window as unknown as JooleWindow).joole!.camera('3d') as {
+        position: number[];
+      };
+      return [...camera.position];
+    });
+  const start = await position();
+  await page.keyboard.down('w');
+  await page.waitForTimeout(350);
+  await page.keyboard.up('w');
+  const forward = await position();
+  // S moves backwards (T15.2): opposite to the W step, and the Select tool
+  // shortcut does not take the key.
+  await page.keyboard.down('s');
+  await page.waitForTimeout(350);
+  await page.keyboard.up('s');
+  const back = await position();
+  const step = forward.map((v, i) => v - start[i]!);
+  const backStep = back.map((v, i) => v - forward[i]!);
+  expect(step.reduce((sum, v, i) => sum + v * backStep[i]!, 0)).toBeLessThan(0);
+  await page.mouse.down({ button: 'middle' });
+  await page.mouse.up({ button: 'middle' });
+  await expect(page.locator('[data-testid=view-title-3d]')).toContainText('Textured');
+  await page.evaluate(() => (window as unknown as JooleWindow).joole!.whenIdle());
+  const flown = await canvasScreenshot(page);
+  expect(flown.equals(zoomed)).toBe(false);
 
   const framesAtIdle = await page.evaluate(
     () => (window as unknown as JooleWindow).joole!.stats().frames,

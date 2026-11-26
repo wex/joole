@@ -758,7 +758,6 @@ Quake texture axes cannot represent every transformed orientation exactly. A war
 - Save, Undo and Redo toolbar icons are disabled placeholders; the keyboard shortcuts work.
 - `Ctrl+H` and `Ctrl+L` are reserved but currently do not invoke hide/lock commands.
 - Entity placement is intended for orthographic views; 3D placement does not project onto a ground plane.
-- `S` does not currently move the 3D fly camera backward because the key is intercepted before fly movement is recorded.
 - There is no group rename field in the current Tree UI.
 - The side-count input remains enabled for `sphere`, but the fixed octahedral primitive does not use it.
 - The File menu has no **New** command. An empty document exists when the editor starts; reloading the page is the only way to return to a truly empty document, subject to the autosave recovery prompt.

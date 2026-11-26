@@ -6,6 +6,7 @@ import { VIEW_ORDER } from '@render/index';
 import {
   CameraController,
   dollyPerspective,
+  flyKey,
   lookPerspective,
   movePerspective,
   orthoCoordinates,
@@ -759,6 +760,15 @@ export function EditorShell(props: EditorShellProps) {
       if (isEditableTarget(event.target)) {
         return;
       }
+      // Fly keys come before every shortcut while the pointer is locked
+      // (T15.2): otherwise S would be taken by the Select tool.
+      const fly = flyKey(event.key, pointerLocked);
+      if (fly) {
+        flyKeys.add(fly);
+        event.preventDefault();
+        ensureMovement();
+        return;
+      }
       if (
         app.activeTool === 'clip' &&
         (event.key === 'Enter' || event.key === 'Tab' || event.key === 'Escape') &&
@@ -891,12 +901,6 @@ export function EditorShell(props: EditorShellProps) {
         // captured here so the browser never performs its own Ctrl/Cmd action.
         event.preventDefault();
         return;
-      }
-      const key = event.key.toLowerCase();
-      if ((key === 'w' || key === 'a' || key === 's' || key === 'd') && pointerLocked) {
-        flyKeys.add(key);
-        event.preventDefault();
-        ensureMovement();
       }
     };
     const keyUp = (event: KeyboardEvent) => {
