@@ -868,6 +868,25 @@ export function EditorShell(props: EditorShellProps) {
         renderer.setToolPreview(output.preview ?? [], output.invalid ?? []);
         return;
       }
+      // Tab steps through the faces in the texture tool (T15.6) — the same
+      // wrap-around order as the Properties ◀ ▶ buttons. The focus rule
+      // keeps Tab for keyboard-focused controls.
+      if (
+        app.activeTool === 'texture' &&
+        event.key === 'Tab' &&
+        !event.ctrlKey &&
+        !event.metaKey &&
+        !event.altKey &&
+        !pointerLocked &&
+        viewShortcutAllowed(event.target, viewport)
+      ) {
+        const focus = app.textureFocus();
+        if (focus.brush) {
+          event.preventDefault();
+          app.stepTextureFocus(event.shiftKey ? -1 : 1);
+          return;
+        }
+      }
       if (
         app.activeTool === 'texture' &&
         (event.key === 'ArrowLeft' ||
