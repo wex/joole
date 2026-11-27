@@ -11,7 +11,7 @@
 .main {
   display: grid;
   min-height: 0;
-  grid-template-columns: minmax(0, 1fr) var(--size-splitter) var(--right-panel-width, 224px);
+  grid-template-columns: minmax(0, 1fr) var(--size-splitter) var(--right-panel-width, 320px);
 }
 
 .center {
