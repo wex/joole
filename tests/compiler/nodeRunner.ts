@@ -15,7 +15,11 @@ export const nodeRunner: CompileRunner = async (step) => {
     print(text: string): void;
     printErr(text: string): void;
   }) => Promise<CompileModule>;
-  const module = await create({ print: () => {}, printErr: () => {} });
+  const lines: string[] = [];
+  const module = await create({
+    print: (text) => lines.push(text),
+    printErr: (text) => lines.push(text),
+  });
   const dirs = new Set<string>();
   for (const file of [...step.files.map((f) => f.path), ...step.outputs]) {
     const parts = file.split('/').filter(Boolean);
@@ -42,5 +46,5 @@ export const nodeRunner: CompileRunner = async (step) => {
       // missing output
     }
   }
-  return { files };
+  return { files, output: lines.join('\n') };
 };

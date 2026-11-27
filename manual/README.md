@@ -243,11 +243,11 @@ The padlock button toggles **Texture lock**. When enabled, moving or rotating a 
 ### Theme and Compile
 
 - The sun/moon button switches dark and light window chrome.
-- **Compile** opens the compile profile menu. It is disabled until game data has been opened, because compilation needs the texture `.wal` headers and `pics/colormap.pcx`.
+- **Compile** opens the compile matrix menu. It is disabled until game data has been opened, because compilation needs the texture `.wal` headers and `pics/colormap.pcx`.
 
 ![Compile profile menu](images/compile-menu.png)
 
-The profiles are **Fast**, **Normal**, **Final** and, while work is running, **Cancel**. See [Compiling and testing a map](#compiling-and-testing-a-map).
+VIS and lighting are selected independently; pressing the menu's **Compile** action starts the chain. While work is running, a persistent status chip shows the active tool and **Cancel**. See [Compiling and testing a map](#compiling-and-testing-a-map).
 
 ## Tool modes
 
@@ -500,7 +500,7 @@ Contents checkboxes:
 
 `SOLID`, `WINDOW`, `AUX`, `LAVA`, `SLIME`, `WATER`, `MIST`, `AREAPORTAL`, `PLAYERCLIP`, `MONSTERCLIP`, `CURRENT_0`, `CURRENT_90`, `CURRENT_180`, `CURRENT_270`, `CURRENT_UP`, `CURRENT_DOWN`, `ORIGIN`, `DETAIL`, `TRANSLUCENT`, `LADDER`
 
-**Value** is an integer. With `SURF_LIGHT`, it is the emitted light intensity used by qrad3. Edits are undoable and apply to all target faces.
+**Value** is an integer. With `SURF_LIGHT`, it is the emitted light intensity used by qrad3; the emitted color is the emitting texture's average `.wal` color. If a face line omits attributes, the compiler falls back to the `.wal` header's contents, flags and value, while explicit edits travel in the exported `.map` and the compiled texinfo. Edits are undoable and apply to all target faces.
 
 ## Entities
 
@@ -623,7 +623,7 @@ Compilation runs entirely in browser workers using WASM builds of id's Quake 2 t
 | **Full** | Normal   | qbsp3, qvis3, qrad3          | regular testing with lighting                |
 | **Full** | Final    | qbsp3, qvis3, qrad3 `-extra` | slower high-quality lighting pass            |
 
-Lighting without VIS is allowed; qrad3 then treats visibility as all-visible, which can be slower and leaves the BSP without VIS data. Choose **Compile**, adjust the two selectors and press the menu's **Compile** action. While compilation is active, a persistent status chip shows a spinner and the active tool (`qbsp3`, `qvis3` or `qrad3`) with a **Cancel** button.
+Lighting without VIS is allowed, but it is not equivalent lighting: qrad3 reports direct lighting only, skips radiosity bounces and applies a small ambient term. Use it only for quick direct-light checks; use VIS plus Normal/Final lighting for representative output. Choose **Compile**, adjust the two selectors and press the menu's **Compile** action. While compilation is active, a persistent status chip shows a spinner and the active tool (`qbsp3`, `qvis3` or `qrad3`) with a **Cancel** button.
 
 The compile pipeline first performs the same export validation as `.map` export. It supplies the `.wal` headers of the textures used by the map and `pics/colormap.pcx` when available. Tool output streams line by line into the **Log** tab. Entries are labeled **Info**, **Ok**, **Warning** or **Error**; the label color distinguishes routine compiler output from editor warnings and failures.
 
@@ -654,7 +654,7 @@ This example builds and tests a simple room using the features described above.
 9. **Add lights and gameplay entities.** Use **Add Entity →** for lights, monsters, items and targets. Convert door or trigger geometry with **Apply Entity →**.
 10. **Configure entities.** Select each entity in the tree, set keys and spawnflags, and use `target`/`targetname` pairs for doors, buttons and triggers.
 11. **Texture the map.** Pick faces in 3D with `T`, choose textures in the browser and apply them. Use arrow-key shifts, rotation, fit and justify for alignment.
-12. **Set surface attributes.** Mark sky, water, translucency, nodraw and light-emitting surfaces as needed. Check the value field for light-emitting faces.
+12. **Set surface attributes.** Mark sky, water, translucency, nodraw and light-emitting surfaces as needed. Check the value field for light-emitting faces. For focused spotlights, use a `light_spot` or give a light a `target`; `_cone` is the cone angle in degrees.
 13. **Organize.** Group repeated or dense areas in the Tree. Use scope when working inside them. Save reusable assemblies as prefabs.
 14. **Save the project.** Press `Ctrl+S` / `Cmd+S` and keep the `.joole.json` as the authoritative source.
 15. **Compile with Fast VIS and Lighting Off.** Fix leaks and geometry warnings first. Use `N` to inspect leak paths.

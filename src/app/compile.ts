@@ -33,6 +33,8 @@ export interface PipelineResult {
   /** True when qbsp3 reported a leak: the .lin pointfile then holds the leak path. */
   readonly leaked: boolean;
   readonly steps: readonly CompileTool[];
+  /** Captured stdout/stderr per tool, when the runner provides it. */
+  readonly stepOutputs: Partial<Record<CompileTool, string>>;
 }
 
 /** The tools print a banner on fatal errors; the run must not continue. */
@@ -82,6 +84,7 @@ export async function runCompilePipeline(
 
   // qbsp3: the map plus the wal headers of every texture it uses.
   const steps: CompileTool[] = [];
+  const stepOutputs: Partial<Record<CompileTool, string>> = {};
   onStage?.('qbsp3');
   const qbsp = await run({
     tool: 'qbsp3',
@@ -90,6 +93,7 @@ export async function runCompilePipeline(
     outputs: [bspPath, prtPath, ptsPath],
   });
   checkStepOutput('qbsp3', qbsp.output);
+  if (qbsp.output !== undefined) stepOutputs.qbsp3 = qbsp.output;
   const bsp = qbsp.files.find((f) => f.path === bspPath)?.data;
   if (!bsp) throw new Error('qbsp3 produced no .bsp');
   const pts = qbsp.files.find((f) => f.path === ptsPath)?.data ?? null;
@@ -98,7 +102,7 @@ export async function runCompilePipeline(
   steps.push('qbsp3');
   if (leaked) {
     // A leak stops the chain: vis cannot run on an unsealed map.
-    return { bsp, prt, pts, leaked, steps };
+    return { bsp, prt, pts, leaked, steps, stepOutputs };
   }
 
   let currentBsp = bsp;
@@ -113,6 +117,7 @@ export async function runCompilePipeline(
       outputs: [bspPath],
     });
     checkStepOutput('qvis3', vis.output);
+    if (vis.output !== undefined) stepOutputs.qvis3 = vis.output;
     const nextBsp = vis.files.find((f) => f.path === bspPath)?.data;
     if (!nextBsp) throw new Error('qvis3 produced no .bsp');
     currentBsp = nextBsp;
@@ -120,7 +125,7 @@ export async function runCompilePipeline(
   }
 
   if (options.lighting === 'off') {
-    return { bsp: currentBsp, prt, pts, leaked, steps };
+    return { bsp: currentBsp, prt, pts, leaked, steps, stepOutputs };
   }
 
   // qrad3: the colormap is required for texture light colors.
@@ -138,6 +143,7 @@ export async function runCompilePipeline(
     outputs: [bspPath],
   });
   checkStepOutput('qrad3', rad.output);
+  if (rad.output !== undefined) stepOutputs.qrad3 = rad.output;
   const litBsp = rad.files.find((f) => f.path === bspPath)?.data;
   if (!litBsp) throw new Error('qrad3 produced no .bsp');
   return {
@@ -146,5 +152,6 @@ export async function runCompilePipeline(
     pts,
     leaked,
     steps: [...steps, 'qrad3'],
+    stepOutputs,
   };
 }

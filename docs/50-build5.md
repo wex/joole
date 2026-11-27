@@ -457,7 +457,7 @@ flowchart LR
 
 ---
 
-### T2.9 – Compile lighting reproductions and surface-attribute export fix
+### T2.9 – Compile lighting reproductions and surface-attribute export fix — DONE
 
 **TODO item:** compile has light-related problems.
 
@@ -480,7 +480,9 @@ flowchart LR
 5. Audit these inputs against `qrad3` source:
    - entity keys `light`/`_light`, `_color`, `style`/`_style`, `_cone`, target/angle;
    - texture-light use of texinfo flags/value and colormap;
-   - behavior with missing VIS data (qrad treats all clusters visible when no visdata exists, so lighting without VIS is logically possible but slower).
+   - behavior with missing VIS data (verified result: qrad still lights, but prints “No vis information, direct lighting only.”, disables radiosity bounces and forces a small ambient term).
+
+**Implementation result (27.11.2026):** controlled real-wasm fixtures now cover default and explicit point-light intensity, the `light`/`_light` alias, exact `_color` normalization, target-aimed spotlights and `_cone`, explicit face `SURF_LIGHT`/`value`, and `.wal`-default surface emission. Test-only BSP lump readers inspect entities, texinfo and lighting bytes. The Node compile runner now captures stdout/stderr. No qrad3 defect was reproduced: point and surface lights produce the expected controlled lighting differences once inputs reach the tools. One extra verified behavior is that lighting without VIS is direct-only (radiosity bounces are disabled), so it is not representative full lighting. The earlier blanket diagnosis was narrower than first stated: UI surface edits already set `attribsInFile`, but exports did not resolve WAL defaults before deciding whether the optional triple was required. The committed export fix preloads those defaults for export/compile and applies the documented predicate.
 
 **Surface-attribute export fix:**
 

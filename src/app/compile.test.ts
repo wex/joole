@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { parsePts } from '@core/formats/index';
 import { runCompilePipeline } from './compile';
 import { nodeRunner } from '../../tests/compiler/nodeRunner';
+import { lightingStats } from '../../tests/compiler/bspInspect';
 
 const mapText = readFileSync('tests/fixtures/maps/sp-sample.map', 'utf8');
 const wal = readFileSync('tests/fixtures/game/baseq2/textures/e2u1/mine10_1.wal');
@@ -75,6 +76,10 @@ describe('runCompilePipeline with the real wasm tools', () => {
     );
     expect(unvisedLit.steps).toEqual(['qbsp3', 'qrad3']);
     expect(unvisedLit.bsp.byteLength).toBeGreaterThan(plain.bsp.byteLength);
+    expect(lightingStats(unvisedLit.bsp).length).toBeGreaterThan(0);
+    // Verified qrad3 behavior: missing visdata does not stop lighting, but it
+    // disables radiosity bounces, so this is direct-only lighting.
+    expect(unvisedLit.stepOutputs.qrad3).toContain('No vis information, direct lighting only.');
   });
 
   it('a leaking map stops after qbsp3 with the pointfile path', async () => {
