@@ -118,3 +118,44 @@ test('edits entity keys, spawnflags and class through the panel', async ({ page 
   for (let i = 0; i < 5; i++) await page.keyboard.press('Control+z');
   expect(await monsterProps(page)).not.toContainEqual(['spawnflags', '1']);
 });
+
+test('worldspawn exposes documented keys and a new light exposes verified defaults', async ({
+  page,
+}) => {
+  await openEmptyEditor(page);
+
+  // Select worldspawn in the tree. Its class is fixed, but the documented
+  // Quake 2 keys are editable rows. The bottom panel starts collapsed, so
+  // open its Tree tab first.
+  await page.getByRole('tab', { name: 'Tree' }).click();
+  await page.getByRole('treeitem', { name: 'worldspawn' }).click();
+  await expect(page.locator('[data-testid=entity-panel]')).toBeVisible();
+  await expect(page.locator('[data-testid=entity-class]')).toHaveCount(0);
+  await expect(page.locator('[data-testid=key-input-gravity]')).toHaveValue('800');
+  await expect(page.locator('[data-testid=key-input-sky]')).toHaveValue('');
+  await page.locator('[data-testid=key-input-message]').fill('Test level');
+  await page.locator('[data-testid=key-input-message]').press('Tab');
+  let entities = await projectEntities(page);
+  const world = entities.find((props) =>
+    props.some(([key, value]) => key === 'classname' && value === 'worldspawn'),
+  );
+  expect(world).toContainEqual(['message', 'Test level']);
+  expect(world).not.toContainEqual(['sky', '']);
+
+  // A newly created light physically receives the compiler-verified default
+  // values the user can edit immediately.
+  const spot = await worldScreen(page, 'front', [0, 0, 32]);
+  await page.mouse.click(spot.x, spot.y, { button: 'right' });
+  await page.locator('[data-testid=menu-add-entity]').click();
+  await page.getByRole('menuitem', { name: 'misc →' }).click();
+  await page.locator('[data-testid=menu-class-light]').click();
+  await expect(page.locator('[data-testid=key-input-light]')).toHaveValue('300');
+  await expect(page.locator('[data-testid=key-input-_color]')).toHaveValue('1 1 1');
+  await expect(page.locator('[data-testid=key-input-style]')).toHaveValue('0');
+  await expect(page.locator('[data-testid=key-input-_cone]')).toHaveValue('10');
+  entities = await projectEntities(page);
+  const light = entities.find((props) =>
+    props.some(([key, value]) => key === 'classname' && value === 'light'),
+  );
+  expect(light).toContainEqual(['light', '300']);
+});

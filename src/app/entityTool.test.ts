@@ -36,6 +36,24 @@ describe('EntityTool', () => {
     expect(output.selection?.size).toBe(1);
   });
 
+  it('uses the supplied creation defaults when placing a light', () => {
+    const doc = createEmptyDocument();
+    const tool = new EntityTool(
+      () => doc,
+      () => 'light',
+      () => doc.worldspawn,
+      8,
+      () => [
+        ['light', '300'],
+        ['_color', '1 1 1'],
+      ],
+    );
+    const patch = tool.pointer(event(0, 0, 0)).commands[0]!.run(doc);
+    const entity = [...patch.after.values()].find((n) => n?.kind === 'entity') as EntityNode;
+    expect(entity.props).toContainEqual(['light', '300']);
+    expect(entity.props).toContainEqual(['_color', '1 1 1']);
+  });
+
   it('ignores non-primary buttons and move events', () => {
     const doc = createEmptyDocument();
     const tool = new EntityTool(

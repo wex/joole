@@ -12,6 +12,10 @@ export interface EntityKeyRow {
   readonly description: string;
   /** Documented keys come first in definition order; unknown keys keep file order after them. */
   readonly documented: boolean;
+  /** False for a virtual documented row that is not physically present in the entity. */
+  readonly present: boolean;
+  /** Verified default shown as a placeholder for an absent row. */
+  readonly defaultValue?: string;
 }
 
 export interface EntityPanelState {
@@ -31,6 +35,8 @@ export interface EntityPanelState {
   readonly targetnames: readonly string[];
   /** The keys whose values are other entities' targetnames. */
   readonly linkedTarget: string | null;
+  /** True for the fixed worldspawn entity; class/category mutation is disabled. */
+  readonly worldspawn: boolean;
 }
 
 /**
@@ -76,24 +82,30 @@ export function entityPanelState(
     keys: [],
     targetnames: collectTargetnames(doc),
     linkedTarget: null,
+    worldspawn: false,
   };
   if (selection.size !== 1) return empty;
   const [id] = selection;
   const node = doc.nodes.get(id!);
-  if (!node || node.kind !== 'entity' || id === doc.worldspawn) return empty;
+  if (!node || node.kind !== 'entity') return empty;
+  const worldspawn = id === doc.worldspawn;
 
   const classname = entityProp(node, 'classname') ?? '';
   const def = defs.find((d) => d.className === classname) ?? null;
   const category = entityCategory(classname);
 
-  const categories = [
-    ...new Set(
-      defs.filter((d) => d.className !== 'worldspawn').map((d) => entityCategory(d.className)),
-    ),
-  ].sort();
-  const categoryClasses = defs
-    .filter((d) => entityCategory(d.className) === category && d.className !== 'worldspawn')
-    .map((d) => d.className);
+  const categories = worldspawn
+    ? []
+    : [
+        ...new Set(
+          defs.filter((d) => d.className !== 'worldspawn').map((d) => entityCategory(d.className)),
+        ),
+      ].sort();
+  const categoryClasses = worldspawn
+    ? []
+    : defs
+        .filter((d) => entityCategory(d.className) === category && d.className !== 'worldspawn')
+        .map((d) => d.className);
 
   const flagValue = Number(entityProp(node, 'spawnflags') ?? '0') || 0;
   const spawnflags = (def?.spawnflags ?? []).map((name, i) => ({
@@ -102,21 +114,50 @@ export function entityPanelState(
     checked: (flagValue & (1 << i)) !== 0,
   }));
 
-  // Keys: documented keys in definition order first (even when absent? no —
-  // only present keys are rows), then undocumented in file order.
+  // Keys: every documented key is a row, even when absent. Absent rows are
+  // virtual placeholders only; they are not written back until edited. A few
+  // editor/game-universal point-entity keys follow, then unknown physical
+  // keys in file order.
   const documented = def ? new Map(def.keys.map((k) => [k.name, k])) : new Map();
-  const keys: EntityKeyRow[] = node.props
-    .filter(([k]) => k !== 'classname')
-    .map(([key, value]) => {
-      const docKey = documented.get(key);
-      return {
-        key,
-        value,
-        type: docKey?.type ?? UNIVERSAL_KEY_TYPES[key] ?? 'str',
-        description: docKey?.description ?? '',
-        documented: !!docKey,
-      };
+  const keys: EntityKeyRow[] = [];
+  const rowKeys = new Set<string>();
+  const pushRow = (
+    key: string,
+    type: string,
+    description: string,
+    documentedKey: boolean,
+    defaultValue?: string,
+  ) => {
+    if (rowKeys.has(key)) return;
+    rowKeys.add(key);
+    const present = node.props.find(([k]) => k === key)?.[1];
+    keys.push({
+      key,
+      value: present ?? '',
+      type,
+      description,
+      documented: documentedKey,
+      present: present !== undefined,
+      ...(defaultValue !== undefined ? { defaultValue } : {}),
     });
+  };
+  for (const key of def?.keys ?? []) {
+    pushRow(key.name, key.type, key.description, true, key.defaultValue);
+  }
+  if (!worldspawn && node.children.length === 0) {
+    pushRow('origin', UNIVERSAL_KEY_TYPES.origin!, '', false);
+    pushRow('angle', UNIVERSAL_KEY_TYPES.angle!, '', false);
+  }
+  for (const [key] of node.props) {
+    if (key === 'classname' || rowKeys.has(key)) continue;
+    const docKey = documented.get(key);
+    pushRow(
+      key,
+      docKey?.type ?? UNIVERSAL_KEY_TYPES[key] ?? 'str',
+      docKey?.description ?? '',
+      !!docKey,
+    );
+  }
 
   return {
     entityId: id!,
@@ -129,6 +170,7 @@ export function entityPanelState(
     keys,
     targetnames: collectTargetnames(doc),
     linkedTarget: entityProp(node, 'target') ?? null,
+    worldspawn,
   };
 }
 
@@ -175,9 +217,25 @@ export function renameEntityPropPatch(
   return replaceNodePatch(doc, id, { ...node, props });
 }
 
-/** The patch that changes the entity's class. The other keys are untouched. */
-export function setEntityClassPatch(doc: Readonly<MapDocument>, id: Id, classname: string): Patch {
-  return setEntityPropPatch(doc, id, 'classname', classname);
+/**
+ * The patch that changes the entity's class. Existing keys are untouched;
+ * verified creation defaults of the new class are added only when missing.
+ */
+export function setEntityClassPatch(
+  doc: Readonly<MapDocument>,
+  id: Id,
+  classname: string,
+  defaults: readonly (readonly [string, string])[] = [],
+): Patch {
+  const node = doc.nodes.get(id);
+  if (!node || node.kind !== 'entity') throw new Error(`node ${id} is not an entity`);
+  let next = withEntityProp(node, 'classname', classname);
+  for (const [key, value] of defaults) {
+    if (key !== 'classname' && entityProp(next, key) === undefined) {
+      next = withEntityProp(next, key, value);
+    }
+  }
+  return replaceNodePatch(doc, id, next);
 }
 
 /** The patch that toggles one spawnflag bit. */

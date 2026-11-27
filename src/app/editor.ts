@@ -52,6 +52,8 @@ import {
   DEFAULT_TEXTURE,
   PALETTE_PATH,
   SURFACE_FLAG_BITS,
+  entityCreationDefaults,
+  withQ2EntityMetadata,
 } from '@game/q2/index';
 import type { GameFileEntry } from '@platform/index';
 import { CommandBus } from './commandBus';
@@ -132,6 +134,22 @@ export interface TextureCacheLike {
 export interface AutosaveStoreLike {
   saveAutosave(project: string, dirty: boolean): Promise<void>;
   clearAutosave(): Promise<void>;
+}
+
+const VANILLA_ENTITY_DEFS = withQ2EntityMetadata(parseQuakedBlocks(q2defText));
+
+/** A new document gets only source-verified worldspawn defaults; opening files never backfills keys. */
+function createInitialDocument(): MapDocument {
+  const empty = createEmptyDocument();
+  const world = empty.nodes.get(empty.worldspawn);
+  if (!world || world.kind !== 'entity') return empty;
+  const props = [...world.props];
+  for (const [key, value] of entityCreationDefaults(VANILLA_ENTITY_DEFS, 'worldspawn')) {
+    if (!props.some(([existing]) => existing === key)) props.push([key, value]);
+  }
+  const nodes = new Map(empty.nodes);
+  nodes.set(empty.worldspawn, { ...world, props });
+  return { nodes, parent: new Map(empty.parent), worldspawn: empty.worldspawn };
 }
 
 export interface EditorAppOptions {
@@ -228,7 +246,7 @@ export class EditorApp {
     this.saveProjectText = options.saveProjectText;
     this.saveMapText = options.saveMapText;
     this.autosaveStore = options.autosaveStore;
-    this.bus = new CommandBus(createEmptyDocument());
+    this.bus = new CommandBus(createInitialDocument());
     this.selectionManager = new SelectionManager(this.bus);
     this.selectTool = new SelectTool(
       () => this.document,
@@ -267,6 +285,7 @@ export class EditorApp {
       () => this.currentEntityClassValue,
       () => this.document.worldspawn,
       () => this.gridSize,
+      (classname) => this.creationDefaultsFor(classname),
     );
     this.bus.subscribe((event) => {
       if (event.type !== 'history') {
@@ -374,10 +393,14 @@ export class EditorApp {
 
   /** Replaces the mod definition layer; an empty list returns to vanilla. */
   setModEntityDefs(texts: readonly string[]): void {
-    const vanilla = parseQuakedBlocks(q2defText);
     const mod = texts.flatMap((text) => parseQuakedBlocks(text));
-    this.entityDefsValue = mod.length > 0 ? mergeEntityDefs(vanilla, mod) : vanilla;
+    this.entityDefsValue =
+      mod.length > 0 ? mergeEntityDefs(VANILLA_ENTITY_DEFS, mod) : VANILLA_ENTITY_DEFS;
     this.modEntityDefTexts = [...texts];
+  }
+
+  private creationDefaultsFor(classname: string): [string, string][] {
+    return entityCreationDefaults(this.entityDefsValue, classname);
   }
 
   /** The class the entity tool places, 'light' until one is chosen. */
@@ -406,6 +429,7 @@ export class EditorApp {
         classname,
         brushIds,
         createId,
+        this.creationDefaultsFor(classname),
       );
       this.executeCommand({ label: `Convert to ${classname}`, run: () => patch });
       this.setSelection([id]);
@@ -643,7 +667,7 @@ export class EditorApp {
   /** Changes the class of a point entity. For brush classes on a brush selection use convertSelectionToEntity. */
   setEntityClass(id: string, classname: string): boolean {
     return this.runEntityPatch(`Class ${classname}`, () =>
-      setEntityClassPatch(this.document, id, classname),
+      setEntityClassPatch(this.document, id, classname, this.creationDefaultsFor(classname)),
     );
   }
 
@@ -669,7 +693,7 @@ export class EditorApp {
     return def ? def.bbox === 'brush' : /^(func|trigger|path|multi)_/.test(classname);
   }
 
-  private entityDefsValue: readonly EntityClassDef[] = parseQuakedBlocks(q2defText);
+  private entityDefsValue: readonly EntityClassDef[] = VANILLA_ENTITY_DEFS;
   private modEntityDefTexts: string[] = [];
 
   setTextureLock(enabled: boolean): void {
@@ -812,6 +836,9 @@ export class EditorApp {
           string,
           string,
         ],
+        ...this.creationDefaultsFor(classname)
+          .filter(([key]) => key !== 'classname' && key !== 'origin')
+          .map(([key, value]) => [key, value] as [string, string]),
       ],
       children: [],
     };

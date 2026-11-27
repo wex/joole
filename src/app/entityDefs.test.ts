@@ -24,6 +24,33 @@ describe('entity definitions in the app', () => {
     expect(app.entityDefs().length).toBe(148);
   });
 
+  it('a new document worldspawn has the verified gravity default', () => {
+    const app = createTestApp();
+    const project = JSON.parse(app.projectText()) as {
+      document: { nodes: { kind: string; props?: [string, string][] }[] };
+    };
+    const world = project.document.nodes.find((node) =>
+      node.props?.some(([key, value]) => key === 'classname' && value === 'worldspawn'),
+    );
+    expect(world?.props).toContainEqual(['gravity', '800']);
+    expect(world?.props?.some(([key]) => key === 'sky')).toBe(false);
+    expect(world?.props?.some(([key]) => key === 'message')).toBe(false);
+  });
+
+  it('placing a light writes compiler-verified creation defaults', () => {
+    const app = createTestApp();
+    const id = app.addEntityAt('light', [32, 32, 32]);
+    expect(id).not.toBeNull();
+    const project = JSON.parse(app.projectText()) as {
+      document: { nodes: { id: string; props?: [string, string][] }[] };
+    };
+    const light = project.document.nodes.find((node) => node.id === id);
+    expect(light?.props).toContainEqual(['light', '300']);
+    expect(light?.props).toContainEqual(['_color', '1 1 1']);
+    expect(light?.props).toContainEqual(['style', '0']);
+    expect(light?.props).toContainEqual(['_cone', '10']);
+  });
+
   it('merges mod definitions over the vanilla set', () => {
     const app = createTestApp();
     const ctf = readFileSync('tests/fixtures/quaked/ctf-blocks.c', 'utf8');

@@ -77,21 +77,24 @@ export function EntityPanel(props: EntityPanelProps) {
     );
   };
 
-  const valueEditor = (key: string, type: string, value: string) => {
-    if (type === 'angle') return angleCompass(value);
+  const valueEditor = (key: string, type: string, value: string, defaultValue?: string) => {
+    const effective = value || defaultValue || '';
+    if (type === 'angle') return angleCompass(effective);
     if (type === 'color') {
       return (
         <span class={styles.colorRow}>
           <input
             type="color"
             class={styles.colorInput}
-            value={rgbToHex(value)}
+            value={rgbToHex(effective)}
             onChange={(e) => commitKey(key, hexToRgb(e.currentTarget.value))}
           />
           <input
             class={styles.valueInput}
             type="text"
             value={value}
+            placeholder={defaultValue ?? ''}
+            data-testid={`key-input-${key}`}
             onChange={(e) => commitKey(key, e.currentTarget.value)}
           />
         </span>
@@ -105,6 +108,7 @@ export function EntityPanel(props: EntityPanelProps) {
             type="text"
             list="joole-targetnames"
             value={value}
+            placeholder={defaultValue ?? ''}
             data-testid={`key-target-input`}
             onChange={(e) => commitKey(key, e.currentTarget.value)}
           />
@@ -116,6 +120,7 @@ export function EntityPanel(props: EntityPanelProps) {
         class={styles.valueInput}
         type="text"
         value={value}
+        placeholder={defaultValue ?? ''}
         data-testid={`key-input-${key}`}
         onChange={(e) => commitKey(key, e.currentTarget.value)}
       />
@@ -126,53 +131,55 @@ export function EntityPanel(props: EntityPanelProps) {
     <Show when={state().entityId}>
       <div class={styles.entity} data-testid="entity-panel">
         <span class={styles.groupLabel}>Entity</span>
-        <label class={styles.row}>
-          <span class={styles.rowLabel}>Category</span>
-          <select
-            class={styles.select}
-            data-testid="entity-category"
-            value={state().category}
-            onChange={(e) => {
-              const category = e.currentTarget.value;
-              const first = app
-                .entityDefs()
-                .filter(
-                  (d) =>
-                    d.className !== 'worldspawn' &&
-                    (d.className.includes('_') ? d.className.split('_')[0] : 'misc') === category,
-                )[0];
-              const id = state().entityId;
-              if (first && id) app.setEntityClass(id, first.className);
-            }}
-          >
-            <For each={state().categories}>
-              {(category) => <option value={category}>{category}</option>}
-            </For>
-          </select>
-        </label>
-        <label class={styles.row}>
-          <span class={styles.rowLabel}>Class</span>
-          <select
-            class={styles.select}
-            data-testid="entity-class"
-            value={state().classname}
-            onChange={(e) => {
-              const id = state().entityId;
-              if (id) app.setEntityClass(id, e.currentTarget.value);
-            }}
-          >
-            <For each={state().categoryClasses}>
-              {(classname) => <option value={classname}>{classname}</option>}
-            </For>
-            <Show
-              when={
-                state().classname !== '' && !state().categoryClasses.includes(state().classname)
-              }
+        <Show when={!state().worldspawn}>
+          <label class={styles.row}>
+            <span class={styles.rowLabel}>Category</span>
+            <select
+              class={styles.select}
+              data-testid="entity-category"
+              value={state().category}
+              onChange={(e) => {
+                const category = e.currentTarget.value;
+                const first = app
+                  .entityDefs()
+                  .filter(
+                    (d) =>
+                      d.className !== 'worldspawn' &&
+                      (d.className.includes('_') ? d.className.split('_')[0] : 'misc') === category,
+                  )[0];
+                const id = state().entityId;
+                if (first && id) app.setEntityClass(id, first.className);
+              }}
             >
-              <option value={state().classname}>{state().classname}</option>
-            </Show>
-          </select>
-        </label>
+              <For each={state().categories}>
+                {(category) => <option value={category}>{category}</option>}
+              </For>
+            </select>
+          </label>
+          <label class={styles.row}>
+            <span class={styles.rowLabel}>Class</span>
+            <select
+              class={styles.select}
+              data-testid="entity-class"
+              value={state().classname}
+              onChange={(e) => {
+                const id = state().entityId;
+                if (id) app.setEntityClass(id, e.currentTarget.value);
+              }}
+            >
+              <For each={state().categoryClasses}>
+                {(classname) => <option value={classname}>{classname}</option>}
+              </For>
+              <Show
+                when={
+                  state().classname !== '' && !state().categoryClasses.includes(state().classname)
+                }
+              >
+                <option value={state().classname}>{state().classname}</option>
+              </Show>
+            </select>
+          </label>
+        </Show>
         <Show when={state().spawnflags.length > 0}>
           <span class={styles.groupLabel}>Spawnflags</span>
           <div class={styles.flags}>
@@ -202,11 +209,18 @@ export function EntityPanel(props: EntityPanelProps) {
           <tbody>
             <For each={state().keys}>
               {(row) => (
-                <tr>
-                  <td class={styles.keyCell} title={row.description}>
+                <tr class={row.present ? undefined : styles.absentRow}>
+                  <td
+                    class={styles.keyCell}
+                    title={
+                      row.description + (row.defaultValue ? ` (default: ${row.defaultValue})` : '')
+                    }
+                  >
                     {row.key}
                   </td>
-                  <td class={styles.valueCell}>{valueEditor(row.key, row.type, row.value)}</td>
+                  <td class={styles.valueCell}>
+                    {valueEditor(row.key, row.type, row.value, row.defaultValue)}
+                  </td>
                 </tr>
               )}
             </For>

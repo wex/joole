@@ -7,12 +7,15 @@ import type { Vec3 } from '../types/index';
  * source (`ext/Quake-2-Tools/qe4/eclass.c`).
  */
 
-export type EntityKeyType = 'str' | 'int' | 'float' | 'vec' | 'color' | 'angle' | 'flagdef';
+export type EntityKeyType =
+  'str' | 'int' | 'float' | 'vec' | 'color' | 'angle' | 'target' | 'flagdef';
 
 export interface EntityKeyDef {
   readonly name: string;
   readonly type: EntityKeyType;
   readonly description: string;
+  /** Numeric default extracted verbatim from the QUAKED documentation, when stated there. */
+  readonly defaultValue?: string;
 }
 
 export interface EntityClassDef {
@@ -104,6 +107,23 @@ function parseHeader(line: string): {
 
 const KEY_LINE = /^\s*"([^"]+)"\s*(\S.*)?$/;
 
+/** Extracts a numeric default documented in phrases such as "(2 default)" or "default is 1". */
+export function documentedDefault(description: string): string | undefined {
+  const patterns = [
+    /\((-?\d*\.?\d+)\s+default(?:\s|,|\))/i,
+    /(?:overrides?\s+)?the\s+default\s+(-?\d*\.?\d+)/i,
+    /defaults?\s*(?:value\s*)?(?:is|:|to)?\s*(-?\d*\.?\d+)/i,
+    /(-?\d*\.?\d+)\s+is\s+default\b/i,
+  ];
+  for (const pattern of patterns) {
+    const match = pattern.exec(description);
+    if (!match) continue;
+    const value = Number(match[1]);
+    if (Number.isFinite(value)) return String(value);
+  }
+  return undefined;
+}
+
 /**
  * Parses every QUAKED block in the text. Sibling classes (several header
  * lines inside one comment) share the description and its keys.
@@ -126,7 +146,9 @@ export function parseQuakedBlocks(text: string, options?: QuakedParseOptions): E
       if (!m || seen.has(m[1]!)) continue;
       seen.add(m[1]!);
       const type = options?.overrides?.[m[1]!] ?? keyType(m[1]!, m[2] ?? '');
-      keys.push({ name: m[1]!, type, description: (m[2] ?? '').trim() });
+      const description = (m[2] ?? '').trim();
+      const defaultValue = documentedDefault(description);
+      keys.push({ name: m[1]!, type, description, ...(defaultValue ? { defaultValue } : {}) });
     }
     for (const header of pending) {
       out.push({ ...header, description, keys });

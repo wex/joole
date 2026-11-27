@@ -16,15 +16,16 @@ describe('mergeEntityDefs', () => {
   });
 
   it('a mod class overrides the vanilla class of the same name', () => {
-    const override = parseQuakedBlocks(
-      '/*QUAKED monster_soldier (1 0 1) (-32 -32 -24) (32 32 32) Custom\nmod variant\n*/',
-    );
+    const override = parseQuakedBlocks('/*QUAKED func_door (1 0 1) ? Custom\nmod variant\n*/');
     const merged = mergeEntityDefs(vanilla, override);
-    const soldier = merged.find((def) => def.className === 'monster_soldier')!;
-    expect(soldier.color).toEqual([1, 0, 1]);
-    expect(soldier.spawnflags).toEqual(['Custom']);
+    const door = merged.find((def) => def.className === 'func_door')!;
+    expect(door.color).toEqual([1, 0, 1]);
+    expect(door.spawnflags).toEqual(['Custom']);
+    // Vanilla documented keys survive a mod override unless the mod replaces
+    // that key explicitly.
+    expect(door.keys.length).toBeGreaterThan(0);
     // No duplicates.
-    expect(merged.filter((def) => def.className === 'monster_soldier').length).toBe(1);
+    expect(merged.filter((def) => def.className === 'func_door').length).toBe(1);
     expect(merged.length).toBe(vanilla.length);
   });
 

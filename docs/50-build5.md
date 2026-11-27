@@ -219,7 +219,7 @@ flowchart LR
 
 ---
 
-### T2.3 – Complete entity-key rows, worldspawn editing and verified defaults
+### T2.3 – Complete entity-key rows, worldspawn editing and verified defaults — DONE
 
 **TODO items:** `worldspawn` is missing default properties; entities are missing default properties.
 

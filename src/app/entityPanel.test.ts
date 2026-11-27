@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { applyPatch, buildDocument } from '@core/doc/index';
 import { parseQuakedBlocks } from '@core/formats/index';
+import { withQ2EntityMetadata } from '@game/q2/index';
 import { readFileSync } from 'node:fs';
 import type { EntityNode } from '@core/types/index';
 import {
@@ -13,7 +14,7 @@ import {
   toggleSpawnflagPatch,
 } from './entityPanel';
 
-const defs = parseQuakedBlocks(readFileSync('src/game/q2/q2.def', 'utf8'));
+const defs = withQ2EntityMetadata(parseQuakedBlocks(readFileSync('src/game/q2/q2.def', 'utf8')));
 
 function entity(id: string, props: [string, string][], children: string[] = []): EntityNode {
   return { kind: 'entity', id, props, children };
@@ -60,6 +61,41 @@ describe('entityPanelState', () => {
     expect(state.keys.find((k) => k.key === 'angle')?.type).toBe('angle');
   });
 
+  it('shows documented and compiler-verified light keys even when absent', () => {
+    const light = entity('l1', [
+      ['classname', 'light'],
+      ['origin', '0 0 32'],
+    ]);
+    const state = entityPanelState(docWith(light), new Set(['l1']), defs);
+    const keys = state.keys.map((row) => row.key);
+    for (const key of ['light', '_color', 'style', '_cone', 'target', 'targetname', 'origin']) {
+      expect(keys).toContain(key);
+    }
+    expect(state.keys.find((row) => row.key === 'light')).toMatchObject({
+      present: false,
+      defaultValue: '300',
+      value: '',
+    });
+    expect(state.keys.find((row) => row.key === 'origin')?.present).toBe(true);
+  });
+
+  it('worldspawn is selectable and exposes its documented keys without inventing values', () => {
+    const doc = docWith(soldier());
+    const state = entityPanelState(doc, new Set(['world']), defs);
+    expect(state.entityId).toBe('world');
+    expect(state.worldspawn).toBe(true);
+    expect(state.keys.map((row) => row.key)).toEqual([
+      'sky',
+      'skyaxis',
+      'skyrotate',
+      'sounds',
+      'gravity',
+      'message',
+    ]);
+    expect(state.keys.find((row) => row.key === 'gravity')?.defaultValue).toBe('800');
+    expect(state.keys.every((row) => !row.present)).toBe(true);
+  });
+
   it('reads spawnflags from the definition with bit positions', () => {
     const withFlags = entity('e1', [
       ['classname', 'monster_soldier'],
@@ -98,6 +134,21 @@ describe('prop editing patches', () => {
     const e = next.nodes.get('e1') as EntityNode;
     expect(e.props).toContainEqual(['facing', '90']);
     expect(e.props.some(([k]) => k === 'angle')).toBe(false);
+  });
+
+  it('setEntityClassPatch adds missing defaults of the new class without overwriting keys', () => {
+    const doc = docWith(soldier());
+    const next = applyPatch(
+      doc,
+      setEntityClassPatch(doc, 'e1', 'light', [
+        ['light', '300'],
+        ['angle', '45'],
+      ]),
+    );
+    const e = next.nodes.get('e1') as EntityNode;
+    expect(e.props).toContainEqual(['light', '300']);
+    // angle already existed and is not overwritten.
+    expect(e.props).toContainEqual(['angle', '90']);
   });
 
   it('toggleSpawnflagPatch flips bits and clears zero', () => {

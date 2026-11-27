@@ -1502,6 +1502,9 @@ export class EntityTool {
     private readonly currentClass: () => string,
     private readonly scopeParent: () => Id,
     gridSize: number | (() => number) = 8,
+    private readonly creationDefaults: (
+      classname: string,
+    ) => readonly (readonly [string, string])[] = () => [],
   ) {
     this.gridSize = typeof gridSize === 'function' ? gridSize : () => gridSize;
     void this.getDocument;
@@ -1530,7 +1533,13 @@ export class EntityTool {
     const doc = this.getDocument();
     let placement: { patch: Patch; id: Id };
     try {
-      placement = createPointEntityPatch(doc, classname, snapped, this.scopeParent());
+      placement = createPointEntityPatch(
+        doc,
+        classname,
+        snapped,
+        this.scopeParent(),
+        this.creationDefaults(classname),
+      );
     } catch {
       return { commands: [] };
     }

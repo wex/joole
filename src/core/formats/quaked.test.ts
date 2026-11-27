@@ -51,6 +51,17 @@ describe('parseQuakedBlocks', () => {
     expect(keys.get('angle')!.description).toContain('opening direction');
   });
 
+  it('extracts numeric defaults documented in key descriptions', () => {
+    const door = byName.get('func_door')!;
+    const keys = new Map(door.keys.map((key) => [key.name, key]));
+    expect(keys.get('speed')!.defaultValue).toBe('100');
+    expect(keys.get('wait')!.defaultValue).toBe('3');
+    expect(keys.get('lip')!.defaultValue).toBe('8');
+    expect(keys.get('dmg')!.defaultValue).toBe('2');
+    const world = byName.get('worldspawn')!;
+    expect(world.keys.find((key) => key.name === 'gravity')!.defaultValue).toBe('800');
+  });
+
   it('keeps the description text of the class', () => {
     const door = byName.get('func_door')!;
     expect(door.description).toContain('START_OPEN');

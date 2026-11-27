@@ -556,6 +556,8 @@ Typed editors include:
 - a color picker plus the raw `r g b` value for color keys;
 - completion of existing `targetname` values in `target` fields.
 
+Every documented key is visible even when the entity does not physically contain it. Absent rows are subdued and their verified default appears as a placeholder; editing one writes the key, but merely opening and saving a map never adds missing keys. New entities and brush-entity conversions physically receive implementation-verified defaults — for example a new light starts with `light` 300, white `_color`, `style` 0 and `_cone` 10. Select `worldspawn` in the Tree to edit map-level keys such as `message`, `sky`, `sounds` and `gravity`; a new document starts with `gravity` 800.
+
 Unknown keys are preserved and can be edited in the raw table. To add a key, type its name in `(new key)` and commit a value in the adjacent field. Setting an existing key to an empty value removes it.
 
 ## Groups, the tree and prefabs

@@ -51,6 +51,7 @@ export function createPointEntityPatch(
   classname: string,
   point: Vec3,
   parent: Id,
+  defaults: readonly (readonly [string, string])[] = [],
 ): { patch: Patch; id: Id } {
   if (!/^[A-Za-z0-9_]+$/.test(classname)) throw new Error(`invalid classname ${classname}`);
   const entity: EntityNode = {
@@ -59,6 +60,9 @@ export function createPointEntityPatch(
     props: [
       ['classname', classname],
       ['origin', point.map((value) => String(value === 0 ? 0 : value)).join(' ')],
+      ...defaults
+        .filter(([key]) => key !== 'classname' && key !== 'origin')
+        .map(([key, value]) => [key, value] as [string, string]),
     ],
     children: [],
   };
@@ -77,6 +81,7 @@ export function convertBrushesToEntityPatch(
   classname: string,
   brushIds: readonly Id[],
   makeId: () => Id,
+  defaults: readonly (readonly [string, string])[] = [],
 ): { patch: Patch; id: Id } {
   if (brushIds.length === 0) throw new Error('no brushes selected');
   if (!/^[A-Za-z0-9_]+$/.test(classname)) throw new Error(`invalid classname ${classname}`);
@@ -91,7 +96,12 @@ export function convertBrushesToEntityPatch(
   const entity: EntityNode = {
     kind: 'entity',
     id: makeId(),
-    props: [['classname', classname]],
+    props: [
+      ['classname', classname],
+      ...defaults
+        .filter(([key]) => key !== 'classname')
+        .map(([key, value]) => [key, value] as [string, string]),
+    ],
     children: [],
   };
   let composite = addNodePatch(doc, parentId, entity);

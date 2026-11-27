@@ -126,3 +126,13 @@
   border: 1px solid var(--surface-3);
   background: var(--surface-2);
 }
+
+.absentRow .keyCell,
+.absentRow .valueCell {
+  opacity: 0.68;
+}
+
+.valueInput::placeholder {
+  color: var(--ink-muted);
+  opacity: 0.72;
+}
