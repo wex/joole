@@ -115,11 +115,26 @@ now resizing Properties/textures-panel is resetted - store in settings._
 The phase gate follows build 3:
 
 1. Every package committed, tests green, docs updated (manual, spec decisions,
-   design system where a component changes).
-2. `pnpm check` green.
+   design system where a component changes). **Done** — T16.1–T16.4 each committed,
+   manual and spec updated per package.
+2. `pnpm check` green. **Done** — format, lint, typecheck, unit tests and build pass.
 3. Full `pnpm e2e` — in CI for the authoritative result. Local firefox degradation
    on WSL is a known environmental issue (see below); CI is the arbiter.
+   **Local result: 198/198 passed across chromium, firefox and webkit** after the
+   baseline recapture (a WSL restart cleared the firefox degradation; the Playwright
+   browser cache in `~/.cache/ms-playwright` does not survive it and needs
+   `pnpm exec playwright install` again).
 4. PR opened with per-package table and verification evidence.
+
+### Gate finding — baseline recapture
+
+T16.4 applies the persisted right-dock width (schema default 320px) at startup,
+where the shell previously rendered at the stale 224px stylesheet fallback — so the
+viewport canvas is 96px narrower in a fresh session. The leak, md2preview and
+texture baselines capture that canvas element and were recaptured in all three
+browsers. The CSS fallback was harmonised to 320px (the 224px dated from the
+original shell in `441742d`, before settings existed; 320 is the deliberate phase-1
+default). No other baselines depend on the dock width.
 
 ## Operational notes (carried from builds 2/3 — read before starting)
 
