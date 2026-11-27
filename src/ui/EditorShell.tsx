@@ -157,6 +157,8 @@ export function EditorShell(props: EditorShellProps) {
   const [textureList, setTextureList] = createSignal(app.textureList());
   const [currentTexture, setCurrentTexture] = createSignal(app.currentTextureName);
   const [gridSize, setGridSize] = createSignal(app.gridSize);
+  const [canUndo, setCanUndo] = createSignal(app.canUndo);
+  const [canRedo, setCanRedo] = createSignal(app.canRedo);
   const [entries, setEntries] = createSignal<readonly LogEntry[]>(app.logEntries());
   const [activeView, setActiveView] = createSignal<ViewId>('3d');
   const [maximizedView, setMaximizedView] = createSignal<ViewId | null>(null);
@@ -1133,6 +1135,8 @@ export function EditorShell(props: EditorShellProps) {
 
     const unsubscribe = app.subscribe((event) => {
       if (event.type === 'document') {
+        setCanUndo(app.canUndo);
+        setCanRedo(app.canRedo);
         setMapName(app.mapName);
         if (!event.patch) {
           setSizePrompt(null);
@@ -1254,6 +1258,11 @@ export function EditorShell(props: EditorShellProps) {
         onOpenSinglePak={() => pakInput?.click()}
         onOpenMap={chooseMap}
         onExportMap={() => void app.exportMap()}
+        onSaveProject={() => void app.saveProject()}
+        onUndo={() => app.undo()}
+        onRedo={() => app.redo()}
+        canUndo={canUndo()}
+        canRedo={canRedo()}
         gameOpen={gameOpen()}
         onCompile={() => setCompileMenuOpen((v) => !v)}
         onDelete={() => app.deleteSelection()}

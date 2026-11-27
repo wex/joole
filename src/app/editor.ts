@@ -773,6 +773,14 @@ export class EditorApp {
     return this.selectionManager.execute(command);
   }
 
+  get canUndo(): boolean {
+    return this.bus.canUndo;
+  }
+
+  get canRedo(): boolean {
+    return this.bus.canRedo;
+  }
+
   undo(): boolean {
     return this.selectionManager.undo();
   }

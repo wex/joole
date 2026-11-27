@@ -318,7 +318,7 @@ flowchart LR
 
 ---
 
-### T2.5 – Save toolbar button wiring
+### T2.5 – Save toolbar button wiring — DONE
 
 **Scope addition discovered during research:** the Save toolbar button exists but is permanently disabled even though Ctrl+S/project saving works.
 
@@ -340,7 +340,7 @@ flowchart LR
 
 ---
 
-### T2.6 – Undo/redo toolbar and Edit-menu wiring
+### T2.6 – Undo/redo toolbar and Edit-menu wiring — DONE
 
 **TODO item:** redo/undo functionality needs wiring.
 

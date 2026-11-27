@@ -395,6 +395,8 @@ Faces can be picked only in 3D. The 2D views show the result, but they are not f
 
 The texture operations target the picked faces. If no faces are picked, they target every face of every currently selected brush. This distinction is important: selecting a whole brush is a quick way to retexture all of it, while the Texture tool gives face-level control.
 
+The toolbar Save button saves the current project exactly like `Ctrl+S` / `Cmd+S`. Its Undo and Redo buttons mirror `Ctrl+Z` and `Ctrl+Shift+Z` / `Ctrl+Y` and are enabled only when the corresponding history stack is non-empty. The same commands are also at the top of the Edit menu.
+
 ## Brush editing commands
 
 ### Clipboard and duplication
