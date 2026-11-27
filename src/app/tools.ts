@@ -1,6 +1,7 @@
 import type {
   BrushNode,
   Command,
+  EntityNode,
   FaceTexture,
   Id,
   MapDocument,
@@ -32,7 +33,7 @@ import { clipSelectionPatch } from './csg';
 import { outermostGroupInScope } from './groups';
 import { clipPlaneFromPoints } from '@core/geom/csg';
 import { moveVertices } from '@core/geom/vertexEdit';
-import { createPointEntityPatch } from './entities';
+import { createPointEntityPatch, entityOrigin } from './entities';
 import { extractWireframe } from '@core/geom/brush';
 import { snap, snapAxes, snapDepthExtent } from './snap';
 
@@ -139,42 +140,45 @@ function depthAxis(view: ToolView): 0 | 1 | 2 {
 
 function boundsOf(doc: Readonly<MapDocument>, ids: ReadonlySet<Id>): Aabb | null {
   let out: Aabb | null = null;
+  const include = (box: Aabb | null) => {
+    if (!box) return;
+    out = out
+      ? {
+          min: [
+            Math.min(out.min[0], box.min[0]),
+            Math.min(out.min[1], box.min[1]),
+            Math.min(out.min[2], box.min[2]),
+          ],
+          max: [
+            Math.max(out.max[0], box.max[0]),
+            Math.max(out.max[1], box.max[1]),
+            Math.max(out.max[2], box.max[2]),
+          ],
+        }
+      : box;
+  };
   // Groups and brush entities carry their geometry in their children, so the
   // lookup descends: selecting a group frames its member brushes (T16.2).
-  const expand = (id: Id, depth: number): Id[] => {
-    if (depth > 32) return [];
+  const visit = (id: Id, depth: number): void => {
+    if (depth > 32) return;
     const node = doc.nodes.get(id);
-    if (!node) return [];
-    if (node.kind === 'brush') return [id];
-    return node.children.flatMap((child) => expand(child, depth + 1));
-  };
-  for (const id of ids) {
-    const brushIds = expand(id, 0);
-    for (const brushId of brushIds) {
-      const node = doc.nodes.get(brushId);
-      if (node?.kind !== 'brush') {
-        continue;
-      }
-      const box = analyzeBrush(node).aabb;
-      if (!box) {
-        continue;
-      }
-      out = out
-        ? {
-            min: [
-              Math.min(out.min[0], box.min[0]),
-              Math.min(out.min[1], box.min[1]),
-              Math.min(out.min[2], box.min[2]),
-            ],
-            max: [
-              Math.max(out.max[0], box.max[0]),
-              Math.max(out.max[1], box.max[1]),
-              Math.max(out.max[2], box.max[2]),
-            ],
-          }
-        : box;
+    if (!node) return;
+    if (node.kind === 'brush') {
+      include(analyzeBrush(node).aabb);
+      return;
     }
-  }
+    if (node.kind === 'entity' && node.id !== doc.worldspawn && node.children.length === 0) {
+      const origin = entityOrigin(node);
+      if (origin) {
+        include({
+          min: [origin[0] - 8, origin[1] - 8, origin[2] - 8],
+          max: [origin[0] + 8, origin[1] + 8, origin[2] + 8],
+        });
+      }
+    }
+    for (const child of node.children) visit(child, depth + 1);
+  };
+  for (const id of ids) visit(id, 0);
   return out;
 }
 
@@ -836,6 +840,44 @@ export class VertexTool {
   }
 }
 
+const ENTITY_PICK_HALF = 8;
+
+interface SelectHit {
+  readonly id: Id;
+  readonly closeness: number;
+  readonly distance: number;
+  readonly t: number;
+}
+
+function rayBox(origin: Vec3, direction: Vec3, min: Vec3, max: Vec3): number | null {
+  let tmin = -Infinity;
+  let tmax = Infinity;
+  for (let axis = 0; axis < 3; axis++) {
+    const o = origin[axis]!;
+    const d = direction[axis]!;
+    if (Math.abs(d) < 1e-15) {
+      if (o < min[axis]! || o > max[axis]!) return null;
+      continue;
+    }
+    let t1 = (min[axis]! - o) / d;
+    let t2 = (max[axis]! - o) / d;
+    if (t1 > t2) [t1, t2] = [t2, t1];
+    tmin = Math.max(tmin, t1);
+    tmax = Math.min(tmax, t2);
+    if (tmin > tmax) return null;
+  }
+  return tmax >= 0 ? Math.max(0, tmin) : null;
+}
+
+function compareSelectHits(a: SelectHit, b: SelectHit): number {
+  return (
+    a.t - b.t ||
+    b.closeness - a.closeness ||
+    a.distance - b.distance ||
+    (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)
+  );
+}
+
 /**
  * The Select tool state machine. It is DOM-free: views provide world-space
  * points/rays and execute the returned commands through the SelectionManager.
@@ -848,6 +890,8 @@ export class SelectTool {
   private mode: Mode = { kind: 'idle' };
   private dragSerial = 0;
   private preview: ToolPreview | null = null;
+  private dragChanged = false;
+  private pendingCycle: { hits: readonly Id[]; selected: Id } | null = null;
 
   private readonly gridSize: () => number;
 
@@ -916,6 +960,8 @@ export class SelectTool {
   cancel(): void {
     this.mode = { kind: 'idle' };
     this.preview = null;
+    this.dragChanged = false;
+    this.pendingCycle = null;
   }
 
   private rebuild(): void {
@@ -927,27 +973,137 @@ export class SelectTool {
     }
   }
 
-  private hit(event: ToolPointerEvent): Id | null {
-    const hits =
-      event.view === '3d'
-        ? this.bvh.rayHits(event.point, event.direction ?? [1, 0, 0]).map((hit) => hit.id)
-        : this.bvh.pick2D(event.point, event.view, event.tolerance).map((hit) => hit.id);
+  private pointEntities(): EntityNode[] {
+    const out: EntityNode[] = [];
+    for (const node of this.doc.nodes.values()) {
+      if (
+        node.kind === 'entity' &&
+        node.id !== this.doc.worldspawn &&
+        node.children.length === 0 &&
+        entityOrigin(node)
+      ) {
+        out.push(node);
+      }
+    }
+    return out;
+  }
+
+  private entityHits2D(event: ToolPointerEvent): SelectHit[] {
+    if (event.view === '3d') return [];
+    const axes = planeAxes(event.view);
+    const depth = depthAxis(event.view);
+    const out: SelectHit[] = [];
+    for (const entity of this.pointEntities()) {
+      const origin = entityOrigin(entity)!;
+      const inside = axes.every((axis) => {
+        const center = origin[axis]!;
+        const point = event.point[axis]!;
+        return (
+          point >= center - ENTITY_PICK_HALF - event.tolerance &&
+          point <= center + ENTITY_PICK_HALF + event.tolerance
+        );
+      });
+      if (!inside) continue;
+      // Project the visible pick box onto the hidden axis and use the face
+      // nearest the viewer, exactly like brush closest-first ordering.
+      const nearest =
+        event.view === 'xz'
+          ? -(origin[depth]! - ENTITY_PICK_HALF)
+          : origin[depth]! + ENTITY_PICK_HALF;
+      out.push({ id: entity.id, closeness: nearest, distance: 0, t: 0 });
+    }
+    return out;
+  }
+
+  private entityHits3D(event: ToolPointerEvent): SelectHit[] {
+    const direction = event.direction ?? [1, 0, 0];
+    const out: SelectHit[] = [];
+    for (const entity of this.pointEntities()) {
+      const origin = entityOrigin(entity)!;
+      const min: Vec3 = [
+        origin[0] - ENTITY_PICK_HALF,
+        origin[1] - ENTITY_PICK_HALF,
+        origin[2] - ENTITY_PICK_HALF,
+      ];
+      const max: Vec3 = [
+        origin[0] + ENTITY_PICK_HALF,
+        origin[1] + ENTITY_PICK_HALF,
+        origin[2] + ENTITY_PICK_HALF,
+      ];
+      const t = rayBox(event.point, direction, min, max);
+      if (t !== null) out.push({ id: entity.id, closeness: 0, distance: 0, t });
+    }
+    return out;
+  }
+
+  private hit(event: ToolPointerEvent, trackClick = false): Id | null {
+    let hits: SelectHit[];
+    if (event.view === '3d') {
+      hits = [
+        ...this.bvh
+          .rayHits(event.point, event.direction ?? [1, 0, 0])
+          .map((hit) => ({ id: hit.id, closeness: 0, distance: 0, t: hit.t })),
+        ...this.entityHits3D(event),
+      ].sort(compareSelectHits);
+    } else {
+      const brushHits = this.bvh.pick2D(event.point, event.view, event.tolerance);
+      // Brush edges keep their priority over all interior-like candidates.
+      // Entities count as interior candidates because their visible box is a
+      // small helper rather than geometry with selectable edge faces.
+      hits =
+        brushHits[0]?.kind === 'edge'
+          ? brushHits.map((hit) => ({ ...hit, t: 0 }))
+          : [...brushHits.map((hit) => ({ ...hit, t: 0 })), ...this.entityHits2D(event)].sort(
+              compareSelectHits,
+            );
+    }
     const resolved: Id[] = [];
-    for (const id of hits) {
+    const push = (id: Id) => {
       const mapped = this.resolveHit(id);
       if (mapped !== null && !resolved.includes(mapped)) resolved.push(mapped);
+    };
+    for (const hit of hits) {
+      push(hit.id);
+      // A plain click on a brush entity's child is brush-first. Repeating
+      // the click escalates to the containing entity, so the entity can be
+      // moved in the view without losing direct brush editing.
+      if (!this.groupPick()) {
+        const parent = this.doc.parent.get(hit.id);
+        const node = parent === undefined ? undefined : this.doc.nodes.get(parent);
+        if (
+          node?.kind === 'entity' &&
+          node.id !== this.doc.worldspawn &&
+          node.children.length > 0
+        ) {
+          push(node.id);
+        }
+      }
     }
     const selectedHit = resolved.find((id) => this.selected.has(id));
     if (selectedHit !== undefined) {
+      // A drag must keep operating on the already selected object. For a
+      // plain 2D click the advance is therefore deferred until pointer-up,
+      // when we know that no drag happened.
+      this.pendingCycle =
+        trackClick &&
+        event.view !== '3d' &&
+        !event.shift &&
+        !event.ctrl &&
+        this.selected.size === 1 &&
+        resolved.length > 1
+          ? { hits: resolved, selected: selectedHit }
+          : null;
       return selectedHit;
     }
+    this.pendingCycle = null;
     const key = event.point.map((x) => Math.round(x / Math.max(1, this.gridSize()))).join(':');
     return this.cycler.choose(resolved, `${event.view}:${key}`);
   }
 
   private pointerDown(event: ToolPointerEvent): ToolOutput {
     this.doc = this.getDocument();
-    const hit = this.hit(event);
+    this.dragChanged = false;
+    const hit = this.hit(event, true);
     const key = `drag-${++this.dragSerial}`;
     const bounds = boundsOf(this.doc, this.selected);
     if (bounds && this.nearCorner(event, bounds)) {
@@ -1060,6 +1216,7 @@ export class SelectTool {
         this.mode.last[1] + delta[1],
         this.mode.last[2] + delta[2],
       ];
+      this.dragChanged = true;
       return {
         commands: [
           createTransformCommand('Move selection', [...this.selected], mat4Translation(delta), {
@@ -1086,6 +1243,7 @@ export class SelectTool {
         return { commands: [] };
       }
       this.mode.last = event.point;
+      this.dragChanged = true;
       return {
         commands: [
           createTransformCommand(
@@ -1129,6 +1287,7 @@ export class SelectTool {
         return { commands: [] };
       }
       this.mode.current = target;
+      this.dragChanged = true;
       return {
         commands: [
           createTransformCommand(
@@ -1155,9 +1314,20 @@ export class SelectTool {
       this.selected = selection;
       this.mode = { kind: 'idle' };
       this.preview = null;
+      this.pendingCycle = null;
       return { commands: [], selection, preview: [] };
     }
     this.mode = { kind: 'idle' };
+    const cycle = this.pendingCycle;
+    const changed = this.dragChanged;
+    this.pendingCycle = null;
+    this.dragChanged = false;
+    if (cycle && !changed) {
+      const index = cycle.hits.indexOf(cycle.selected);
+      const next = cycle.hits[(index + 1) % cycle.hits.length]!;
+      this.selected = new Set([next]);
+      return { commands: [], selection: this.selected, editing: new Set(this.selected) };
+    }
     return { commands: [], editing: new Set() };
   }
 
@@ -1169,10 +1339,22 @@ export class SelectTool {
     const maxB = Math.max(start[axes[1]]!, end[axes[1]]!);
     const out = new Set<Id>();
     for (const node of this.doc.nodes.values()) {
-      if (node.kind !== 'brush') {
-        continue;
+      let box: Aabb | null = null;
+      if (node.kind === 'brush') {
+        box = analyzeBrush(node).aabb;
+      } else if (
+        node.kind === 'entity' &&
+        node.id !== this.doc.worldspawn &&
+        node.children.length === 0
+      ) {
+        const origin = entityOrigin(node);
+        if (origin) {
+          box = {
+            min: [origin[0] - 8, origin[1] - 8, origin[2] - 8],
+            max: [origin[0] + 8, origin[1] + 8, origin[2] + 8],
+          };
+        }
       }
-      const box = analyzeBrush(node).aabb;
       if (
         box &&
         box.max[axes[0]]! >= minA &&
@@ -1320,6 +1502,9 @@ export class EntityTool {
     private readonly currentClass: () => string,
     private readonly scopeParent: () => Id,
     gridSize: number | (() => number) = 8,
+    private readonly creationDefaults: (
+      classname: string,
+    ) => readonly (readonly [string, string])[] = () => [],
   ) {
     this.gridSize = typeof gridSize === 'function' ? gridSize : () => gridSize;
     void this.getDocument;
@@ -1348,7 +1533,13 @@ export class EntityTool {
     const doc = this.getDocument();
     let placement: { patch: Patch; id: Id };
     try {
-      placement = createPointEntityPatch(doc, classname, snapped, this.scopeParent());
+      placement = createPointEntityPatch(
+        doc,
+        classname,
+        snapped,
+        this.scopeParent(),
+        this.creationDefaults(classname),
+      );
     } catch {
       return { commands: [] };
     }

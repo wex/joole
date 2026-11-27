@@ -1,11 +1,22 @@
-import type { BrushNode, Command, Id, MapDocument, MapNode, Patch } from '@core/types/index';
+import type {
+  BrushNode,
+  Command,
+  EntityNode,
+  Id,
+  MapDocument,
+  MapNode,
+  Patch,
+  Vec3,
+} from '@core/types/index';
 import { allBrushesOf, replaceNodePatch } from '@core/doc/index';
 import {
+  mat4ApplyPoint,
   snapBrushToGrid,
   transformBrush,
   transformBrushTextureLock,
   type Mat4,
 } from '@core/geom/index';
+import { entityOrigin, formatEntityPoint, withEntityProp } from './entities';
 
 function emptyPatch(): Patch {
   return {
@@ -42,9 +53,26 @@ export function brushTargets(doc: Readonly<MapDocument>, ids: readonly Id[]): Br
   return [...out.values()];
 }
 
+/** Point entities at or below the requested nodes, deduplicated. */
+export function pointEntityTargets(doc: Readonly<MapDocument>, ids: readonly Id[]): EntityNode[] {
+  const out = new Map<Id, EntityNode>();
+  const visit = (id: Id, depth: number): void => {
+    if (depth > 64) return;
+    const node: MapNode | undefined = doc.nodes.get(id);
+    if (!node || node.kind === 'brush') return;
+    if (node.kind === 'entity' && id !== doc.worldspawn && node.children.length === 0) {
+      if (entityOrigin(node)) out.set(id, node);
+    }
+    for (const child of node.children) visit(child, depth + 1);
+  };
+  for (const id of ids) visit(id, 0);
+  return [...out.values()];
+}
+
 /**
- * Creates a move/rotate/scale command. Groups are expanded to their
- * descendant brushes because the document has no local transform matrices.
+ * Creates a move/rotate/scale command. Groups and entities are expanded to
+ * their descendant brushes because the document has no local transform
+ * matrices; point-entity origins are transformed as positions.
  */
 export interface TransformOptions {
   readonly mergeKey?: string;
@@ -88,6 +116,19 @@ export function createTransformCommand(
           mergeIndependent(patch, replaceNodePatch(doc, brush.id, result.value));
         }
       }
+      for (const entity of pointEntityTargets(doc, ids)) {
+        const origin = entityOrigin(entity);
+        if (!origin) continue;
+        const moved = mat4ApplyPoint(matrix, origin);
+        mergeIndependent(
+          patch,
+          replaceNodePatch(
+            doc,
+            entity.id,
+            withEntityProp(entity, 'origin', formatEntityPoint(moved)),
+          ),
+        );
+      }
       if (flagged > 0 && options.onLockWarning) {
         options.onLockWarning(worstError);
       }
@@ -108,6 +149,19 @@ export function createSnapToGridCommand(ids: readonly Id[], grid: number): Comma
           throw new Error(`Snap to grid would make brush ${brush.id} invalid`);
         }
         mergeIndependent(patch, replaceNodePatch(doc, brush.id, result.value));
+      }
+      for (const entity of pointEntityTargets(doc, ids)) {
+        const origin = entityOrigin(entity);
+        if (!origin) continue;
+        const snapped = origin.map((value) => Math.round(value / grid) * grid) as Vec3;
+        mergeIndependent(
+          patch,
+          replaceNodePatch(
+            doc,
+            entity.id,
+            withEntityProp(entity, 'origin', formatEntityPoint(snapped)),
+          ),
+        );
       }
       return patch;
     },

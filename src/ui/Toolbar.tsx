@@ -1,5 +1,5 @@
 import { createSignal, For, onSettled, Show } from 'solid-js';
-import type { PrimitiveKind } from '@core/geom/index';
+import { SPHERE_SIDE_PRESETS, type PrimitiveKind } from '@core/geom/index';
 import { Icon } from './Icon';
 import { toolInfo } from '@app/toolInfo';
 import styles from './Toolbar.module.css';
@@ -17,6 +17,11 @@ export interface ToolbarProps {
   readonly onOpenMap: () => void;
   readonly onOpenSettings: () => void;
   readonly onExportMap: () => void;
+  readonly onSaveProject: () => void;
+  readonly onUndo: () => void;
+  readonly onRedo: () => void;
+  readonly canUndo: boolean;
+  readonly canRedo: boolean;
   readonly onDelete: () => void;
   readonly onGroup: () => void;
   readonly onUngroup: () => void;
@@ -164,6 +169,26 @@ export function Toolbar(props: ToolbarProps) {
         <Show when={editOpen()}>
           <ul class={styles.menu} role="menu">
             <li role="none">
+              <button
+                type="button"
+                role="menuitem"
+                disabled={!props.canUndo}
+                onClick={() => choose(props.onUndo)}
+              >
+                Undo <span class={styles.shortcut}>Ctrl+Z</span>
+              </button>
+            </li>
+            <li role="none">
+              <button
+                type="button"
+                role="menuitem"
+                disabled={!props.canRedo}
+                onClick={() => choose(props.onRedo)}
+              >
+                Redo <span class={styles.shortcut}>Ctrl+Shift+Z</span>
+              </button>
+            </li>
+            <li role="none">
               <button type="button" role="menuitem" onClick={() => choose(props.onDelete)}>
                 Delete <span class={styles.shortcut}>Del</span>
               </button>
@@ -305,14 +330,34 @@ export function Toolbar(props: ToolbarProps) {
           </ul>
         </Show>
       </div>
-      <button type="button" class={styles.iconButton} title="Save" disabled>
+      <button
+        type="button"
+        class={styles.iconButton}
+        title="Save"
+        aria-label="Save"
+        onClick={() => props.onSaveProject()}
+      >
         <Icon name="save" />
       </button>
       <span class={styles.separator} />
-      <button type="button" class={styles.iconButton} title="Undo" disabled>
+      <button
+        type="button"
+        class={styles.iconButton}
+        title="Undo"
+        aria-label="Undo"
+        disabled={!props.canUndo}
+        onClick={() => props.onUndo()}
+      >
         <Icon name="undo" />
       </button>
-      <button type="button" class={styles.iconButton} title="Redo" disabled>
+      <button
+        type="button"
+        class={styles.iconButton}
+        title="Redo"
+        aria-label="Redo"
+        disabled={!props.canRedo}
+        onClick={() => props.onRedo()}
+      >
         <Icon name="redo" />
       </button>
       <span class={styles.separator} />
@@ -348,16 +393,33 @@ export function Toolbar(props: ToolbarProps) {
         </label>
         <label class={styles.primitiveControl}>
           <span>Sides</span>
-          <input
-            type="number"
-            min="3"
-            max="64"
-            value={props.brushSides}
-            aria-label="Primitive sides"
-            onChange={(event) =>
-              props.onBrushPrimitive(props.brushPrimitive, Number(event.currentTarget.value))
+          <Show
+            when={props.brushPrimitive === 'sphere'}
+            fallback={
+              <input
+                type="number"
+                min="3"
+                max="64"
+                value={props.brushSides}
+                aria-label="Primitive sides"
+                onChange={(event) =>
+                  props.onBrushPrimitive(props.brushPrimitive, Number(event.currentTarget.value))
+                }
+              />
             }
-          />
+          >
+            <select
+              aria-label="Primitive sides"
+              value={props.brushSides}
+              onChange={(event) =>
+                props.onBrushPrimitive(props.brushPrimitive, Number(event.currentTarget.value))
+              }
+            >
+              <For each={SPHERE_SIDE_PRESETS}>
+                {(sides) => <option value={sides}>{sides}</option>}
+              </For>
+            </select>
+          </Show>
         </label>
       </Show>
       <span class={styles.separator} />

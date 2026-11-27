@@ -38,6 +38,23 @@ describe('createPointEntityPatch', () => {
     expect(next.parent.get(id)).toBe('world');
   });
 
+  it('appends verified creation defaults without replacing the origin', () => {
+    const doc = docWith();
+    const { patch, id } = createPointEntityPatch(doc, 'light', [64, -32, 8], 'world', [
+      ['light', '300'],
+      ['_color', '1 1 1'],
+      ['style', '0'],
+    ]);
+    const entity = applyPatch(doc, patch).nodes.get(id) as EntityNode;
+    expect(entity.props.map(([key]) => key)).toEqual([
+      'classname',
+      'origin',
+      'light',
+      '_color',
+      'style',
+    ]);
+  });
+
   it('rejects invalid classnames', () => {
     expect(() => createPointEntityPatch(docWith(), 'bad name!', [0, 0, 0], 'world')).toThrow();
   });
@@ -54,6 +71,17 @@ describe('convertBrushesToEntityPatch', () => {
     expect(next.parent.get('b1')).toBe(id);
     // The entity itself stays in the parent; only the brushes moved.
     expect((next.nodes.get('world') as EntityNode).children).toEqual([id]);
+  });
+
+  it('adds brush-entity creation defaults at conversion time', () => {
+    const doc = docWith('b1');
+    const { patch, id } = convertBrushesToEntityPatch(doc, 'func_door', ['b1'], createId, [
+      ['speed', '100'],
+      ['wait', '3'],
+    ]);
+    const entity = applyPatch(doc, patch).nodes.get(id) as EntityNode;
+    expect(entity.props).toContainEqual(['speed', '100']);
+    expect(entity.props).toContainEqual(['wait', '3']);
   });
 
   it('inverts cleanly with the patch inverse semantics', () => {

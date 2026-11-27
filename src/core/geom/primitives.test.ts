@@ -41,12 +41,27 @@ describe('createPrimitiveBrush', () => {
 
   it('creates valid cylinder, cone and sphere approximations', () => {
     for (const kind of ['cylinder', 'cone', 'sphere'] as const) {
-      const brush = primitive(kind, [-64, -64, 0], [64, 64, 128], 8);
+      const brush = primitive(kind, [-64, -64, 0], [64, 64, 128], kind === 'sphere' ? 14 : 8);
       const analysis = analyzeBrush(brush);
       expect(validateBrush(analysis)).toEqual({ valid: true, reasons: [] });
       expect(analysis.volume).toBeGreaterThan(0);
       for (const face of brush.faces) {
         expect(face.tex.name).toBe('e2u1/mine10_1');
+        for (const point of face.points) {
+          expect(point.every((x) => Number.isInteger(x))).toBe(true);
+        }
+      }
+    }
+  });
+
+  it('creates the Qoole sphere presets with their exact face counts', () => {
+    for (const sides of [14, 18, 20, 26]) {
+      const brush = primitive('sphere', [-64, -64, -64], [64, 64, 64], sides);
+      const analysis = analyzeBrush(brush);
+      expect(validateBrush(analysis)).toEqual({ valid: true, reasons: [] });
+      expect(brush.faces).toHaveLength(sides);
+      expect(analysis.volume).toBeGreaterThan(0);
+      for (const face of brush.faces) {
         for (const point of face.points) {
           expect(point.every((x) => Number.isInteger(x))).toBe(true);
         }
@@ -90,7 +105,7 @@ describe('createPrimitiveBrush', () => {
           min: [0, 0, 0],
           max: [x, y, z],
           texture: tex,
-          sides: Math.max(8, sides),
+          sides: kind === 'sphere' ? 14 : Math.max(8, sides),
         });
         expect(result.ok).toBe(true);
         if (result.ok) {

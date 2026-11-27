@@ -40,7 +40,7 @@ _The default workspace: toolbar, four views, properties panel, texture browser a
 4. Edit in the four views. Press `B` and drag in Top, Front or Side to create a brush; press `S` and click a brush to select it.
 5. Save often with `Ctrl+S` (`Cmd+S` on macOS). This writes a `.joole.json` project, the primary lossless format.
 6. Use **File → Export .map…** when the map is needed by another editor or by external compile tools.
-7. Choose **Compile → Fast** for a quick sealed-map check. When the `.bsp` is produced, save or copy it into `baseq2/maps/` and test it in q2pro or another Quake 2 engine with `+map <name>`.
+7. Choose **Compile**, set VIS to **Fast** and Lighting to **Off** for a quick sealed-map check, then choose the menu’s **Compile** action. When the `.bsp` is produced, save or copy it into `baseq2/maps/` and test it in q2pro or another Quake 2 engine with `+map <name>`.
 
 ## The workspace
 
@@ -87,7 +87,7 @@ Fly mode is intended to own `W`, `A`, `S` and `D`, and tool shortcuts are ignore
 - The **bottom panel** has three tabs: **Tree**, **Prefabs** and **Log**. It starts collapsed to its tab strip; clicking a tab or the chevron opens it. While it is collapsed — or another tab is up — the **Log** tab counts new errors, and it never opens by itself.
 - Drag the vertical or horizontal splitter to resize a panel. A focused splitter can also be moved with the arrow keys in 8-pixel steps.
 - The bottom panel can be enlarged when reading long compile logs or a deep document tree.
-- The panel sizes, the dock's splitter position, the collapsed sections, the thumbnail size, the grid size and the theme are remembered between sessions.
+- The panel sizes, the dock's splitter position, the collapsed sections, panel order and visibility, the maximized-view arrangement, the thumbnail size, the grid size and the theme are remembered between sessions.
 
 ![The light UI theme](images/overview-light.png)
 
@@ -137,9 +137,11 @@ Choose **Recover** to load the autosave as `recovered.joole.json`, or **Discard*
 
 **File → Settings…** (`Ctrl+,`) opens the settings dialog. Every change applies immediately and is remembered between sessions; there is no OK or Cancel step. **Reset to Defaults** restores every setting at once. Escape closes the dialog.
 
+![The Layout tab of the settings dialog](images/settings-layout.png)
+
 ![The Colors tab of the settings dialog](images/settings-colors.png)
 
-The dialog has two tabs. **General** holds the theme, the view and grid options, the texture thumbnail size, the tool overlay, the handle size and CSG grouping. **Colors** lists every colour of the editor — the views and the interface — for the current theme: change one with its colour well, restore one row with its × button, or restore them all with **Reset colours** (which clears both themes). Colours apply at once and are remembered per theme.
+The dialog has three tabs. **General** holds the theme, the view and grid options, the texture thumbnail size, the tool overlay, the handle size and CSG grouping. **Layout** controls the bounded workspace arrangement: the right dock can be hidden, Properties and Textures can be reordered or hidden, the bottom dock can be hidden, Tree/Prefabs/Log can be reordered or hidden, and the viewport arrangement can be the four-view grid or one maximized view. A visible dock keeps at least one visible section or tab; hiding the whole dock is the explicit way to remove all of them. The same tab saves the current arrangement — including dock visibility, panel order/visibility, collapsed state, panel sizes, the dock split, the active bottom tab and the viewport arrangement — under a name. Saved layouts can be applied, renamed, updated with the current arrangement or deleted. **Reset layout** returns the current arrangement to the built-in default without deleting saved layouts. Layout names must be unique, are limited to 40 characters, and at most 32 layouts can be saved. Changing the arrangement manually makes it a custom arrangement again. **Colors** lists every colour of the editor — the views and the interface — for the current theme: change one with its colour well, restore one row with its × button, or restore them all with **Reset colours** (which clears both themes). Colours apply at once and are remembered per theme.
 
 | Setting                    | Effect                                                                            |
 | -------------------------- | --------------------------------------------------------------------------------- |
@@ -152,7 +154,7 @@ The dialog has two tabs. **General** holds the theme, the view and grid options,
 | **Group CSG results**      | Whether Hollow and CSG Subtract group their fragments automatically.              |
 | **Handle size**            | The size of the vertex, edge and face dots, 7–28 px (14 px by default).           |
 
-The panel sizes, the collapsed sections and the splitter positions are remembered too, but they do not appear in the dialog.
+The panel sizes, the collapsed sections, the splitter positions and the arrangement made in the Layout tab are remembered too.
 
 ## Toolbar reference
 
@@ -186,7 +188,7 @@ Their exact behavior is described in [Brush editing commands](#brush-editing-com
 
 ### Save, Undo and Redo icons
 
-The Save, Undo and Redo toolbar icons are present as disabled placeholders in the current build. Use the implemented keyboard commands instead:
+The Save, Undo and Redo toolbar icons perform the same commands as their shortcuts and are disabled only when the corresponding history operation is unavailable:
 
 - `Ctrl+S` / `Cmd+S` — save project
 - `Delete` / `Backspace` — delete the selection right away, with no confirmation; undo restores it
@@ -214,9 +216,9 @@ The active tool is filled with the accent color. In the current implementation t
 When the Brush tool is active, two controls appear:
 
 - **Primitive** — `box`, `wedge`, `cylinder`, `cone` or `sphere`.
-- **Sides** — the side count for round primitives, from 3 to 64. The default is 8. Box and wedge do not use the side count.
+- **Sides** — the side count for cylinders and cones, from 3 to 64. The default is 8. Box and wedge do not use the side count. For `sphere`, this is a fixed preset picker instead: 14, 18, 20 or 26 sides.
 
-The `sphere` primitive is a convex octahedral approximation rather than a high-resolution segmented sphere.
+The `sphere` primitive is a convex ring-and-pole approximation. Its preset number is the exact number of triangular brush faces.
 
 ### CSG Subtract and Hollow buttons
 
@@ -243,11 +245,11 @@ The padlock button toggles **Texture lock**. When enabled, moving or rotating a 
 ### Theme and Compile
 
 - The sun/moon button switches dark and light window chrome.
-- **Compile** opens the compile profile menu. It is disabled until game data has been opened, because compilation needs the texture `.wal` headers and `pics/colormap.pcx`.
+- **Compile** opens the compile matrix menu. It is disabled until game data has been opened, because compilation needs the texture `.wal` headers and `pics/colormap.pcx`.
 
 ![Compile profile menu](images/compile-menu.png)
 
-The profiles are **Fast**, **Normal**, **Final** and, while work is running, **Cancel**. See [Compiling and testing a map](#compiling-and-testing-a-map).
+VIS and lighting are selected independently; pressing the menu's **Compile** action starts the chain. While work is running, a persistent status chip shows the active tool and **Cancel**. See [Compiling and testing a map](#compiling-and-testing-a-map).
 
 ## Tool modes
 
@@ -261,8 +263,8 @@ The Select tool picks and transforms whole brushes.
 
 - Click a brush in any view to replace the selection.
 - `Shift+click` adds a brush or removes an already selected brush.
-- When overlapping unselected brushes are hit at the same position, clicks can cycle between them; a brush that is already selected takes precedence in the current picking implementation.
-- Drag on empty space in an orthographic view for a box selection. Every brush whose projected bounding box intersects the rectangle is selected.
+- Repeated plain clicks at the same position cycle through every overlapping brush, starting with the brush closest to the viewer in that orthographic view. If you press the mouse on the already selected brush and actually drag, the drag keeps operating on that brush instead of advancing the cycle.
+- Drag on empty space in an orthographic view for a box selection. Every brush or point entity whose projected bounding box intersects the rectangle is selected.
 - Click empty space without `Shift` clears the selection.
 
 **Transforms:**
@@ -276,7 +278,7 @@ A drag is merged into one undo step even though intermediate positions are appli
 
 **Typing a size:** with brushes selected, point at an orthographic view and press `Enter`. A field opens at the selection's centre with its current size as _width height depth_ of that view — in Front, for example, width is X, height is Z and depth is Y. Type a new size and press `Enter`: the selection is resized around its centre in one undo step. `Escape` cancels. Typed sizes are used exactly and are not snapped to the grid.
 
-View picking is brush-based. Pick point entities, groups and brush-entity containers in the **Tree** tab; their properties then appear in the right panel.
+Point entities can be picked in the 2D and 3D views by their visible helper box and dragged like brushes; moving them rewrites their `origin` key. Clicking a brush that belongs to a brush entity selects the brush first; repeating the click escalates to the containing brush entity, and dragging that entity moves all its child brushes. Groups and entity containers can also be picked in the **Tree** tab; their properties then appear in the right panel.
 
 ### Brush (`B`)
 
@@ -301,7 +303,7 @@ Primitive notes:
 - `wedge` — a triangular prism for ramps and sloped pieces. It rises toward +X; flip or rotate it for other directions.
 - `cylinder` — a vertical, Z-aligned n-sided prism.
 - `cone` — a vertical, Z-aligned n-sided cone with its apex at +Z.
-- `sphere` — a fixed convex octahedral approximation. The side count does not affect it.
+- `sphere` — a convex ring-and-pole approximation with exactly 14, 18, 20 or 26 triangular faces.
 
 **Context-menu shortcut:** right-click an orthographic view and choose **Add Brush** to switch directly to this tool.
 
@@ -394,6 +396,8 @@ The Texture tool selects individual faces in the 3D view.
 Faces can be picked only in 3D. The 2D views show the result, but they are not face-picking views.
 
 The texture operations target the picked faces. If no faces are picked, they target every face of every currently selected brush. This distinction is important: selecting a whole brush is a quick way to retexture all of it, while the Texture tool gives face-level control.
+
+The toolbar Save button saves the current project exactly like `Ctrl+S` / `Cmd+S`. Its Undo and Redo buttons mirror `Ctrl+Z` and `Ctrl+Shift+Z` / `Ctrl+Y` and are enabled only when the corresponding history stack is non-empty. The same commands are also at the top of the Edit menu.
 
 ## Brush editing commands
 
@@ -498,7 +502,7 @@ Contents checkboxes:
 
 `SOLID`, `WINDOW`, `AUX`, `LAVA`, `SLIME`, `WATER`, `MIST`, `AREAPORTAL`, `PLAYERCLIP`, `MONSTERCLIP`, `CURRENT_0`, `CURRENT_90`, `CURRENT_180`, `CURRENT_270`, `CURRENT_UP`, `CURRENT_DOWN`, `ORIGIN`, `DETAIL`, `TRANSLUCENT`, `LADDER`
 
-**Value** is an integer. With `SURF_LIGHT`, it is the emitted light intensity used by qrad3. Edits are undoable and apply to all target faces.
+**Value** is an integer. With `SURF_LIGHT`, it is the emitted light intensity used by qrad3; the emitted color is the emitting texture's average `.wal` color. If a face line omits attributes, the compiler falls back to the `.wal` header's contents, flags and value, while explicit edits travel in the exported `.map` and the compiled texinfo. Edits are undoable and apply to all target faces.
 
 ## Entities
 
@@ -554,6 +558,8 @@ Typed editors include:
 - a color picker plus the raw `r g b` value for color keys;
 - completion of existing `targetname` values in `target` fields.
 
+Every documented key is visible even when the entity does not physically contain it. Absent rows are subdued and their verified default appears as a placeholder; editing one writes the key, but merely opening and saving a map never adds missing keys. New entities and brush-entity conversions physically receive implementation-verified defaults — for example a new light starts with `light` 300, white `_color`, `style` 0 and `_cone` 10. Select `worldspawn` in the Tree to edit map-level keys such as `message`, `sky`, `sounds` and `gravity`; a new document starts with `gravity` 800.
+
 Unknown keys are preserved and can be edited in the raw table. To add a key, type its name in `(new key)` and commit a value in the adjacent field. Setting an existing key to an empty value removes it.
 
 ## Groups, the tree and prefabs
@@ -608,17 +614,18 @@ Prefab insertion is undoable. Because prefabs use `.map` text, they can contain 
 
 ## Compiling and testing a map
 
-### Profiles
+### Compile options
 
-Compilation runs entirely in browser workers using WASM builds of id's Quake 2 tools. The tools communicate through an in-memory filesystem; no data leaves the browser.
+Compilation runs entirely in browser workers using WASM builds of id's Quake 2 tools. The tools communicate through an in-memory filesystem; no data leaves the browser. qbsp3 always runs. VIS and lighting are independent options:
 
-| Profile | Steps                          | Intended use                      |
-| ------- | ------------------------------ | --------------------------------- |
-| Fast    | qbsp3, qvis3 `-fast`; no qrad3 | quick leak and structural checks  |
-| Normal  | qbsp3, qvis3, qrad3            | regular testing with lighting     |
-| Final   | qbsp3, qvis3, qrad3 `-extra`   | slower high-quality lighting pass |
+| VIS      | Lighting | Steps                        | Intended use                                 |
+| -------- | -------- | ---------------------------- | -------------------------------------------- |
+| **Off**  | **Off**  | qbsp3                        | quickest plain-BSP playtest/structural check |
+| **Fast** | **Off**  | qbsp3, qvis3 `-fast`         | quick leak and visibility check              |
+| **Full** | Normal   | qbsp3, qvis3, qrad3          | regular testing with lighting                |
+| **Full** | Final    | qbsp3, qvis3, qrad3 `-extra` | slower high-quality lighting pass            |
 
-Choose **Compile**, then a profile. While compilation is active, the menu contains **Cancel**.
+Lighting without VIS is allowed, but it is not equivalent lighting: qrad3 reports direct lighting only, skips radiosity bounces and applies a small ambient term. Use it only for quick direct-light checks; use VIS plus Normal/Final lighting for representative output. Choose **Compile**, adjust the two selectors and press the menu's **Compile** action. While compilation is active, a persistent status chip shows a spinner and the active tool (`qbsp3`, `qvis3` or `qrad3`) with a **Cancel** button.
 
 The compile pipeline first performs the same export validation as `.map` export. It supplies the `.wal` headers of the textures used by the map and `pics/colormap.pcx` when available. Tool output streams line by line into the **Log** tab. Entries are labeled **Info**, **Ok**, **Warning** or **Error**; the label color distinguishes routine compiler output from editor warnings and failures.
 
@@ -649,11 +656,11 @@ This example builds and tests a simple room using the features described above.
 9. **Add lights and gameplay entities.** Use **Add Entity →** for lights, monsters, items and targets. Convert door or trigger geometry with **Apply Entity →**.
 10. **Configure entities.** Select each entity in the tree, set keys and spawnflags, and use `target`/`targetname` pairs for doors, buttons and triggers.
 11. **Texture the map.** Pick faces in 3D with `T`, choose textures in the browser and apply them. Use arrow-key shifts, rotation, fit and justify for alignment.
-12. **Set surface attributes.** Mark sky, water, translucency, nodraw and light-emitting surfaces as needed. Check the value field for light-emitting faces.
+12. **Set surface attributes.** Mark sky, water, translucency, nodraw and light-emitting surfaces as needed. Check the value field for light-emitting faces. For focused spotlights, use a `light_spot` or give a light a `target`; `_cone` is the cone angle in degrees.
 13. **Organize.** Group repeated or dense areas in the Tree. Use scope when working inside them. Save reusable assemblies as prefabs.
 14. **Save the project.** Press `Ctrl+S` / `Cmd+S` and keep the `.joole.json` as the authoritative source.
-15. **Compile Fast.** Fix leaks and geometry warnings first. Use `N` to inspect leak paths.
-16. **Compile Normal or Final.** Save the `.bsp` into `baseq2/maps/` and test it in q2pro.
+15. **Compile with Fast VIS and Lighting Off.** Fix leaks and geometry warnings first. Use `N` to inspect leak paths.
+16. **Compile with Full VIS and Normal or Final lighting.** Save the `.bsp` into `baseq2/maps/` and test it in q2pro.
 17. **Iterate.** Return to Joole, adjust the project, save and compile again.
 
 ## Keyboard and mouse reference
@@ -772,7 +779,6 @@ Quake texture axes cannot represent every transformed orientation exactly. A war
 - `Ctrl+H` and `Ctrl+L` are reserved but currently do not invoke hide/lock commands.
 - Entity placement is intended for orthographic views; 3D placement does not project onto a ground plane.
 - There is no group rename field in the current Tree UI.
-- The side-count input remains enabled for `sphere`, but the fixed octahedral primitive does not use it.
 - The File menu has no **New** command. An empty document exists when the editor starts; reloading the page is the only way to return to a truly empty document, subject to the autosave recovery prompt.
 
 These are implementation limitations, not intentional format restrictions. They do not affect the validity of saved `.joole.json` projects or exported `.map` files.

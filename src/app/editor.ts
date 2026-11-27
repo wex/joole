@@ -1,4 +1,4 @@
-import { analyzeBrush } from '@core/geom/index';
+import { analyzeBrush, SPHERE_SIDE_PRESETS } from '@core/geom/index';
 import { stepTextureFocus as stepFocus, textureFocus as resolveFocus } from './textureFocus';
 import {
   reparentNodePatch,
@@ -36,11 +36,12 @@ import {
   ungroupNodesPatch,
 } from './groups';
 import { boxSegments, dashedSegment } from './tools';
-import { runCompilePipeline, type CompileProfile, type CompileRunner } from './compile';
+import { runCompilePipeline, type CompileOptions, type CompileRunner } from './compile';
 import type { EntityClassDef } from '@core/formats/index';
 import type {
   Command,
   ConvertedTexture,
+  FaceTexture,
   Inflate,
   MapDocument,
   Patch,
@@ -51,6 +52,8 @@ import {
   DEFAULT_TEXTURE,
   PALETTE_PATH,
   SURFACE_FLAG_BITS,
+  entityCreationDefaults,
+  withQ2EntityMetadata,
 } from '@game/q2/index';
 import type { GameFileEntry } from '@platform/index';
 import { CommandBus } from './commandBus';
@@ -131,6 +134,22 @@ export interface TextureCacheLike {
 export interface AutosaveStoreLike {
   saveAutosave(project: string, dirty: boolean): Promise<void>;
   clearAutosave(): Promise<void>;
+}
+
+const VANILLA_ENTITY_DEFS = withQ2EntityMetadata(parseQuakedBlocks(q2defText));
+
+/** A new document gets only source-verified worldspawn defaults; opening files never backfills keys. */
+function createInitialDocument(): MapDocument {
+  const empty = createEmptyDocument();
+  const world = empty.nodes.get(empty.worldspawn);
+  if (!world || world.kind !== 'entity') return empty;
+  const props = [...world.props];
+  for (const [key, value] of entityCreationDefaults(VANILLA_ENTITY_DEFS, 'worldspawn')) {
+    if (!props.some(([existing]) => existing === key)) props.push([key, value]);
+  }
+  const nodes = new Map(empty.nodes);
+  nodes.set(empty.worldspawn, { ...world, props });
+  return { nodes, parent: new Map(empty.parent), worldspawn: empty.worldspawn };
 }
 
 export interface EditorAppOptions {
@@ -227,7 +246,7 @@ export class EditorApp {
     this.saveProjectText = options.saveProjectText;
     this.saveMapText = options.saveMapText;
     this.autosaveStore = options.autosaveStore;
-    this.bus = new CommandBus(createEmptyDocument());
+    this.bus = new CommandBus(createInitialDocument());
     this.selectionManager = new SelectionManager(this.bus);
     this.selectTool = new SelectTool(
       () => this.document,
@@ -266,6 +285,7 @@ export class EditorApp {
       () => this.currentEntityClassValue,
       () => this.document.worldspawn,
       () => this.gridSize,
+      (classname) => this.creationDefaultsFor(classname),
     );
     this.bus.subscribe((event) => {
       if (event.type !== 'history') {
@@ -373,10 +393,14 @@ export class EditorApp {
 
   /** Replaces the mod definition layer; an empty list returns to vanilla. */
   setModEntityDefs(texts: readonly string[]): void {
-    const vanilla = parseQuakedBlocks(q2defText);
     const mod = texts.flatMap((text) => parseQuakedBlocks(text));
-    this.entityDefsValue = mod.length > 0 ? mergeEntityDefs(vanilla, mod) : vanilla;
+    this.entityDefsValue =
+      mod.length > 0 ? mergeEntityDefs(VANILLA_ENTITY_DEFS, mod) : VANILLA_ENTITY_DEFS;
     this.modEntityDefTexts = [...texts];
+  }
+
+  private creationDefaultsFor(classname: string): [string, string][] {
+    return entityCreationDefaults(this.entityDefsValue, classname);
   }
 
   /** The class the entity tool places, 'light' until one is chosen. */
@@ -405,6 +429,7 @@ export class EditorApp {
         classname,
         brushIds,
         createId,
+        this.creationDefaultsFor(classname),
       );
       this.executeCommand({ label: `Convert to ${classname}`, run: () => patch });
       this.setSelection([id]);
@@ -642,7 +667,7 @@ export class EditorApp {
   /** Changes the class of a point entity. For brush classes on a brush selection use convertSelectionToEntity. */
   setEntityClass(id: string, classname: string): boolean {
     return this.runEntityPatch(`Class ${classname}`, () =>
-      setEntityClassPatch(this.document, id, classname),
+      setEntityClassPatch(this.document, id, classname, this.creationDefaultsFor(classname)),
     );
   }
 
@@ -668,7 +693,7 @@ export class EditorApp {
     return def ? def.bbox === 'brush' : /^(func|trigger|path|multi)_/.test(classname);
   }
 
-  private entityDefsValue: readonly EntityClassDef[] = parseQuakedBlocks(q2defText);
+  private entityDefsValue: readonly EntityClassDef[] = VANILLA_ENTITY_DEFS;
   private modEntityDefTexts: string[] = [];
 
   setTextureLock(enabled: boolean): void {
@@ -773,6 +798,14 @@ export class EditorApp {
     return this.selectionManager.execute(command);
   }
 
+  get canUndo(): boolean {
+    return this.bus.canUndo;
+  }
+
+  get canRedo(): boolean {
+    return this.bus.canRedo;
+  }
+
   undo(): boolean {
     return this.selectionManager.undo();
   }
@@ -803,6 +836,9 @@ export class EditorApp {
           string,
           string,
         ],
+        ...this.creationDefaultsFor(classname)
+          .filter(([key]) => key !== 'classname' && key !== 'origin')
+          .map(([key, value]) => [key, value] as [string, string]),
       ],
       children: [],
     };
@@ -1181,6 +1217,17 @@ export class EditorApp {
     if (!Number.isInteger(sides) || sides < 3 || sides > 64) {
       return false;
     }
+    if (
+      kind === 'sphere' &&
+      !SPHERE_SIDE_PRESETS.includes(sides as (typeof SPHERE_SIDE_PRESETS)[number])
+    ) {
+      // Sphere detail is a fixed preset picker rather than a free numeric
+      // field. Normalize stale cylinder/cone values instead of rejecting the
+      // primitive switch outright.
+      sides = SPHERE_SIDE_PRESETS.reduce((best, preset) =>
+        Math.abs(preset - sides) < Math.abs(best - sides) ? preset : best,
+      );
+    }
     this.brushTool.primitive = kind;
     this.brushTool.sides = sides;
     this.emit({ type: 'tool' });
@@ -1296,6 +1343,7 @@ export class EditorApp {
   cancelCompileWorker: (() => void) | null = null;
 
   private compiling = false;
+  private compileStageValue: string | null = null;
 
   /** The parsed leak path of the last compile, or null when there is none. */
   leakPath: readonly [number, number, number][] | null = null;
@@ -1314,6 +1362,11 @@ export class EditorApp {
     return this.compiling;
   }
 
+  /** The active compile tool while compiling, or null when idle. */
+  get compileStage(): string | null {
+    return this.compileStageValue;
+  }
+
   /** Cancels the running compile, if any. */
   cancelCompile(): void {
     this.cancelCompileWorker?.();
@@ -1326,7 +1379,7 @@ export class EditorApp {
    * the log and saves the .bsp. A leak stops the chain and keeps the
    * pointfile for the leak display.
    */
-  async compileMap(profile: CompileProfile): Promise<boolean> {
+  async compileMap(options: CompileOptions): Promise<boolean> {
     if (!this.compileRunner || !this.vfs) {
       this.log('warning', 'Open a game folder before compiling.');
       return false;
@@ -1335,12 +1388,14 @@ export class EditorApp {
       this.log('warning', 'A compile is already running.');
       return false;
     }
+    const mapName = (this.map?.replace(/\.(map|joole\.json)$/i, '') || 'untitled') + '.map';
+    // The .wal headers of every texture the map uses. Loading them before
+    // export lets the writer emit edited surface flags and light values.
+    await this.loadWalAttribs([...this.texturesInUse()]);
     const exported = this.exportMapText();
     for (const warning of exported.warnings) {
       this.log('warning', warning);
     }
-    const mapName = (this.map?.replace(/\.(map|joole\.json)$/i, '') || 'untitled') + '.map';
-    // The .wal headers of every texture the map uses.
     const wals: { name: string; data: Uint8Array }[] = [];
     const missing: string[] = [];
     for (const name of this.texturesInUse()) {
@@ -1356,16 +1411,20 @@ export class EditorApp {
     }
     const colormap = await this.vfs.readFile('pics/colormap.pcx');
     this.compiling = true;
-    this.log('info', `Compiling ${mapName} (${profile})…`);
+    this.log('info', `Compiling ${mapName} (VIS ${options.vis}, lighting ${options.lighting})…`);
     this.emit({ type: 'document' });
     try {
       const result = await runCompilePipeline(
         this.compileRunner,
-        profile,
+        options,
         mapName,
         exported.text,
         wals,
         colormap ?? null,
+        (tool) => {
+          this.compileStageValue = tool;
+          this.emit({ type: 'document' });
+        },
       );
       if (result.leaked) {
         this.leakPath = result.pts ? parsePts(new TextDecoder().decode(result.pts)) : null;
@@ -1382,16 +1441,24 @@ export class EditorApp {
       this.log('ok', `Compiled ${bspName} (${result.bsp.byteLength} bytes).`);
       return saved;
     } catch (error) {
-      this.log('error', `Compile failed: ${errorText(error)}`);
+      if (errorText(error) === 'compile cancelled') {
+        this.log('info', 'Compile cancelled.');
+      } else {
+        this.log('error', `Compile failed: ${errorText(error)}`);
+      }
       return false;
     } finally {
       this.compiling = false;
+      this.compileStageValue = null;
       this.emit({ type: 'document' });
     }
   }
 
   exportMapText(): { text: string; warnings: string[] } {
-    return writeMap(this.document, { mode: 'export' });
+    return writeMap(this.document, {
+      mode: 'export',
+      writeAttribs: (face) => this.shouldWriteFaceAttribs(face),
+    });
   }
 
   async saveProject(): Promise<boolean> {
@@ -1433,6 +1500,35 @@ export class EditorApp {
       }
     }
     return [...names].sort();
+  }
+
+  private async loadWalAttribs(names: readonly string[]): Promise<void> {
+    if (!this.vfs) return;
+    for (const name of names) {
+      if (this.walAttribs.has(name)) continue;
+      const bytes = await this.vfs.readFile(`textures/${name}.wal`);
+      if (!bytes) continue;
+      try {
+        const header = readWalHeader(new Uint8Array(bytes));
+        this.walAttribs.set(name, {
+          flags: header.flags,
+          contents: header.contents,
+          value: header.value,
+        });
+      } catch {
+        // An unreadable wal is treated as missing for attribute purposes.
+      }
+    }
+  }
+
+  private shouldWriteFaceAttribs(face: { tex: FaceTexture }): boolean {
+    const t = face.tex;
+    if (t.attribsInFile) return true;
+    const defaults = this.walAttribs.get(t.name);
+    if (!defaults) return true;
+    return (
+      t.contents !== defaults.contents || t.flags !== defaults.flags || t.value !== defaults.value
+    );
   }
 
   /**
@@ -1668,6 +1764,7 @@ export class EditorApp {
 
   async exportMap(): Promise<boolean> {
     if (!this.saveMapText) return false;
+    await this.loadWalAttribs([...this.texturesInUse()]);
     const result = this.exportMapText();
     for (const warning of result.warnings) this.log('warning', warning);
     const name = (this.map?.replace(/\.(map|joole\.json)$/i, '') ?? 'untitled') + '.map';

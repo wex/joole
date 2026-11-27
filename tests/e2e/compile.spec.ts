@@ -1,6 +1,7 @@
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
+import { bspLump } from '../compiler/bspInspect';
 
 const gameDir = path.join(
   path.dirname(fileURLToPath(new URL('../fixtures/room.map', import.meta.url))),
@@ -47,14 +48,15 @@ test('compiles the map in the browser through all three tools', async ({ page })
 
   // Compile with the fast profile through the toolbar menu.
   await page.locator('[data-testid=compile-button]').click();
-  await expect(page.locator('[data-testid=compile-normal]')).toBeVisible();
+  await expect(page.locator('[data-testid=compile-start]')).toBeVisible();
   const download = page.waitForEvent('download', { timeout: 60000 });
-  await page.locator('[data-testid=compile-normal]').click();
+  await page.locator('[data-testid=compile-start]').click();
   const file = await download;
   expect(file.suggestedFilename()).toMatch(/\.bsp$/);
   const filePath = await file.path();
   const { statSync } = await import('node:fs');
   expect(statSync(filePath!).size).toBeGreaterThan(5000);
+  await expect(page.locator('[data-testid=compile-status]')).toHaveCount(0);
 
   // The log streamed the tools' banners; open the log tab to read them.
   await page.locator('#bottom-tab-log').click();
@@ -70,8 +72,15 @@ test('compiles the map in the browser through all three tools', async ({ page })
   // The other two profiles compile the sample as well (Gate 5's rehearsal).
   for (const profile of ['fast', 'final'] as const) {
     await page.locator('[data-testid=compile-button]').click();
+    if (profile === 'fast') {
+      await page.locator('[data-testid=compile-vis]').selectOption('fast');
+      await page.locator('[data-testid=compile-lighting]').selectOption('off');
+    } else {
+      await page.locator('[data-testid=compile-vis]').selectOption('full');
+      await page.locator('[data-testid=compile-lighting]').selectOption('final');
+    }
     const nextDownload = page.waitForEvent('download', { timeout: 60000 });
-    await page.locator(`[data-testid=compile-${profile}]`).click();
+    await page.locator('[data-testid=compile-start]').click();
     const nextFile = await nextDownload;
     expect(nextFile.suggestedFilename()).toMatch(/\.bsp$/);
     const nextPath = await nextFile.path();
@@ -82,4 +91,52 @@ test('compiles the map in the browser through all three tools', async ({ page })
   const logText = await page.locator('[data-testid=log-panel]').textContent();
   expect(logText?.split('Radiosity').length).toBe(3);
   expect(errors).toEqual([]);
+});
+
+test('compile status cancels visibly and qbsp-only writes an unlit bsp', async ({ page }) => {
+  test.setTimeout(90000);
+  // Delay only wasm module fetches so the fast fixture stays in the running
+  // state long enough to exercise the persistent cancel control.
+  await page.route('**/*.wasm', async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, 180));
+    await route.continue();
+  });
+  await openWithGame(page);
+  const sample = path.join(
+    path.dirname(fileURLToPath(new URL('../fixtures/room.map', import.meta.url))),
+    'maps',
+    'sp-sample.map',
+  );
+  await page.locator('[data-testid=map-input]').setInputFiles(sample);
+  await page.evaluate(() => (window as unknown as JooleWindow).joole!.whenIdle());
+
+  await page.locator('[data-testid=compile-button]').click();
+  await page.locator('[data-testid=compile-vis]').selectOption('full');
+  await page.locator('[data-testid=compile-lighting]').selectOption('final');
+  await page.locator('[data-testid=compile-start]').click();
+  await expect(page.locator('[data-testid=compile-status]')).toBeVisible();
+  await expect(page.locator('[data-testid=compile-status]')).toContainText(/Compiling:/);
+  await expect(page.locator('[data-testid=compile-cancel]')).toBeVisible();
+  await page.locator('[data-testid=compile-cancel]').click();
+  await expect(page.locator('[data-testid=compile-status]')).toHaveCount(0);
+  await page.locator('#bottom-tab-log').click();
+  await expect(page.locator('[data-testid=log-panel]')).toContainText('Compile cancelled.');
+
+  // Cancellation returns the app to idle, so another combination can start.
+  const before = (await page.locator('[data-testid=log-panel]').textContent()) ?? '';
+  await page.locator('[data-testid=compile-button]').click();
+  await page.locator('[data-testid=compile-vis]').selectOption('off');
+  await page.locator('[data-testid=compile-lighting]').selectOption('off');
+  const download = page.waitForEvent('download', { timeout: 60000 });
+  await page.locator('[data-testid=compile-start]').click();
+  const file = await download;
+  expect(file.suggestedFilename()).toMatch(/\.bsp$/);
+  const { readFileSync } = await import('node:fs');
+  const bytes = new Uint8Array(readFileSync((await file.path())!));
+  expect(bspLump(bytes, 7).length).toBe(0);
+  await expect(page.locator('[data-testid=compile-status]')).toHaveCount(0);
+  const after = (await page.locator('[data-testid=log-panel]').textContent()) ?? '';
+  const added = after.slice(before.length);
+  expect(added).not.toContain('---- vis ----');
+  expect(added).not.toContain('Radiosity');
 });

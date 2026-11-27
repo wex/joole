@@ -26,7 +26,7 @@ describe('sp-sample gate compile', () => {
     const colormap = readFileSync('tests/fixtures/colormap.pcx');
     const result = await runCompilePipeline(
       nodeRunner,
-      'normal',
+      { vis: 'full', lighting: 'normal' },
       'sp-sample',
       text,
       [{ name: 'e2u1/mine10_1', data: new Uint8Array(wal) }],

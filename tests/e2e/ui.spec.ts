@@ -322,6 +322,44 @@ test('the brush tool creates a primitive in a 2D view and undo removes it', asyn
   expect(errors).toEqual([]);
 });
 
+test('sphere detail is a fixed preset picker', async ({ page }) => {
+  await openFixtureMap(page);
+  await page.getByRole('button', { name: 'Brush (B)' }).click();
+  await page.getByLabel('Brush primitive').selectOption('sphere');
+  const sides = page.getByLabel('Primitive sides');
+  await expect(sides).toHaveValue('14');
+  await expect(sides.locator('option')).toHaveText(['14', '18', '20', '26']);
+  await sides.selectOption('26');
+  await expect(sides).toHaveValue('26');
+  await page.getByLabel('Brush primitive').selectOption('cylinder');
+  await expect(page.getByLabel('Primitive sides')).toHaveAttribute('type', 'number');
+});
+
+test('toolbar Undo and Redo buttons follow command history', async ({ page }) => {
+  await openFixtureMap(page);
+  const nodesBefore = await page.evaluate(
+    () => (window as unknown as JooleWindow).joole!.stats().nodes,
+  );
+  const undo = page.getByRole('button', { name: 'Undo', exact: true }).first();
+  const redo = page.getByRole('button', { name: 'Redo', exact: true }).first();
+  await expect(undo).toBeDisabled();
+  await expect(redo).toBeDisabled();
+
+  const top = await viewPoint(page, 'top');
+  await page.mouse.click(top.x, top.y);
+  await page.keyboard.press('Control+d');
+  await expect(undo).toBeEnabled();
+  await undo.click();
+  await expect
+    .poll(() => page.evaluate(() => (window as unknown as JooleWindow).joole!.stats().nodes))
+    .toBe(nodesBefore);
+  await expect(redo).toBeEnabled();
+  await redo.click();
+  await expect
+    .poll(() => page.evaluate(() => (window as unknown as JooleWindow).joole!.stats().nodes))
+    .toBe(nodesBefore + 1);
+});
+
 test('copy, paste, cut and duplicate operate on the selection', async ({ page, context }) => {
   const errors = consoleErrors(page);
   // Firefox has no clipboard permission names; the copy paths do not need
@@ -368,7 +406,7 @@ test('Ctrl+S downloads a project and the project reloads without loss', async ({
   );
 
   const downloadPromise = page.waitForEvent('download');
-  await page.keyboard.press('Control+s');
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
   const download = await downloadPromise;
   expect(download.suggestedFilename()).toBe('room.joole.json');
   const path = await download.path();

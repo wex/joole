@@ -32,6 +32,16 @@ import { DockSection } from './DockSection';
 import { SettingsDialog } from './SettingsDialog';
 import { ToolHint } from './ToolHint';
 import { DEFAULT_SETTINGS } from '@app/settings';
+import {
+  DEFAULT_LAYOUT_SNAPSHOT,
+  normalizeNamedLayouts,
+  normalizeWorkspaceLayout,
+  updateWorkspaceLayout,
+  type NamedLayout,
+  type RightSectionId,
+  type WorkspaceLayout,
+  type WorkspaceLayoutSnapshot,
+} from '@app/layout';
 import { toolInfo } from '@app/toolInfo';
 import { parseSizeInput } from '@app/sizeInput';
 import { SizeInput } from './SizeInput';
@@ -65,6 +75,9 @@ export interface EditorShellProps {
     readonly groupCsgResults: boolean;
     readonly handleSize: number;
     readonly bottomCollapsed: boolean;
+    readonly layout?: unknown;
+    readonly layouts?: unknown;
+    readonly activeLayoutId?: unknown;
     readonly colors: {
       readonly dark: Record<string, string>;
       readonly light: Record<string, string>;
@@ -157,11 +170,31 @@ export function EditorShell(props: EditorShellProps) {
   const [textureList, setTextureList] = createSignal(app.textureList());
   const [currentTexture, setCurrentTexture] = createSignal(app.currentTextureName);
   const [gridSize, setGridSize] = createSignal(app.gridSize);
+  const [canUndo, setCanUndo] = createSignal(app.canUndo);
+  const [canRedo, setCanRedo] = createSignal(app.canRedo);
   const [entries, setEntries] = createSignal<readonly LogEntry[]>(app.logEntries());
   const [activeView, setActiveView] = createSignal<ViewId>('3d');
-  const [maximizedView, setMaximizedView] = createSignal<ViewId | null>(null);
+  const [workspaceLayout, setWorkspaceLayout] = createSignal<WorkspaceLayout>(
+    normalizeWorkspaceLayout(initialSettings?.layout),
+  );
+  const [namedLayouts, setNamedLayouts] = createSignal<readonly NamedLayout[]>(
+    normalizeNamedLayouts(initialSettings?.layouts),
+  );
+  const [activeLayoutId, setActiveLayoutId] = createSignal<string | null>(
+    typeof initialSettings?.activeLayoutId === 'string' ? initialSettings.activeLayoutId : null,
+  );
+  const initialMaximized = untrack(workspaceLayout).viewport;
+  const [maximizedView, setMaximizedView] = createSignal<ViewId | null>(
+    initialMaximized === 'quad' ? null : initialMaximized,
+  );
   const [compileMenuOpen, setCompileMenuOpen] = createSignal(false);
-  const [bottomTab, setBottomTab] = createSignal<BottomTab>('tree');
+  const [compileVis, setCompileVis] = createSignal<'off' | 'fast' | 'full'>('full');
+  const [compileLighting, setCompileLighting] = createSignal<'off' | 'normal' | 'final'>('normal');
+  const [compiling, setCompiling] = createSignal(app.isCompiling);
+  const [compileStage, setCompileStage] = createSignal<string | null>(app.compileStage);
+  const [bottomTab, setBottomTab] = createSignal<BottomTab>(
+    untrack(workspaceLayout).bottomActiveTab,
+  );
   const [bottomCollapsed, setBottomCollapsed] = createSignal(
     initialSettings?.bottomCollapsed !== false,
   );
@@ -204,6 +237,17 @@ export function EditorShell(props: EditorShellProps) {
     initialSettings?.groupCsgResults ?? true,
   );
   const [handleSize, setHandleSize] = createSignal(initialSettings?.handleSize ?? 14);
+  /** Snapshots every layout-related piece of state, and nothing else. */
+  const currentLayoutSnapshot = (): WorkspaceLayoutSnapshot => ({
+    ...workspaceLayout(),
+    rightWidth: rightWidth(),
+    bottomHeight: bottomHeight(),
+    dockSplit: dockSplit(),
+    propertiesCollapsed: propertiesCollapsed(),
+    texturesCollapsed: texturesCollapsed(),
+    bottomCollapsed: bottomCollapsed(),
+  });
+
   /** Applies one dialog change immediately: signals, side effects, persistence. */
   const applySettingsChange = (partial: Record<string, unknown>) => {
     if (typeof partial['theme'] === 'string') {
@@ -236,6 +280,17 @@ export function EditorShell(props: EditorShellProps) {
     if (typeof partial['bottomCollapsed'] === 'boolean') {
       setBottomCollapsed(partial['bottomCollapsed'] as boolean);
     }
+    if (partial['layout'] && typeof partial['layout'] === 'object') {
+      syncWorkspaceLayout(partial['layout'], false);
+    }
+    if (Array.isArray(partial['layouts'])) {
+      setNamedLayouts(normalizeNamedLayouts(partial['layouts']));
+    }
+    if ('activeLayoutId' in partial) {
+      setActiveLayoutId(
+        typeof partial['activeLayoutId'] === 'string' ? partial['activeLayoutId'] : null,
+      );
+    }
     if (partial['colors'] && typeof partial['colors'] === 'object') {
       const next = partial['colors'] as {
         dark: Record<string, string>;
@@ -257,6 +312,30 @@ export function EditorShell(props: EditorShellProps) {
     props.onSettingsChange?.(partial);
   };
   const reportSetting = (key: string, value: unknown) => props.onSettingsChange?.({ [key]: value });
+
+  /** Applies validated arrangement state locally and optionally persists it. */
+  const syncWorkspaceLayout = (nextLayout: unknown, persist = true): WorkspaceLayout => {
+    const next = normalizeWorkspaceLayout(nextLayout);
+    setWorkspaceLayout(next);
+    setBottomTab(next.bottomActiveTab);
+    const maximized = next.viewport === 'quad' ? null : next.viewport;
+    setMaximizedView(maximized);
+    if (maximized) setActiveView(maximized);
+    renderer.setMaximized(maximized);
+    if (persist) {
+      setActiveLayoutId(null);
+      props.onSettingsChange?.({ layout: next, activeLayoutId: null });
+    }
+    return next;
+  };
+
+  const updateArrangement = (partial: Partial<WorkspaceLayout>) => {
+    syncWorkspaceLayout(updateWorkspaceLayout(workspaceLayout(), partial));
+  };
+
+  const selectBottomTab = (tab: BottomTab) => {
+    updateArrangement({ bottomActiveTab: tab });
+  };
   const [viewMenu, setViewMenu] = createSignal<{
     x: number;
     y: number;
@@ -440,9 +519,8 @@ export function EditorShell(props: EditorShellProps) {
 
   const toggleMaximized = (view: ViewId) => {
     const next = maximizedView() === view ? null : view;
-    setMaximizedView(next);
     setActiveView(view);
-    renderer.setMaximized(next);
+    updateArrangement({ viewport: next ?? 'quad' });
   };
 
   const chooseGameFolder = () => {
@@ -1133,7 +1211,11 @@ export function EditorShell(props: EditorShellProps) {
 
     const unsubscribe = app.subscribe((event) => {
       if (event.type === 'document') {
+        setCanUndo(app.canUndo);
+        setCanRedo(app.canRedo);
         setMapName(app.mapName);
+        setCompiling(app.isCompiling);
+        setCompileStage(app.compileStage);
         if (!event.patch) {
           setSizePrompt(null);
           controller.frame(renderer.bounds(), renderer.viewRects());
@@ -1179,6 +1261,7 @@ export function EditorShell(props: EditorShellProps) {
         setRecoveryAvailable(app.recoveryProject !== null);
       }
     });
+    renderer.setMaximized(maximizedView());
     const initialFrame = requestAnimationFrame(() => {
       controller.frame(renderer.bounds(), renderer.viewRects());
     });
@@ -1245,6 +1328,86 @@ export function EditorShell(props: EditorShellProps) {
       }
     },
   );
+  const visibleRightSections = () =>
+    workspaceLayout().rightSections.filter((section) => section.visible);
+  const rightSectionCollapsed = (id: RightSectionId) =>
+    id === 'properties' ? propertiesCollapsed() : texturesCollapsed();
+  const rightSectionStyle = (id: RightSectionId, index: number, count: number) => {
+    if (rightSectionCollapsed(id)) return undefined;
+    const other = visibleRightSections().find((section) => section.id !== id);
+    if (count === 1 || (other && rightSectionCollapsed(other.id))) return { flex: '1' };
+    return index === 0 ? { flex: 'none', height: `${dockSplit() * 100}%` } : { flex: '1' };
+  };
+
+  const renderRightSection = (id: RightSectionId) =>
+    id === 'properties' ? (
+      <DockSection
+        title="Properties"
+        testId="dock-properties"
+        collapsed={propertiesCollapsed()}
+        onToggle={() => {
+          const next = !propertiesCollapsed();
+          setPropertiesCollapsed(next);
+          reportSetting('propertiesCollapsed', next);
+        }}
+      >
+        <PropertiesPanel
+          app={app}
+          mapName={mapName()}
+          gameOpen={gameOpen()}
+          version={panelVersion}
+        />
+      </DockSection>
+    ) : (
+      <DockSection
+        title="Textures"
+        testId="dock-textures"
+        collapsed={texturesCollapsed()}
+        onToggle={() => {
+          const next = !texturesCollapsed();
+          setTexturesCollapsed(next);
+          reportSetting('texturesCollapsed', next);
+        }}
+      >
+        <div class={styles.textureControls}>
+          <label class={styles.textureSliderLabel}>
+            Thumbnail size
+            <input
+              type="range"
+              min="32"
+              max="128"
+              step="16"
+              value={thumbSize()}
+              aria-label="Thumbnail size"
+              data-testid="thumb-size-slider"
+              onInput={(event) => {
+                const next = Number(event.currentTarget.value);
+                setThumbSize(next);
+                reportSetting('thumbSize', next);
+              }}
+            />
+          </label>
+        </div>
+        <Show
+          when={gameOpen()}
+          fallback={
+            <div class={styles.texturePlaceholder} data-testid="texture-placeholder">
+              Open a game folder to index textures.
+            </div>
+          }
+        >
+          <TextureBrowser
+            entries={textureList()}
+            inUse={() => app.texturesInUse()}
+            selected={() => currentTexture()}
+            thumbSize={thumbSize}
+            onSelect={(name) => app.chooseTexture(name)}
+            load={(name) => app.loadTexture(name)}
+          />
+        </Show>
+      </DockSection>
+    );
+
   return (
     <div class={styles.shell} data-testid="editor-shell">
       <Toolbar
@@ -1254,6 +1417,11 @@ export function EditorShell(props: EditorShellProps) {
         onOpenSinglePak={() => pakInput?.click()}
         onOpenMap={chooseMap}
         onExportMap={() => void app.exportMap()}
+        onSaveProject={() => void app.saveProject()}
+        onUndo={() => app.undo()}
+        onRedo={() => app.redo()}
+        canUndo={canUndo()}
+        canRedo={canRedo()}
         gameOpen={gameOpen()}
         onCompile={() => setCompileMenuOpen((v) => !v)}
         onDelete={() => app.deleteSelection()}
@@ -1283,43 +1451,72 @@ export function EditorShell(props: EditorShellProps) {
         onBrushPrimitive={(kind, sides) => app.setBrushPrimitive(kind, sides)}
       />
       <Show when={compileMenuOpen()}>
-        <div class={styles.compileMenu} role="menu" aria-label="Compile profile">
-          <For each={['fast', 'normal', 'final'] as const}>
-            {(profile) => (
-              <button
-                type="button"
-                role="menuitem"
-                class={styles.contextMenuItem}
-                data-testid={`compile-${profile}`}
-                onClick={() => {
-                  setCompileMenuOpen(false);
-                  void app.compileMap(profile);
-                }}
-              >
-                {profile[0]!.toUpperCase() + profile.slice(1)}
-              </button>
-            )}
-          </For>
-          <Show when={app.isCompiling}>
-            <button
-              type="button"
-              role="menuitem"
-              class={styles.contextMenuItem}
-              data-testid="compile-cancel"
-              onClick={() => {
-                setCompileMenuOpen(false);
-                app.cancelCompile();
-              }}
+        <div class={styles.compileMenu} role="menu" aria-label="Compile options">
+          <label class={styles.compileOption}>
+            VIS
+            <select
+              data-testid="compile-vis"
+              value={compileVis()}
+              onChange={(event) =>
+                setCompileVis(event.currentTarget.value as 'off' | 'fast' | 'full')
+              }
             >
-              Cancel
-            </button>
-          </Show>
+              <option value="off">Off</option>
+              <option value="fast">Fast</option>
+              <option value="full">Full</option>
+            </select>
+          </label>
+          <label class={styles.compileOption}>
+            Lighting
+            <select
+              data-testid="compile-lighting"
+              value={compileLighting()}
+              onChange={(event) =>
+                setCompileLighting(event.currentTarget.value as 'off' | 'normal' | 'final')
+              }
+            >
+              <option value="off">Off</option>
+              <option value="normal">Normal</option>
+              <option value="final">Final</option>
+            </select>
+          </label>
+          <button
+            type="button"
+            role="menuitem"
+            class={styles.contextMenuItem}
+            data-testid="compile-start"
+            disabled={compiling()}
+            onClick={() => {
+              setCompileMenuOpen(false);
+              void app.compileMap({ vis: compileVis(), lighting: compileLighting() });
+            }}
+          >
+            Compile
+          </button>
+        </div>
+      </Show>
+      <Show when={compiling()}>
+        <div class={styles.compileStatus} data-testid="compile-status">
+          <span class={styles.compileSpinner} aria-hidden="true" />
+          <span>Compiling: {compileStage() ?? 'preparing'}</span>
+          <button type="button" data-testid="compile-cancel" onClick={() => app.cancelCompile()}>
+            Cancel
+          </button>
         </div>
       </Show>
 
-      <div class={styles.main} ref={(el) => (mainElement = el)}>
+      <div
+        class={[styles.main, { [styles.mainNoRightDock!]: !workspaceLayout().rightDockVisible }]}
+        ref={(el) => (mainElement = el)}
+      >
         <div
-          class={[styles.center, bottomCollapsed() ? styles.centerCollapsed : ''].join(' ')}
+          class={[
+            styles.center,
+            {
+              [styles.centerCollapsed!]: bottomCollapsed(),
+              [styles.centerNoBottomDock!]: !workspaceLayout().bottomDockVisible,
+            },
+          ]}
           ref={(el) => (centerElement = el)}
         >
           <div
@@ -1582,7 +1779,7 @@ export function EditorShell(props: EditorShellProps) {
               )}
             </Show>
           </div>
-          <Show when={!bottomCollapsed()}>
+          <Show when={workspaceLayout().bottomDockVisible && !bottomCollapsed()}>
             <div
               class={[styles.splitter, styles.horizontalSplitter]}
               role="separator"
@@ -1594,157 +1791,105 @@ export function EditorShell(props: EditorShellProps) {
               onKeyDown={(event) => splitterKey(event, 'horizontal')}
             />
           </Show>
-          <section
-            class={[styles.bottomPanel, bottomCollapsed() ? styles.collapsed : ''].join(' ')}
-            aria-label="Textures and log"
-          >
-            <PanelTabs
-              selected={bottomTab()}
-              maximized={maximizedView()}
-              collapsed={bottomCollapsed()}
-              newErrors={
-                bottomCollapsed() || bottomTab() !== 'log'
-                  ? countNewErrors(entries(), logSeenId())
-                  : 0
-              }
-              onSelect={(tab) => {
-                setBottomTab(tab);
-                if (bottomCollapsed()) {
-                  setBottomCollapsed(false);
-                  reportSetting('bottomCollapsed', false);
-                }
-              }}
-              onView={toggleMaximized}
-              onToggleCollapsed={() => {
-                const next = !bottomCollapsed();
-                setBottomCollapsed(next);
-                reportSetting('bottomCollapsed', next);
-              }}
-            />
-            <Show when={!bottomCollapsed()}>
-              <Show when={bottomTab() === 'tree'}>
-                <TreeView app={app} version={panelVersion} />
-              </Show>
-              <Show when={bottomTab() === 'prefabs'}>
-                <PrefabBrowser app={app} version={panelVersion} />
-              </Show>
-              <Show when={bottomTab() === 'log'}>
-                <LogPanel entries={entries()} />
-              </Show>
-            </Show>
-          </section>
-        </div>
-        <div
-          class={[styles.splitter, styles.verticalSplitter]}
-          role="separator"
-          aria-orientation="vertical"
-          aria-label="Resize properties panel"
-          aria-valuenow={rightWidth()}
-          tabindex="0"
-          onPointerDown={(event) => beginSplitterDrag(event, 'vertical')}
-          onKeyDown={(event) => splitterKey(event, 'vertical')}
-        />
-        <aside
-          class={styles.dock}
-          aria-label="Properties and textures"
-          ref={(el) => (dockElement = el)}
-        >
-          <div
-            class={styles.dockProperties}
-            style={
-              propertiesCollapsed()
-                ? undefined
-                : texturesCollapsed()
-                  ? { flex: '1' }
-                  : { height: `${dockSplit() * 100}%` }
-            }
-          >
-            <DockSection
-              title="Properties"
-              testId="dock-properties"
-              collapsed={propertiesCollapsed()}
-              onToggle={() => {
-                const next = !propertiesCollapsed();
-                setPropertiesCollapsed(next);
-                reportSetting('propertiesCollapsed', next);
-              }}
+          <Show when={workspaceLayout().bottomDockVisible}>
+            <section
+              class={[styles.bottomPanel, { [styles.collapsed!]: bottomCollapsed() }]}
+              aria-label="Textures and log"
             >
-              <PropertiesPanel
-                app={app}
-                mapName={mapName()}
-                gameOpen={gameOpen()}
-                version={panelVersion}
+              <PanelTabs
+                selected={bottomTab()}
+                tabs={workspaceLayout()
+                  .bottomTabs.filter((tab) => tab.visible)
+                  .map((tab) => tab.id)}
+                maximized={maximizedView()}
+                collapsed={bottomCollapsed()}
+                newErrors={
+                  bottomCollapsed() || bottomTab() !== 'log'
+                    ? countNewErrors(entries(), logSeenId())
+                    : 0
+                }
+                onSelect={(tab) => {
+                  selectBottomTab(tab);
+                  if (bottomCollapsed()) {
+                    setBottomCollapsed(false);
+                    reportSetting('bottomCollapsed', false);
+                  }
+                }}
+                onView={toggleMaximized}
+                onToggleCollapsed={() => {
+                  const next = !bottomCollapsed();
+                  setBottomCollapsed(next);
+                  reportSetting('bottomCollapsed', next);
+                }}
               />
-            </DockSection>
-          </div>
-          <Show when={!propertiesCollapsed() && !texturesCollapsed()}>
-            <div
-              class={[styles.splitter, styles.horizontalSplitter]}
-              role="separator"
-              aria-orientation="horizontal"
-              aria-label="Resize dock sections"
-              aria-valuenow={Math.round(dockSplit() * 100)}
-              tabindex="0"
-              onPointerDown={beginDockSplitterDrag}
-              onKeyDown={dockSplitterKey}
-            />
-          </Show>
-          <div
-            class={styles.dockTextures}
-            style={
-              texturesCollapsed() ? undefined : propertiesCollapsed() ? { flex: '1' } : undefined
-            }
-            data-testid="dock-textures-wrap"
-          >
-            <DockSection
-              title="Textures"
-              testId="dock-textures"
-              collapsed={texturesCollapsed()}
-              onToggle={() => {
-                const next = !texturesCollapsed();
-                setTexturesCollapsed(next);
-                reportSetting('texturesCollapsed', next);
-              }}
-            >
-              <div class={styles.textureControls}>
-                <label class={styles.textureSliderLabel}>
-                  Thumbnail size
-                  <input
-                    type="range"
-                    min="32"
-                    max="128"
-                    step="16"
-                    value={thumbSize()}
-                    aria-label="Thumbnail size"
-                    data-testid="thumb-size-slider"
-                    onInput={(event) => {
-                      const next = Number(event.currentTarget.value);
-                      setThumbSize(next);
-                      reportSetting('thumbSize', next);
-                    }}
-                  />
-                </label>
-              </div>
-              <Show
-                when={gameOpen()}
-                fallback={
-                  <div class={styles.texturePlaceholder} data-testid="texture-placeholder">
-                    Open a game folder to index textures.
-                  </div>
-                }
-              >
-                <TextureBrowser
-                  entries={textureList()}
-                  inUse={() => app.texturesInUse()}
-                  selected={() => currentTexture()}
-                  thumbSize={thumbSize}
-                  onSelect={(name) => app.chooseTexture(name)}
-                  load={(name) => app.loadTexture(name)}
-                />
+              <Show when={!bottomCollapsed()}>
+                <Show when={bottomTab() === 'tree'}>
+                  <TreeView app={app} version={panelVersion} />
+                </Show>
+                <Show when={bottomTab() === 'prefabs'}>
+                  <PrefabBrowser app={app} version={panelVersion} />
+                </Show>
+                <Show when={bottomTab() === 'log'}>
+                  <LogPanel entries={entries()} />
+                </Show>
               </Show>
-            </DockSection>
-          </div>
-        </aside>
+            </section>
+          </Show>
+        </div>
+        <Show when={workspaceLayout().rightDockVisible}>
+          <>
+            <div
+              class={[styles.splitter, styles.verticalSplitter]}
+              role="separator"
+              aria-orientation="vertical"
+              aria-label="Resize properties panel"
+              aria-valuenow={rightWidth()}
+              tabindex="0"
+              onPointerDown={(event) => beginSplitterDrag(event, 'vertical')}
+              onKeyDown={(event) => splitterKey(event, 'vertical')}
+            />
+            <aside
+              class={styles.dock}
+              aria-label="Properties and textures"
+              ref={(el) => (dockElement = el)}
+            >
+              <For each={visibleRightSections()}>
+                {(section, index) => (
+                  <>
+                    <div
+                      class={[styles.dockSectionWrap, { [styles.dockSectionAfter!]: index() > 0 }]}
+                      style={rightSectionStyle(section.id, index(), visibleRightSections().length)}
+                      data-testid={
+                        section.id === 'textures' ? 'dock-textures-wrap' : `dock-${section.id}-wrap`
+                      }
+                    >
+                      {renderRightSection(section.id)}
+                    </div>
+                    <Show
+                      when={
+                        index() === 0 &&
+                        visibleRightSections().length === 2 &&
+                        !propertiesCollapsed() &&
+                        !texturesCollapsed()
+                      }
+                    >
+                      <div
+                        class={[styles.splitter, styles.horizontalSplitter]}
+                        role="separator"
+                        aria-orientation="horizontal"
+                        aria-label="Resize dock sections"
+                        aria-valuenow={Math.round(dockSplit() * 100)}
+                        tabindex="0"
+                        onPointerDown={beginDockSplitterDrag}
+                        onKeyDown={dockSplitterKey}
+                      />
+                    </Show>
+                  </>
+                )}
+              </For>
+            </aside>
+          </>
+        </Show>
       </div>
       <Show when={settingsOpen()}>
         <SettingsDialog
@@ -1759,6 +1904,11 @@ export function EditorShell(props: EditorShellProps) {
             handleSize: handleSize(),
           }}
           colors={colors()}
+          layout={workspaceLayout()}
+          layouts={namedLayouts()}
+          activeLayoutId={activeLayoutId()}
+          currentLayoutSnapshot={currentLayoutSnapshot}
+          defaultLayoutSnapshot={DEFAULT_LAYOUT_SNAPSHOT}
           onChange={applySettingsChange}
           onReset={() => applySettingsChange({ ...DEFAULT_SETTINGS })}
           onResetColors={() => applySettingsChange({ colors: { dark: {}, light: {} } })}

@@ -1,7 +1,14 @@
 import type { CompileTool } from '@core/types/index';
 
-/** The compile profile chosen in the editor state (fast, normal or final). */
-export type CompileProfile = 'fast' | 'normal' | 'final';
+/** VIS is optional; fast mode preserves the old fast-vis quick compile. */
+export type CompileVisMode = 'off' | 'fast' | 'full';
+/** Lighting is optional; final passes qrad3's -extra quality flag. */
+export type CompileLightingMode = 'off' | 'normal' | 'final';
+
+export interface CompileOptions {
+  readonly vis: CompileVisMode;
+  readonly lighting: CompileLightingMode;
+}
 
 export interface CompileStepIO {
   readonly tool: CompileTool;
@@ -26,6 +33,8 @@ export interface PipelineResult {
   /** True when qbsp3 reported a leak: the .lin pointfile then holds the leak path. */
   readonly leaked: boolean;
   readonly steps: readonly CompileTool[];
+  /** Captured stdout/stderr per tool, when the runner provides it. */
+  readonly stepOutputs: Partial<Record<CompileTool, string>>;
 }
 
 /** The tools print a banner on fatal errors; the run must not continue. */
@@ -48,19 +57,20 @@ function baseName(mapName: string): string {
 }
 
 /**
- * The compile pipeline: qbsp3 turns the exported .map into a .bsp and .prt,
- * qvis3 adds visibility, qrad3 the lighting. The fast profile stops before
- * radiosity and runs vis in fast mode; final passes -extra to qrad3.
+ * The compile pipeline: qbsp3 always turns the exported .map into a .bsp and
+ * .prt, while qvis3 and qrad3 are independent options. Lighting without VIS is
+ * allowed: qrad3 treats missing visdata as all-visible, merely doing more work.
  * Every step runs in its own worker, so cancelling between steps does not
  * corrupt the chain.
  */
 export async function runCompilePipeline(
   run: CompileRunner,
-  profile: CompileProfile,
+  options: CompileOptions,
   mapName: string,
   mapText: string,
   textureWals: readonly { name: string; data: Uint8Array }[],
   colormap: Uint8Array | null,
+  onStage?: (tool: CompileTool) => void,
 ): Promise<PipelineResult> {
   const base = baseName(mapName);
   const mapPath = `${Q2PREFIX}/maps/${base}.map`;
@@ -73,6 +83,9 @@ export async function runCompilePipeline(
   }));
 
   // qbsp3: the map plus the wal headers of every texture it uses.
+  const steps: CompileTool[] = [];
+  const stepOutputs: Partial<Record<CompileTool, string>> = {};
+  onStage?.('qbsp3');
   const qbsp = await run({
     tool: 'qbsp3',
     args: [mapPath],
@@ -80,39 +93,49 @@ export async function runCompilePipeline(
     outputs: [bspPath, prtPath, ptsPath],
   });
   checkStepOutput('qbsp3', qbsp.output);
+  if (qbsp.output !== undefined) stepOutputs.qbsp3 = qbsp.output;
   const bsp = qbsp.files.find((f) => f.path === bspPath)?.data;
   if (!bsp) throw new Error('qbsp3 produced no .bsp');
   const pts = qbsp.files.find((f) => f.path === ptsPath)?.data ?? null;
   const prt = qbsp.files.find((f) => f.path === prtPath)?.data ?? null;
   const leaked = pts !== null;
+  steps.push('qbsp3');
   if (leaked) {
     // A leak stops the chain: vis cannot run on an unsealed map.
-    return { bsp, prt, pts, leaked, steps: ['qbsp3'] };
+    return { bsp, prt, pts, leaked, steps, stepOutputs };
   }
 
-  // qvis3: reads the bsp and prt, rewrites the bsp in place.
-  const visArgs = profile === 'fast' ? ['-fast', bspPath] : [bspPath];
-  const vis = await run({
-    tool: 'qvis3',
-    args: visArgs,
-    files: [{ path: bspPath, data: bsp }, ...(prt ? [{ path: prtPath, data: prt }] : [])],
-    outputs: [bspPath],
-  });
-  checkStepOutput('qvis3', vis.output);
-  const visedBsp = vis.files.find((f) => f.path === bspPath)?.data;
-  if (!visedBsp) throw new Error('qvis3 produced no .bsp');
+  let currentBsp = bsp;
+  if (options.vis !== 'off') {
+    // qvis3: reads the bsp and prt, rewrites the bsp in place.
+    onStage?.('qvis3');
+    const visArgs = options.vis === 'fast' ? ['-fast', bspPath] : [bspPath];
+    const vis = await run({
+      tool: 'qvis3',
+      args: visArgs,
+      files: [{ path: bspPath, data: currentBsp }, ...(prt ? [{ path: prtPath, data: prt }] : [])],
+      outputs: [bspPath],
+    });
+    checkStepOutput('qvis3', vis.output);
+    if (vis.output !== undefined) stepOutputs.qvis3 = vis.output;
+    const nextBsp = vis.files.find((f) => f.path === bspPath)?.data;
+    if (!nextBsp) throw new Error('qvis3 produced no .bsp');
+    currentBsp = nextBsp;
+    steps.push('qvis3');
+  }
 
-  if (profile === 'fast') {
-    return { bsp: visedBsp, prt, pts, leaked, steps: ['qbsp3', 'qvis3'] };
+  if (options.lighting === 'off') {
+    return { bsp: currentBsp, prt, pts, leaked, steps, stepOutputs };
   }
 
   // qrad3: the colormap is required for texture light colors.
   // qrad3 reads the .wal files again, for the light colors of textures.
-  const radFiles = [{ path: bspPath, data: visedBsp }, ...walFiles];
+  const radFiles = [{ path: bspPath, data: currentBsp }, ...walFiles];
   if (colormap) {
     radFiles.push({ path: `${Q2PREFIX}/pics/colormap.pcx`, data: colormap });
   }
-  const radArgs = profile === 'final' ? ['-extra', bspPath] : [bspPath];
+  const radArgs = options.lighting === 'final' ? ['-extra', bspPath] : [bspPath];
+  onStage?.('qrad3');
   const rad = await run({
     tool: 'qrad3',
     args: radArgs,
@@ -120,6 +143,7 @@ export async function runCompilePipeline(
     outputs: [bspPath],
   });
   checkStepOutput('qrad3', rad.output);
+  if (rad.output !== undefined) stepOutputs.qrad3 = rad.output;
   const litBsp = rad.files.find((f) => f.path === bspPath)?.data;
   if (!litBsp) throw new Error('qrad3 produced no .bsp');
   return {
@@ -127,6 +151,7 @@ export async function runCompilePipeline(
     prt,
     pts,
     leaked,
-    steps: ['qbsp3', 'qvis3', 'qrad3'],
+    steps: [...steps, 'qrad3'],
+    stepOutputs,
   };
 }

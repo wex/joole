@@ -6,7 +6,7 @@ import { addNodePatch } from '@core/doc/index';
 import { analyzeBrush } from '@core/geom/index';
 import { makeBox } from '@core/geom/__tests__/helpers';
 import type { BrushNode } from '@core/types/index';
-import { EditorApp } from './editor';
+import { EditorApp, type EditorAppOptions } from './editor';
 
 function source(bytes: Uint8Array): ByteSource {
   return {
@@ -19,14 +19,23 @@ function fixture(name: string): Uint8Array {
   return new Uint8Array(readFileSync(`tests/fixtures/${name}`));
 }
 
-function textureGameEntries() {
+function textureGameEntries(wal: Uint8Array = fixture('harness.wal')) {
   return [
     { path: 'baseq2/pics/colormap.pcx', source: source(fixture('colormap.pcx')) },
-    { path: 'baseq2/textures/e2u1/mine10_1.wal', source: source(fixture('harness.wal')) },
+    { path: 'baseq2/textures/e2u1/mine10_1.wal', source: source(wal) },
   ];
 }
 
-function makeApp() {
+function walWithDefaults(flags: number, contents: number, value: number): Uint8Array {
+  const wal = fixture('harness.wal');
+  const view = new DataView(wal.buffer, wal.byteOffset, wal.byteLength);
+  view.setInt32(88, flags, true);
+  view.setInt32(92, contents, true);
+  view.setInt32(96, value, true);
+  return wal;
+}
+
+function makeApp(overrides: Partial<EditorAppOptions> = {}) {
   let conversions = 0;
   const cache = new Map<string, ConvertedTexture>();
   const app = new EditorApp({
@@ -44,6 +53,7 @@ function makeApp() {
         return Promise.resolve();
       },
     },
+    ...overrides,
   });
   return {
     app,
@@ -51,6 +61,20 @@ function makeApp() {
     conversionCount: () => conversions,
   };
 }
+
+describe('EditorApp brush primitives', () => {
+  it('normalizes sphere detail to the fixed Qoole presets', () => {
+    const { app } = makeApp();
+    expect(app.setBrushPrimitive('sphere', 8)).toBe(true);
+    expect(app.brushSides).toBe(14);
+    expect(app.setBrushPrimitive('sphere', 18)).toBe(true);
+    expect(app.brushSides).toBe(18);
+    expect(app.setBrushPrimitive('sphere', 21)).toBe(true);
+    expect(app.brushSides).toBe(20);
+    expect(app.setBrushPrimitive('cylinder', 8)).toBe(true);
+    expect(app.brushSides).toBe(8);
+  });
+});
 
 describe('EditorApp', () => {
   it('opens a valid map, reports it and emits a document event', async () => {
@@ -94,6 +118,50 @@ describe('EditorApp', () => {
     expect(app.logEntries().at(-1)?.text).toBe('Game data opened: 1 texture.');
   });
 
+  it('export preloads wal defaults and writes differing absent attributes explicitly', async () => {
+    let exported = '';
+    const { app } = makeApp({
+      saveMapText: (_name, text) => {
+        exported = text;
+        return Promise.resolve(true);
+      },
+    });
+    // This wal is a surface light by default. A source face that omitted the
+    // optional triple is represented as zero attributes, so export must make
+    // that difference from the wal explicit instead of silently inheriting.
+    expect(
+      await app.openGameEntries(textureGameEntries(walWithDefaults(1, 0, 180)), 'lit fixture'),
+    ).toBe(true);
+    const target = { ...makeBox([0, 0, 0], [64, 64, 64]), id: 'target' };
+    app.executeCommand({
+      label: 'Add brush',
+      run: (doc) => addNodePatch(doc, doc.worldspawn, target),
+    });
+
+    expect(await app.exportMap()).toBe(true);
+    expect(exported).toMatch(/e2u1\/mine10_1 0 0 0 1 1 0 0 0\n/);
+  });
+
+  it('export omits the optional surface triple when it exactly matches wal defaults', async () => {
+    let exported = '';
+    const { app } = makeApp({
+      saveMapText: (_name, text) => {
+        exported = text;
+        return Promise.resolve(true);
+      },
+    });
+    expect(await app.openGameEntries(textureGameEntries(), 'fixture game')).toBe(true);
+    const target = { ...makeBox([0, 0, 0], [64, 64, 64]), id: 'target' };
+    app.executeCommand({
+      label: 'Add brush',
+      run: (doc) => addNodePatch(doc, doc.worldspawn, target),
+    });
+
+    expect(await app.exportMap()).toBe(true);
+    expect(exported).toMatch(/e2u1\/mine10_1 0 0 0 1 1\n/);
+    expect(exported).not.toMatch(/e2u1\/mine10_1 0 0 0 1 1 0 0 0\n/);
+  });
+
   it('rejects files without a baseq2 directory and says what to choose', async () => {
     const { app } = makeApp();
 
@@ -114,6 +182,30 @@ describe('EditorApp', () => {
     expect(first).toMatchObject({ width: 64, height: 64 });
     expect(second).toMatchObject({ width: 64, height: 64 });
     expect(conversionCount()).toBe(1);
+  });
+
+  it('compile cancellation is a controlled non-error abort that returns to idle', async () => {
+    const { app } = makeApp();
+    expect(await app.openGameEntries(textureGameEntries(), 'fixture game')).toBe(true);
+    let rejectStep: ((error: Error) => void) | null = null;
+    app.compileRunner = () =>
+      new Promise((_resolve, reject) => {
+        rejectStep = reject;
+      });
+    app.cancelCompileWorker = () => rejectStep?.(new Error('compile cancelled'));
+
+    const running = app.compileMap({ vis: 'full', lighting: 'normal' });
+    for (let i = 0; i < 20 && !app.isCompiling; i++) {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    }
+    expect(app.isCompiling).toBe(true);
+
+    app.cancelCompile();
+    expect(await running).toBe(false);
+    expect(app.isCompiling).toBe(false);
+    expect(app.compileStage).toBeNull();
+    const last = app.logEntries().at(-1);
+    expect(last).toMatchObject({ level: 'info', text: 'Compile cancelled.' });
   });
 
   it('keeps grid sizes to powers of two from 1 to 256', () => {

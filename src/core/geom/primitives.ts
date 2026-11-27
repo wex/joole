@@ -4,6 +4,9 @@ import { planeFromPoints } from './plane';
 import { cross, dot, sub } from './vec3';
 
 export type PrimitiveKind = 'box' | 'wedge' | 'cylinder' | 'cone' | 'sphere';
+
+/** Qoole's fixed sphere-detail presets; the number is the exact face count. */
+export const SPHERE_SIDE_PRESETS = [14, 18, 20, 26] as const;
 export type PrimitiveError = 'invalid-primitive';
 
 export interface PrimitiveOptions {
@@ -77,8 +80,8 @@ function ring(cx: number, cy: number, rx: number, ry: number, z: number, sides: 
 /**
  * Creates the editing primitives. Cylinder, cone and sphere vertices are
  * rounded to integers, so grid-aligned integer bounds stay integer-point
- * brushes. The approximate sphere is presently an octahedron; higher-detail
- * sphere segmentation is a later refinement.
+ * brushes. A sphere is an even-sided bipyramid: `sides / 2` equatorial
+ * vertices joined to the top and bottom poles, so the face count is exact.
  */
 export function createPrimitiveBrush(
   kind: PrimitiveKind,
@@ -174,29 +177,29 @@ export function createPrimitiveBrush(
     return brushFromPolygons(id, vertices, polygons, texture);
   }
 
-  // Octahedral sphere approximation.
+  // An even-sided bipyramid. Qoole's sphere menu likewise uses a small set of
+  // exact side counts rather than continuous latitude/longitude segmentation;
+  // a convex ring-and-pole construction keeps every plane simple while giving
+  // the requested count exactly. The polygons are triangles, so rounding the
+  // vertices cannot introduce non-planar quad faces.
+  const ringSides = Math.floor(sides / 2);
+  if (ringSides < 3 || sides !== ringSides * 2) {
+    return { ok: false, error: 'invalid-primitive' };
+  }
   const cz = (z0 + z1) / 2;
+  const equator = ring(cx, cy, rx, ry, cz, ringSides);
+  const topIndex = equator.length;
+  const bottomIndex = equator.length + 1;
   const vertices: Vec3[] = [
-    [rounded(cx + rx), rounded(cy), rounded(cz)],
-    [rounded(cx - rx), rounded(cy), rounded(cz)],
-    [rounded(cx), rounded(cy + ry), rounded(cz)],
-    [rounded(cx), rounded(cy - ry), rounded(cz)],
+    ...equator,
     [rounded(cx), rounded(cy), z1],
     [rounded(cx), rounded(cy), z0],
   ];
-  return brushFromPolygons(
-    id,
-    vertices,
-    [
-      [4, 0, 2],
-      [4, 2, 1],
-      [4, 1, 3],
-      [4, 3, 0],
-      [5, 2, 0],
-      [5, 1, 2],
-      [5, 3, 1],
-      [5, 0, 3],
-    ],
-    texture,
-  );
+  const polygons: number[][] = [];
+  for (let i = 0; i < ringSides; i++) {
+    const j = (i + 1) % ringSides;
+    polygons.push([topIndex, i, j]);
+    polygons.push([bottomIndex, j, i]);
+  }
+  return brushFromPolygons(id, vertices, polygons, texture);
 }

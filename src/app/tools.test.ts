@@ -3,6 +3,7 @@ import { createEmptyDocument, addNodePatch, applyPatch, buildDocument } from '@c
 import { analyzeBrush, extractWireframe, validateBrush } from '@core/geom/index';
 import type { BrushNode, Command, EntityNode, MapDocument } from '@core/types/index';
 import { makeBox } from '../core/geom/__tests__/helpers';
+import { convertBrushesToEntityPatch, createPointEntityPatch, entityProp } from './entities';
 import {
   BrushTool,
   ClipTool,
@@ -84,6 +85,30 @@ describe('SelectTool event scripts', () => {
     expect(analyzeBrush(other as BrushNode).aabb?.min[0]).toBe(0);
   });
 
+  it('repeated plain clicks cycle overlapping 2D brushes closest-first without breaking drags', () => {
+    let doc = createEmptyDocument();
+    for (const b of [
+      brush('low', [0, 0, 0], [64, 64, 64]),
+      brush('high', [0, 0, 64], [64, 64, 128]),
+    ]) {
+      doc = applyPatch(doc, addNodePatch(doc, doc.worldspawn, b));
+    }
+    const tool = new SelectTool(() => doc, 8);
+
+    expect([...(tool.pointer(down(32, 32)).selection ?? [])]).toEqual(['high']);
+    tool.pointer(up(32, 32));
+
+    tool.pointer(down(32, 32));
+    expect([...(tool.pointer(up(32, 32)).selection ?? [])]).toEqual(['low']);
+    tool.pointer(down(32, 32));
+    expect([...(tool.pointer(up(32, 32)).selection ?? [])]).toEqual(['high']);
+
+    // Once the mouse actually moves, the click is a drag of the current hit
+    // rather than a selection-cycle click.
+    const commands = runScript(tool, [down(32, 32), move(48, 32), up(48, 32)]);
+    expect(commands.length).toBeGreaterThan(0);
+  });
+
   it('dragging a selected brush produces merged translation commands snapped to the grid', () => {
     const doc = documentWithBrushes();
     const tool = new SelectTool(() => doc, 8);
@@ -98,6 +123,67 @@ describe('SelectTool event scripts', () => {
     if (moved?.kind === 'brush') {
       expect(analyzeBrush(moved).aabb!.min.map((x) => x + 0)).toEqual([16, 8, 0]);
     }
+  });
+
+  it('point entities can be selected in 2D and dragged by their origin', () => {
+    let doc = createEmptyDocument();
+    const placed = createPointEntityPatch(doc, 'light', [32, 32, 32], doc.worldspawn);
+    doc = applyPatch(doc, placed.patch);
+    const tool = new SelectTool(() => doc, 8);
+
+    expect([...(tool.pointer(down(32, 32)).selection ?? [])]).toEqual([placed.id]);
+    const commands = runScript(tool, [move(48, 32), up(48, 32)]);
+    expect(commands.length).toBeGreaterThan(0);
+    let next = doc;
+    for (const command of commands) next = applyPatch(next, command.run(next));
+    const entity = next.nodes.get(placed.id);
+    expect(entity?.kind).toBe('entity');
+    if (entity?.kind === 'entity') expect(entityProp(entity, 'origin')).toBe('48 32 32');
+  });
+
+  it('point entities can be selected by a 3D picking ray', () => {
+    let doc = createEmptyDocument();
+    const placed = createPointEntityPatch(doc, 'light', [32, 32, 32], doc.worldspawn);
+    doc = applyPatch(doc, placed.patch);
+    const tool = new SelectTool(() => doc, 8);
+    const event: ToolPointerEvent = {
+      type: 'down',
+      button: 0,
+      view: '3d',
+      point: [-64, 32, 32],
+      direction: [1, 0, 0],
+      tolerance: 4,
+      shift: false,
+      ctrl: false,
+    };
+    expect([...(tool.pointer(event).selection ?? [])]).toEqual([placed.id]);
+  });
+
+  it('clicks on a brush entity child escalate brush, entity, brush and entity drags move children', () => {
+    let doc = createEmptyDocument();
+    const child = brush('child', [0, 0, 0], [64, 64, 64]);
+    doc = applyPatch(doc, addNodePatch(doc, doc.worldspawn, child));
+    const converted = convertBrushesToEntityPatch(doc, 'func_door', ['child'], () => 'door1');
+    doc = applyPatch(doc, converted.patch);
+    const tool = new SelectTool(() => doc, 8);
+
+    expect([...(tool.pointer(down(32, 32)).selection ?? [])]).toEqual(['child']);
+    tool.pointer(up(32, 32));
+    tool.pointer(down(32, 32));
+    expect([...(tool.pointer(up(32, 32)).selection ?? [])]).toEqual(['door1']);
+    tool.pointer(down(32, 32));
+    expect([...(tool.pointer(up(32, 32)).selection ?? [])]).toEqual(['child']);
+
+    // Re-select the entity and drag it: the child brush planes move.
+    tool.pointer(down(32, 32));
+    tool.pointer(up(32, 32));
+    expect(tool.selection.has('door1')).toBe(true);
+    const commands = runScript(tool, [down(32, 32), move(48, 32), up(48, 32)]);
+    let next = doc;
+    for (const command of commands) next = applyPatch(next, command.run(next));
+    const moved = next.nodes.get('child');
+    expect(moved?.kind).toBe('brush');
+    if (moved?.kind === 'brush') expect(analyzeBrush(moved).aabb?.min[0]).toBe(16);
   });
 
   it('empty drag box-selects overlapping brushes', () => {

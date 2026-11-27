@@ -1,5 +1,20 @@
-import { createSignal, For, Show } from 'solid-js';
+import { createSignal, For, Show, untrack } from 'solid-js';
 import { COLOR_TOKENS, defaultColor } from '@app/colors';
+import {
+  arrangementOfSnapshot,
+  deleteNamedLayout,
+  moveLayoutPanel,
+  renameNamedLayout,
+  saveNamedLayout,
+  setLayoutPanelVisible,
+  updateNamedLayout,
+  updateWorkspaceLayout,
+  type LayoutViewport,
+  type NamedLayout,
+  type NamedLayoutError,
+  type WorkspaceLayout,
+  type WorkspaceLayoutSnapshot,
+} from '@app/layout';
 import { Dialog } from './Dialog';
 import styles from './SettingsDialog.module.css';
 
@@ -21,6 +36,13 @@ export interface SettingsDialogProps {
     readonly dark: Record<string, string>;
     readonly light: Record<string, string>;
   };
+  /** The current bounded workspace arrangement (T2.7). */
+  readonly layout: WorkspaceLayout;
+  /** Saved arrangements and the active preset id (T2.8). */
+  readonly layouts: readonly NamedLayout[];
+  readonly activeLayoutId: string | null;
+  readonly currentLayoutSnapshot: () => WorkspaceLayoutSnapshot;
+  readonly defaultLayoutSnapshot: WorkspaceLayoutSnapshot;
   readonly onChange: (partial: Record<string, unknown>) => void;
   readonly onReset: () => void;
   readonly onResetColors: () => void;
@@ -34,9 +56,15 @@ const gridSizes = [1, 2, 4, 8, 16, 32, 64, 128, 256];
  * there is no OK/Cancel step.
  */
 export function SettingsDialog(props: SettingsDialogProps) {
-  const [tab, setTab] = createSignal<'general' | 'colors'>('general');
+  const [tab, setTab] = createSignal<'general' | 'layout' | 'colors'>('general');
+  const [selectedLayout, setSelectedLayout] = createSignal(
+    untrack(() => props.activeLayoutId) ?? '',
+  );
+  const [layoutName, setLayoutName] = createSignal('');
+  const [layoutError, setLayoutError] = createSignal<NamedLayoutError | null>(null);
   const tabs = [
     { id: 'general' as const, label: 'General' },
+    { id: 'layout' as const, label: 'Layout' },
     { id: 'colors' as const, label: 'Colors' },
   ];
   const moveTab = (event: KeyboardEvent) => {
@@ -44,7 +72,9 @@ export function SettingsDialog(props: SettingsDialogProps) {
       return;
     }
     event.preventDefault();
-    const next = tab() === 'general' ? 'colors' : 'general';
+    const index = tabs.findIndex((item) => item.id === tab());
+    const step = event.key === 'ArrowRight' ? 1 : -1;
+    const next = tabs[(index + step + tabs.length) % tabs.length]!.id;
     setTab(next);
     queueMicrotask(() => document.getElementById(`settings-tab-${next}`)?.focus());
   };
@@ -59,6 +89,91 @@ export function SettingsDialog(props: SettingsDialogProps) {
     props.onChange({
       colors: { dark: { ...props.colors.dark }, light: { ...props.colors.light }, [theme]: next },
     });
+  };
+
+  const changeLayout = (layout: WorkspaceLayout) =>
+    props.onChange({ layout, activeLayoutId: null });
+  const movePanel = (zone: 'rightSections' | 'bottomTabs', id: string, delta: -1 | 1) =>
+    changeLayout(moveLayoutPanel(props.layout, zone, id, delta));
+  const setPanelVisible = (zone: 'rightSections' | 'bottomTabs', id: string, visible: boolean) =>
+    changeLayout(setLayoutPanelVisible(props.layout, zone, id, visible));
+  const panelLabel = (id: string) => id[0]!.toUpperCase() + id.slice(1);
+  const onlyVisible = (zone: 'rightSections' | 'bottomTabs', id: string) =>
+    props.layout[zone].filter((panel) => panel.visible).length === 1 &&
+    props.layout[zone].find((panel) => panel.id === id)?.visible === true;
+
+  const layoutErrorText = (error: NamedLayoutError) =>
+    ({
+      'empty-name': 'Enter a layout name.',
+      'long-name': 'Layout names are limited to 40 characters.',
+      'duplicate-name': 'A layout with that name already exists.',
+      'too-many-layouts': 'At most 32 layouts can be saved.',
+      'missing-layout': 'Choose a saved layout first.',
+    })[error];
+  const layoutById = (id: string) => props.layouts.find((layout) => layout.id === id) ?? null;
+  const showLayoutResult = (result: { ok: true } | { ok: false; error: NamedLayoutError }) =>
+    setLayoutError(result.ok ? null : result.error);
+  const layoutPartial = (snapshot: WorkspaceLayoutSnapshot, activeLayoutId: string | null) => ({
+    layout: arrangementOfSnapshot(snapshot),
+    rightWidth: snapshot.rightWidth,
+    bottomHeight: snapshot.bottomHeight,
+    dockSplit: snapshot.dockSplit,
+    propertiesCollapsed: snapshot.propertiesCollapsed,
+    texturesCollapsed: snapshot.texturesCollapsed,
+    bottomCollapsed: snapshot.bottomCollapsed,
+    activeLayoutId,
+  });
+  const newLayoutId = () =>
+    globalThis.crypto?.randomUUID?.() ?? `layout-${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+
+  const saveLayout = () => {
+    const id = newLayoutId();
+    const result = saveNamedLayout(props.layouts, layoutName(), props.currentLayoutSnapshot(), id);
+    showLayoutResult(result);
+    if (!result.ok) return;
+    props.onChange({ layouts: [...result.layouts], activeLayoutId: id });
+    setSelectedLayout(id);
+    setLayoutName('');
+  };
+  const applyLayout = () => {
+    const entry = layoutById(selectedLayout());
+    if (!entry) {
+      setLayoutError('missing-layout');
+      return;
+    }
+    setLayoutError(null);
+    props.onChange(layoutPartial(entry.snapshot, entry.id));
+  };
+  const renameLayout = () => {
+    const result = renameNamedLayout(props.layouts, selectedLayout(), layoutName());
+    showLayoutResult(result);
+    if (result.ok) props.onChange({ layouts: [...result.layouts] });
+  };
+  const overwriteLayout = () => {
+    const result = updateNamedLayout(
+      props.layouts,
+      selectedLayout(),
+      props.currentLayoutSnapshot(),
+    );
+    showLayoutResult(result);
+    if (result.ok) props.onChange({ layouts: [...result.layouts] });
+  };
+  const removeLayout = () => {
+    const id = selectedLayout();
+    const result = deleteNamedLayout(props.layouts, id);
+    showLayoutResult(result);
+    if (!result.ok) return;
+    props.onChange({
+      layouts: [...result.layouts],
+      ...(props.activeLayoutId === id ? { activeLayoutId: null } : {}),
+    });
+    setSelectedLayout('');
+    setLayoutName('');
+  };
+  const resetLayout = () => {
+    setLayoutError(null);
+    setSelectedLayout('');
+    props.onChange(layoutPartial(props.defaultLayoutSnapshot, null));
   };
   return (
     <Dialog title="Settings" onClose={props.onClose} testId="settings-dialog">
@@ -132,6 +247,232 @@ export function SettingsDialog(props: SettingsDialogProps) {
               Reset colours
             </button>
           </footer>
+        </div>
+      </Show>
+      <Show when={tab() === 'layout'}>
+        <div class={styles.form} data-testid="settings-layout">
+          <section class={styles.group}>
+            <h3 class={styles.heading}>Workspace</h3>
+            <label class={styles.row}>
+              <span class={styles.label}>Viewport arrangement</span>
+              <select
+                data-testid="layout-viewport"
+                value={props.layout.viewport}
+                onChange={(event) =>
+                  changeLayout(
+                    updateWorkspaceLayout(props.layout, {
+                      viewport: event.currentTarget.value as LayoutViewport,
+                    }),
+                  )
+                }
+              >
+                <option value="quad">Four views</option>
+                <option value="3d">3D maximized</option>
+                <option value="top">Top maximized</option>
+                <option value="front">Front maximized</option>
+                <option value="side">Side maximized</option>
+              </select>
+            </label>
+            <label class={styles.row}>
+              <span class={styles.label}>Show right dock</span>
+              <input
+                type="checkbox"
+                data-testid="layout-right-dock-visible"
+                checked={props.layout.rightDockVisible}
+                onChange={(event) =>
+                  changeLayout(
+                    updateWorkspaceLayout(props.layout, {
+                      rightDockVisible: event.currentTarget.checked,
+                    }),
+                  )
+                }
+              />
+            </label>
+            <label class={styles.row}>
+              <span class={styles.label}>Show bottom dock</span>
+              <input
+                type="checkbox"
+                data-testid="layout-bottom-dock-visible"
+                checked={props.layout.bottomDockVisible}
+                onChange={(event) =>
+                  changeLayout(
+                    updateWorkspaceLayout(props.layout, {
+                      bottomDockVisible: event.currentTarget.checked,
+                    }),
+                  )
+                }
+              />
+            </label>
+          </section>
+          <section class={styles.group}>
+            <h3 class={styles.heading}>Right dock sections</h3>
+            <For each={props.layout.rightSections}>
+              {(panel, index) => (
+                <div class={styles.layoutItem} data-testid={`layout-right-${panel.id}`}>
+                  <label class={styles.layoutName}>
+                    <input
+                      type="checkbox"
+                      data-testid={`layout-right-${panel.id}-visible`}
+                      checked={panel.visible}
+                      disabled={
+                        props.layout.rightDockVisible && onlyVisible('rightSections', panel.id)
+                      }
+                      onChange={(event) =>
+                        setPanelVisible('rightSections', panel.id, event.currentTarget.checked)
+                      }
+                    />
+                    {panelLabel(panel.id)}
+                  </label>
+                  <span class={styles.layoutButtons}>
+                    <button
+                      type="button"
+                      aria-label={`Move ${panelLabel(panel.id)} up`}
+                      data-testid={`layout-right-${panel.id}-up`}
+                      disabled={index() === 0}
+                      onClick={() => movePanel('rightSections', panel.id, -1)}
+                    >
+                      ↑
+                    </button>
+                    <button
+                      type="button"
+                      aria-label={`Move ${panelLabel(panel.id)} down`}
+                      data-testid={`layout-right-${panel.id}-down`}
+                      disabled={index() === props.layout.rightSections.length - 1}
+                      onClick={() => movePanel('rightSections', panel.id, 1)}
+                    >
+                      ↓
+                    </button>
+                  </span>
+                </div>
+              )}
+            </For>
+          </section>
+          <section class={styles.group}>
+            <h3 class={styles.heading}>Bottom tabs</h3>
+            <For each={props.layout.bottomTabs}>
+              {(panel, index) => (
+                <div class={styles.layoutItem} data-testid={`layout-bottom-${panel.id}`}>
+                  <label class={styles.layoutName}>
+                    <input
+                      type="checkbox"
+                      data-testid={`layout-bottom-${panel.id}-visible`}
+                      checked={panel.visible}
+                      disabled={
+                        props.layout.bottomDockVisible && onlyVisible('bottomTabs', panel.id)
+                      }
+                      onChange={(event) =>
+                        setPanelVisible('bottomTabs', panel.id, event.currentTarget.checked)
+                      }
+                    />
+                    {panelLabel(panel.id)}
+                  </label>
+                  <span class={styles.layoutButtons}>
+                    <button
+                      type="button"
+                      aria-label={`Move ${panelLabel(panel.id)} up`}
+                      data-testid={`layout-bottom-${panel.id}-up`}
+                      disabled={index() === 0}
+                      onClick={() => movePanel('bottomTabs', panel.id, -1)}
+                    >
+                      ↑
+                    </button>
+                    <button
+                      type="button"
+                      aria-label={`Move ${panelLabel(panel.id)} down`}
+                      data-testid={`layout-bottom-${panel.id}-down`}
+                      disabled={index() === props.layout.bottomTabs.length - 1}
+                      onClick={() => movePanel('bottomTabs', panel.id, 1)}
+                    >
+                      ↓
+                    </button>
+                  </span>
+                </div>
+              )}
+            </For>
+          </section>
+          <section class={styles.group}>
+            <h3 class={styles.heading}>Named layouts</h3>
+            <label class={styles.row}>
+              <span class={styles.label}>Saved layout</span>
+              <select
+                data-testid="layout-preset-select"
+                value={selectedLayout()}
+                onChange={(event) => {
+                  const id = event.currentTarget.value;
+                  setSelectedLayout(id);
+                  setLayoutName(layoutById(id)?.name ?? '');
+                  setLayoutError(null);
+                }}
+              >
+                <option value="" disabled>
+                  Choose…
+                </option>
+                <For each={props.layouts}>
+                  {(layout) => <option value={layout.id}>{layout.name}</option>}
+                </For>
+              </select>
+            </label>
+            <label class={styles.row}>
+              <span class={styles.label}>Name</span>
+              <input
+                type="text"
+                maxlength="40"
+                data-testid="layout-name-input"
+                value={layoutName()}
+                placeholder="Layout name"
+                onInput={(event) => setLayoutName(event.currentTarget.value)}
+              />
+            </label>
+            <div class={styles.layoutActions}>
+              <button type="button" data-testid="layout-save" onClick={saveLayout}>
+                Save current as
+              </button>
+              <button
+                type="button"
+                data-testid="layout-apply"
+                disabled={!selectedLayout()}
+                onClick={applyLayout}
+              >
+                Apply
+              </button>
+              <button
+                type="button"
+                data-testid="layout-rename"
+                disabled={!selectedLayout()}
+                onClick={renameLayout}
+              >
+                Rename
+              </button>
+              <button
+                type="button"
+                data-testid="layout-update"
+                disabled={!selectedLayout()}
+                onClick={overwriteLayout}
+              >
+                Update
+              </button>
+              <button
+                type="button"
+                data-testid="layout-delete"
+                disabled={!selectedLayout()}
+                onClick={removeLayout}
+              >
+                Delete
+              </button>
+            </div>
+            <div class={styles.layoutActions}>
+              <button type="button" data-testid="layout-reset" onClick={resetLayout}>
+                Reset layout
+              </button>
+            </div>
+            <Show when={layoutError()}>
+              {(error) => (
+                <p class={styles.layoutError} data-testid="layout-error" role="alert">
+                  {layoutErrorText(error())}
+                </p>
+              )}
+            </Show>
+          </section>
         </div>
       </Show>
       <Show when={tab() === 'general'}>

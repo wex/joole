@@ -12,6 +12,28 @@ export function entityProp(node: EntityNode, key: string): string | undefined {
   return node.props.find(([k]) => k === key)?.[1];
 }
 
+/** Parses the origin key of a point entity, or null when it is absent/broken. */
+export function entityOrigin(node: EntityNode): Vec3 | null {
+  const value = entityProp(node, 'origin');
+  if (value === undefined) return null;
+  const numbers = value.trim().split(/\s+/).map(Number);
+  if (numbers.length !== 3 || numbers.some((n) => !Number.isFinite(n))) return null;
+  return [numbers[0]!, numbers[1]!, numbers[2]!];
+}
+
+/** Canonical entity-origin formatting: up to six decimals, no trailing zeroes. */
+export function formatEntityPoint(point: Vec3): string {
+  return point
+    .map((value) => {
+      if (Number.isInteger(value)) return String(value);
+      let text = value.toFixed(6);
+      while (text.endsWith('0')) text = text.slice(0, -1);
+      if (text.endsWith('.')) text = text.slice(0, -1);
+      return text;
+    })
+    .join(' ');
+}
+
 /** Writes one property of an entity, keeping the position of existing keys. */
 export function withEntityProp(node: EntityNode, key: string, value: string): EntityNode {
   const index = node.props.findIndex(([k]) => k === key);
@@ -29,6 +51,7 @@ export function createPointEntityPatch(
   classname: string,
   point: Vec3,
   parent: Id,
+  defaults: readonly (readonly [string, string])[] = [],
 ): { patch: Patch; id: Id } {
   if (!/^[A-Za-z0-9_]+$/.test(classname)) throw new Error(`invalid classname ${classname}`);
   const entity: EntityNode = {
@@ -37,6 +60,9 @@ export function createPointEntityPatch(
     props: [
       ['classname', classname],
       ['origin', point.map((value) => String(value === 0 ? 0 : value)).join(' ')],
+      ...defaults
+        .filter(([key]) => key !== 'classname' && key !== 'origin')
+        .map(([key, value]) => [key, value] as [string, string]),
     ],
     children: [],
   };
@@ -55,6 +81,7 @@ export function convertBrushesToEntityPatch(
   classname: string,
   brushIds: readonly Id[],
   makeId: () => Id,
+  defaults: readonly (readonly [string, string])[] = [],
 ): { patch: Patch; id: Id } {
   if (brushIds.length === 0) throw new Error('no brushes selected');
   if (!/^[A-Za-z0-9_]+$/.test(classname)) throw new Error(`invalid classname ${classname}`);
@@ -69,7 +96,12 @@ export function convertBrushesToEntityPatch(
   const entity: EntityNode = {
     kind: 'entity',
     id: makeId(),
-    props: [['classname', classname]],
+    props: [
+      ['classname', classname],
+      ...defaults
+        .filter(([key]) => key !== 'classname')
+        .map(([key, value]) => [key, value] as [string, string]),
+    ],
     children: [],
   };
   let composite = addNodePatch(doc, parentId, entity);

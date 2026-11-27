@@ -134,3 +134,50 @@ test('places entities through the context menu and the tool, converts brushes', 
   });
   expect(afterUndo).toBe(0);
 });
+
+test('point entities are selectable and movable in a 2D view', async ({ page }) => {
+  await openEmptyEditor(page);
+  await page.locator('[data-testid=map-input]').setInputFiles({
+    name: 'point-entity.map',
+    mimeType: 'text/plain',
+    buffer: Buffer.from(`{
+"classname" "worldspawn"
+}
+{
+"classname" "light"
+"origin" "32 32 32"
+}
+`),
+  });
+  await expect(page.locator('[data-testid=properties-panel]')).toContainText('point-entity.map');
+  await page.evaluate(() => (window as unknown as JooleWindow).joole!.whenIdle());
+
+  const center = await worldScreen(page, 'top', [32, 32, 0]);
+  await page.mouse.click(center.x, center.y);
+  await expect
+    .poll(() => page.evaluate(() => (window as unknown as JooleWindow).joole!.selection().length))
+    .toBe(1);
+
+  const target = await worldScreen(page, 'top', [48, 32, 0]);
+  await page.mouse.move(center.x, center.y);
+  await page.mouse.down();
+  await page.mouse.move(target.x, target.y, { steps: 3 });
+  await page.mouse.up();
+  await page.evaluate(() => (window as unknown as JooleWindow).joole!.whenIdle());
+
+  const origin = await page.evaluate(() => {
+    const project = JSON.parse(
+      (window as unknown as { joole: { project(): string } }).joole.project(),
+    ) as { document: { nodes: { kind: string; props?: [string, string][] }[] } };
+    const entity = project.document.nodes.find(
+      (node) =>
+        node.kind === 'entity' &&
+        node.props?.some(([key, value]) => key === 'classname' && value === 'light'),
+    );
+    return entity?.props?.find(([key]) => key === 'origin')?.[1];
+  });
+  const parts = origin?.split(' ').map(Number);
+  expect(parts?.[0]).toBeGreaterThan(32);
+  expect(parts?.[1]).toBe(32);
+  expect(parts?.[2]).toBe(32);
+});

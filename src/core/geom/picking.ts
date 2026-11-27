@@ -22,6 +22,11 @@ export interface BrushPick2D {
   readonly id: Id;
   readonly kind: 'edge' | 'inside';
   readonly distance: number;
+  /**
+   * Closeness to the orthographic viewer along the hidden axis. Larger is
+   * closer: +Z in Top, -Y in Front and +X in Side.
+   */
+  readonly closeness: number;
 }
 
 function union(a: Aabb, b: Aabb): Aabb {
@@ -243,6 +248,26 @@ function edgeDistance(data: LeafData, point: Vec3, axis: PickAxis): number {
   return best;
 }
 
+/** Closeness to the orthographic viewer; larger values are visually above. */
+function depthCloseness(data: LeafData, axis: PickAxis): number {
+  const depthAxis = axis === 'xy' ? 2 : axis === 'xz' ? 1 : 0;
+  let min = Infinity;
+  let max = -Infinity;
+  for (const vertex of data.wireframe.vertices) {
+    min = Math.min(min, vertex[depthAxis]!);
+    max = Math.max(max, vertex[depthAxis]!);
+  }
+  // Front looks along +Y, so smaller Y is closer. Top and Side look towards
+  // -Z/-X respectively, so their larger coordinate is closer.
+  return axis === 'xz' ? -min : max;
+}
+
+function comparePick2D(a: BrushPick2D, b: BrushPick2D): number {
+  return (
+    b.closeness - a.closeness || a.distance - b.distance || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)
+  );
+}
+
 /**
  * A dynamic binary AABB tree over brush geometry. Leaves cache the analyzed
  * polygons and wireframe, so ray, edge and point picking share exactly the
@@ -350,17 +375,18 @@ export class BrushBvh {
         continue;
       }
       const edge = edgeDistance(leaf, point, axis);
+      const closeness = depthCloseness(leaf, axis);
       if (edge <= tolerance) {
-        edges.push({ id, kind: 'edge', distance: edge });
+        edges.push({ id, kind: 'edge', distance: edge, closeness });
       } else {
         const depthAxis = axis === 'xy' ? 2 : axis === 'xz' ? 1 : 0;
         if (lineIntersectsAnalysis(leaf.analysis, point, depthAxis)) {
-          inside.push({ id, kind: 'inside', distance: 0 });
+          inside.push({ id, kind: 'inside', distance: 0, closeness });
         }
       }
     }
-    edges.sort((a, b) => a.distance - b.distance || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
-    inside.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+    edges.sort(comparePick2D);
+    inside.sort(comparePick2D);
     return edges.length > 0 ? edges : inside;
   }
 

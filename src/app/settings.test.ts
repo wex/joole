@@ -74,3 +74,84 @@ describe('settings validation (T1.15)', () => {
     expect(reset.thumbSize).toBe(DEFAULT_SETTINGS.thumbSize);
   });
 });
+
+describe('workspace layout settings', () => {
+  it('parses and preserves a valid arrangement', () => {
+    const parsed = parseSettings({
+      layout: {
+        rightDockVisible: true,
+        rightSections: [
+          { id: 'textures', visible: true },
+          { id: 'properties', visible: false },
+        ],
+        bottomDockVisible: true,
+        bottomTabs: [
+          { id: 'log', visible: true },
+          { id: 'tree', visible: true },
+          { id: 'prefabs', visible: false },
+        ],
+        bottomActiveTab: 'log',
+        viewport: 'front',
+      },
+    });
+    expect(parsed.layout.rightSections.map((panel) => panel.id)).toEqual([
+      'textures',
+      'properties',
+    ]);
+    expect(parsed.layout.bottomActiveTab).toBe('log');
+    expect(parsed.layout.viewport).toBe('front');
+  });
+
+  it('corrupt arrangement state falls back to the bounded default', () => {
+    expect(parseSettings({ layout: 'everything-floating' }).layout).toEqual(
+      DEFAULT_SETTINGS.layout,
+    );
+    const partial = parseSettings({ layout: { viewport: 'side', bottomActiveTab: 'invalid' } });
+    expect(partial.layout.viewport).toBe('side');
+    expect(partial.layout.bottomActiveTab).toBe('tree');
+  });
+});
+
+describe('named layout settings', () => {
+  it('parses valid presets and drops corrupt entries individually', () => {
+    const parsed = parseSettings({
+      layouts: [
+        {
+          id: 'work',
+          name: 'Work',
+          snapshot: {
+            rightDockVisible: true,
+            rightSections: [
+              { id: 'textures', visible: true },
+              { id: 'properties', visible: true },
+            ],
+            bottomDockVisible: true,
+            bottomTabs: [
+              { id: 'tree', visible: true },
+              { id: 'prefabs', visible: true },
+              { id: 'log', visible: true },
+            ],
+            bottomActiveTab: 'tree',
+            viewport: 'quad',
+            rightWidth: 400,
+            bottomHeight: 180,
+            dockSplit: 0.6,
+            propertiesCollapsed: false,
+            texturesCollapsed: false,
+            bottomCollapsed: false,
+          },
+        },
+        { id: 'broken', name: '', snapshot: {} },
+      ],
+      activeLayoutId: 'work',
+    });
+    expect(parsed.layouts).toHaveLength(1);
+    expect(parsed.layouts[0]?.snapshot.rightWidth).toBe(400);
+    expect(parsed.activeLayoutId).toBe('work');
+  });
+
+  it('clears an active id that does not reference a valid layout', () => {
+    expect(parseSettings({ activeLayoutId: 'missing' }).activeLayoutId).toBeNull();
+    expect(parseSettings({ layouts: 'corrupt' }).layouts).toEqual([]);
+  });
+});
