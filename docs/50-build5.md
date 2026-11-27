@@ -278,7 +278,7 @@ flowchart LR
 
 ---
 
-### T2.4 – Qoole-like sphere presets
+### T2.4 – Qoole-like sphere presets — DONE
 
 **TODO item:** creating a sphere with X sides does not work.
 

@@ -214,9 +214,9 @@ The active tool is filled with the accent color. In the current implementation t
 When the Brush tool is active, two controls appear:
 
 - **Primitive** — `box`, `wedge`, `cylinder`, `cone` or `sphere`.
-- **Sides** — the side count for round primitives, from 3 to 64. The default is 8. Box and wedge do not use the side count.
+- **Sides** — the side count for cylinders and cones, from 3 to 64. The default is 8. Box and wedge do not use the side count. For `sphere`, this is a fixed preset picker instead: 14, 18, 20 or 26 sides.
 
-The `sphere` primitive is a convex octahedral approximation rather than a high-resolution segmented sphere.
+The `sphere` primitive is a convex ring-and-pole approximation. Its preset number is the exact number of triangular brush faces.
 
 ### CSG Subtract and Hollow buttons
 
@@ -301,7 +301,7 @@ Primitive notes:
 - `wedge` — a triangular prism for ramps and sloped pieces. It rises toward +X; flip or rotate it for other directions.
 - `cylinder` — a vertical, Z-aligned n-sided prism.
 - `cone` — a vertical, Z-aligned n-sided cone with its apex at +Z.
-- `sphere` — a fixed convex octahedral approximation. The side count does not affect it.
+- `sphere` — a convex ring-and-pole approximation with exactly 14, 18, 20 or 26 triangular faces.
 
 **Context-menu shortcut:** right-click an orthographic view and choose **Add Brush** to switch directly to this tool.
 
@@ -776,7 +776,6 @@ Quake texture axes cannot represent every transformed orientation exactly. A war
 - `Ctrl+H` and `Ctrl+L` are reserved but currently do not invoke hide/lock commands.
 - Entity placement is intended for orthographic views; 3D placement does not project onto a ground plane.
 - There is no group rename field in the current Tree UI.
-- The side-count input remains enabled for `sphere`, but the fixed octahedral primitive does not use it.
 - The File menu has no **New** command. An empty document exists when the editor starts; reloading the page is the only way to return to a truly empty document, subject to the autosave recovery prompt.
 
 These are implementation limitations, not intentional format restrictions. They do not affect the validity of saved `.joole.json` projects or exported `.map` files.

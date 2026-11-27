@@ -1,5 +1,5 @@
 import { createSignal, For, onSettled, Show } from 'solid-js';
-import type { PrimitiveKind } from '@core/geom/index';
+import { SPHERE_SIDE_PRESETS, type PrimitiveKind } from '@core/geom/index';
 import { Icon } from './Icon';
 import { toolInfo } from '@app/toolInfo';
 import styles from './Toolbar.module.css';
@@ -393,16 +393,33 @@ export function Toolbar(props: ToolbarProps) {
         </label>
         <label class={styles.primitiveControl}>
           <span>Sides</span>
-          <input
-            type="number"
-            min="3"
-            max="64"
-            value={props.brushSides}
-            aria-label="Primitive sides"
-            onChange={(event) =>
-              props.onBrushPrimitive(props.brushPrimitive, Number(event.currentTarget.value))
+          <Show
+            when={props.brushPrimitive === 'sphere'}
+            fallback={
+              <input
+                type="number"
+                min="3"
+                max="64"
+                value={props.brushSides}
+                aria-label="Primitive sides"
+                onChange={(event) =>
+                  props.onBrushPrimitive(props.brushPrimitive, Number(event.currentTarget.value))
+                }
+              />
             }
-          />
+          >
+            <select
+              aria-label="Primitive sides"
+              value={props.brushSides}
+              onChange={(event) =>
+                props.onBrushPrimitive(props.brushPrimitive, Number(event.currentTarget.value))
+              }
+            >
+              <For each={SPHERE_SIDE_PRESETS}>
+                {(sides) => <option value={sides}>{sides}</option>}
+              </For>
+            </select>
+          </Show>
         </label>
       </Show>
       <span class={styles.separator} />

@@ -1,4 +1,4 @@
-import { analyzeBrush } from '@core/geom/index';
+import { analyzeBrush, SPHERE_SIDE_PRESETS } from '@core/geom/index';
 import { stepTextureFocus as stepFocus, textureFocus as resolveFocus } from './textureFocus';
 import {
   reparentNodePatch,
@@ -1216,6 +1216,17 @@ export class EditorApp {
   setBrushPrimitive(kind: PrimitiveKind, sides = this.brushTool.sides): boolean {
     if (!Number.isInteger(sides) || sides < 3 || sides > 64) {
       return false;
+    }
+    if (
+      kind === 'sphere' &&
+      !SPHERE_SIDE_PRESETS.includes(sides as (typeof SPHERE_SIDE_PRESETS)[number])
+    ) {
+      // Sphere detail is a fixed preset picker rather than a free numeric
+      // field. Normalize stale cylinder/cone values instead of rejecting the
+      // primitive switch outright.
+      sides = SPHERE_SIDE_PRESETS.reduce((best, preset) =>
+        Math.abs(preset - sides) < Math.abs(best - sides) ? preset : best,
+      );
     }
     this.brushTool.primitive = kind;
     this.brushTool.sides = sides;

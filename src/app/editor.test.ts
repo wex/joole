@@ -52,6 +52,20 @@ function makeApp() {
   };
 }
 
+describe('EditorApp brush primitives', () => {
+  it('normalizes sphere detail to the fixed Qoole presets', () => {
+    const { app } = makeApp();
+    expect(app.setBrushPrimitive('sphere', 8)).toBe(true);
+    expect(app.brushSides).toBe(14);
+    expect(app.setBrushPrimitive('sphere', 18)).toBe(true);
+    expect(app.brushSides).toBe(18);
+    expect(app.setBrushPrimitive('sphere', 21)).toBe(true);
+    expect(app.brushSides).toBe(20);
+    expect(app.setBrushPrimitive('cylinder', 8)).toBe(true);
+    expect(app.brushSides).toBe(8);
+  });
+});
+
 describe('EditorApp', () => {
   it('opens a valid map, reports it and emits a document event', async () => {
     const { app } = makeApp();

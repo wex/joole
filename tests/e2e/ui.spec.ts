@@ -322,6 +322,19 @@ test('the brush tool creates a primitive in a 2D view and undo removes it', asyn
   expect(errors).toEqual([]);
 });
 
+test('sphere detail is a fixed preset picker', async ({ page }) => {
+  await openFixtureMap(page);
+  await page.getByRole('button', { name: 'Brush (B)' }).click();
+  await page.getByLabel('Brush primitive').selectOption('sphere');
+  const sides = page.getByLabel('Primitive sides');
+  await expect(sides).toHaveValue('14');
+  await expect(sides.locator('option')).toHaveText(['14', '18', '20', '26']);
+  await sides.selectOption('26');
+  await expect(sides).toHaveValue('26');
+  await page.getByLabel('Brush primitive').selectOption('cylinder');
+  await expect(page.getByLabel('Primitive sides')).toHaveAttribute('type', 'number');
+});
+
 test('toolbar Undo and Redo buttons follow command history', async ({ page }) => {
   await openFixtureMap(page);
   const nodesBefore = await page.evaluate(
