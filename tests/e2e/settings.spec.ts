@@ -57,6 +57,7 @@ test('colour overrides apply at once, persist and reset (T15.10)', async ({ page
   await expect(page.locator('[data-testid=settings-dialog]')).toBeVisible();
   await page.locator('#settings-tab-general').focus();
   await page.keyboard.press('ArrowRight');
+  await page.keyboard.press('ArrowRight');
   await expect(page.locator('[data-testid=settings-colors]')).toBeVisible();
 
   // Set vp-select to blue and close; the override is inline on the root.
@@ -100,4 +101,57 @@ test('colour overrides apply at once, persist and reset (T15.10)', async ({ page
     document.documentElement.style.getPropertyValue('--vp-select'),
   );
   expect(cleared).toBe('');
+});
+
+test('bounded panel and viewport arrangements apply and persist (T2.7)', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.locator('[data-testid=editor-shell]')).toBeVisible();
+
+  await page.keyboard.press('Control+,');
+  await expect(page.locator('[data-testid=settings-dialog]')).toBeVisible();
+  await page.locator('#settings-tab-layout').click();
+  await expect(page.locator('[data-testid=settings-layout]')).toBeVisible();
+
+  // Swap the two right-dock sections, hide the Prefabs tab and maximize Front.
+  await page.locator('[data-testid=layout-right-properties-down]').click();
+  await page.locator('[data-testid=layout-bottom-prefabs-visible]').uncheck();
+  await page.locator('[data-testid=layout-viewport]').selectOption('front');
+
+  const ordered = await page.evaluate(() =>
+    [...document.querySelectorAll('[data-testid$=-wrap]')].map((el) =>
+      el.getAttribute('data-testid'),
+    ),
+  );
+  expect(ordered.indexOf('dock-textures-wrap')).toBeLessThan(
+    ordered.indexOf('dock-properties-wrap'),
+  );
+  await expect(page.locator('#bottom-tab-prefabs')).toHaveCount(0);
+  await expect(page.locator('[data-testid=view-title-front]')).toBeVisible();
+  await expect(page.locator('[data-testid=view-title-top]')).toBeHidden();
+  await page.keyboard.press('Escape');
+
+  // The arrangement is persisted as settings, not only session state.
+  await page.waitForTimeout(700);
+  await page.reload();
+  await expect(page.locator('[data-testid=editor-shell]')).toBeVisible();
+  const orderedAfter = await page.evaluate(() =>
+    [...document.querySelectorAll('[data-testid$=-wrap]')].map((el) =>
+      el.getAttribute('data-testid'),
+    ),
+  );
+  expect(orderedAfter.indexOf('dock-textures-wrap')).toBeLessThan(
+    orderedAfter.indexOf('dock-properties-wrap'),
+  );
+  await expect(page.locator('#bottom-tab-prefabs')).toHaveCount(0);
+  await expect(page.locator('[data-testid=view-title-front]')).toBeVisible();
+  await expect(page.locator('[data-testid=view-title-top]')).toBeHidden();
+
+  // Entire docks can be hidden explicitly while the viewport remains usable.
+  await page.keyboard.press('Control+,');
+  await page.locator('#settings-tab-layout').click();
+  await page.locator('[data-testid=layout-right-dock-visible]').uncheck();
+  await page.locator('[data-testid=layout-bottom-dock-visible]').uncheck();
+  await expect(page.locator('[data-testid=dock-textures]')).toHaveCount(0);
+  await expect(page.locator('[role=tablist][aria-label="Bottom panel"]')).toHaveCount(0);
+  await expect(page.locator('[data-testid=viewport-area]')).toBeVisible();
 });

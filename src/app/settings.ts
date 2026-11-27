@@ -1,4 +1,5 @@
 import { COLOR_TOKENS, isHexColor } from './colors';
+import { DEFAULT_WORKSPACE_LAYOUT, normalizeWorkspaceLayout, type WorkspaceLayout } from './layout';
 
 /**
  * The persisted editor settings (T1.12): one typed object with defaults.
@@ -33,6 +34,8 @@ export interface EditorSettings {
   readonly handleSize: number;
   /** The bottom panel shows only its tab strip (T15.9). */
   readonly bottomCollapsed: boolean;
+  /** The bounded arrangement of docks, sections, tabs and maximized viewport (T2.7). */
+  readonly layout: WorkspaceLayout;
   /** Colour overrides per theme, only the changed tokens (T15.10). */
   readonly colors: {
     readonly dark: Record<string, string>;
@@ -56,6 +59,7 @@ export const DEFAULT_SETTINGS: EditorSettings = {
   groupCsgResults: true,
   handleSize: 14,
   bottomCollapsed: true,
+  layout: DEFAULT_WORKSPACE_LAYOUT,
   colors: { dark: {}, light: {} },
 };
 
@@ -91,6 +95,7 @@ const checks: Record<string, (value: unknown) => boolean> = {
   showToolOverlay: (value) => typeof value === 'boolean',
   groupCsgResults: (value) => typeof value === 'boolean',
   handleSize: num(7, 28),
+  layout: (value) => !!value && typeof value === 'object',
 };
 
 /**
@@ -124,6 +129,7 @@ export function parseSettings(stored: unknown): EditorSettings {
     }
   }
   out['colors'] = clean;
+  out['layout'] = normalizeWorkspaceLayout(out['layout']);
   return out as EditorSettings;
 }
 

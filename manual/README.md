@@ -87,7 +87,7 @@ Fly mode is intended to own `W`, `A`, `S` and `D`, and tool shortcuts are ignore
 - The **bottom panel** has three tabs: **Tree**, **Prefabs** and **Log**. It starts collapsed to its tab strip; clicking a tab or the chevron opens it. While it is collapsed — or another tab is up — the **Log** tab counts new errors, and it never opens by itself.
 - Drag the vertical or horizontal splitter to resize a panel. A focused splitter can also be moved with the arrow keys in 8-pixel steps.
 - The bottom panel can be enlarged when reading long compile logs or a deep document tree.
-- The panel sizes, the dock's splitter position, the collapsed sections, the thumbnail size, the grid size and the theme are remembered between sessions.
+- The panel sizes, the dock's splitter position, the collapsed sections, panel order and visibility, the maximized-view arrangement, the thumbnail size, the grid size and the theme are remembered between sessions.
 
 ![The light UI theme](images/overview-light.png)
 
@@ -139,7 +139,7 @@ Choose **Recover** to load the autosave as `recovered.joole.json`, or **Discard*
 
 ![The Colors tab of the settings dialog](images/settings-colors.png)
 
-The dialog has two tabs. **General** holds the theme, the view and grid options, the texture thumbnail size, the tool overlay, the handle size and CSG grouping. **Colors** lists every colour of the editor — the views and the interface — for the current theme: change one with its colour well, restore one row with its × button, or restore them all with **Reset colours** (which clears both themes). Colours apply at once and are remembered per theme.
+The dialog has three tabs. **General** holds the theme, the view and grid options, the texture thumbnail size, the tool overlay, the handle size and CSG grouping. **Layout** controls the bounded workspace arrangement: the right dock can be hidden, Properties and Textures can be reordered or hidden, the bottom dock can be hidden, Tree/Prefabs/Log can be reordered or hidden, and the viewport arrangement can be the four-view grid or one maximized view. A visible dock keeps at least one visible section or tab; hiding the whole dock is the explicit way to remove all of them. **Colors** lists every colour of the editor — the views and the interface — for the current theme: change one with its colour well, restore one row with its × button, or restore them all with **Reset colours** (which clears both themes). Colours apply at once and are remembered per theme.
 
 | Setting                    | Effect                                                                            |
 | -------------------------- | --------------------------------------------------------------------------------- |
@@ -152,7 +152,7 @@ The dialog has two tabs. **General** holds the theme, the view and grid options,
 | **Group CSG results**      | Whether Hollow and CSG Subtract group their fragments automatically.              |
 | **Handle size**            | The size of the vertex, edge and face dots, 7–28 px (14 px by default).           |
 
-The panel sizes, the collapsed sections and the splitter positions are remembered too, but they do not appear in the dialog.
+The panel sizes, the collapsed sections, the splitter positions and the arrangement made in the Layout tab are remembered too.
 
 ## Toolbar reference
 
@@ -186,7 +186,7 @@ Their exact behavior is described in [Brush editing commands](#brush-editing-com
 
 ### Save, Undo and Redo icons
 
-The Save, Undo and Redo toolbar icons are present as disabled placeholders in the current build. Use the implemented keyboard commands instead:
+The Save, Undo and Redo toolbar icons perform the same commands as their shortcuts and are disabled only when the corresponding history operation is unavailable:
 
 - `Ctrl+S` / `Cmd+S` — save project
 - `Delete` / `Backspace` — delete the selection right away, with no confirmation; undo restores it

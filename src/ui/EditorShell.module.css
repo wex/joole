@@ -25,6 +25,14 @@
   grid-template-rows: minmax(0, 1fr) 0 var(--bottom-panel-height, 160px);
 }
 
+.mainNoRightDock {
+  grid-template-columns: minmax(0, 1fr) 0 0;
+}
+
+.centerNoBottomDock {
+  grid-template-rows: minmax(0, 1fr) 0 0;
+}
+
 .viewport {
   position: relative;
   min-width: 0;
@@ -264,10 +272,15 @@
 }
 
 .dockProperties,
-.dockTextures {
+.dockTextures,
+.dockSectionWrap {
   display: flex;
   min-height: 0;
   flex-direction: column;
+}
+
+.dockSectionAfter {
+  border-top: 1px solid var(--line);
 }
 
 .dockProperties {

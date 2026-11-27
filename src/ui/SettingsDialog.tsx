@@ -1,5 +1,12 @@
 import { createSignal, For, Show } from 'solid-js';
 import { COLOR_TOKENS, defaultColor } from '@app/colors';
+import {
+  moveLayoutPanel,
+  setLayoutPanelVisible,
+  updateWorkspaceLayout,
+  type LayoutViewport,
+  type WorkspaceLayout,
+} from '@app/layout';
 import { Dialog } from './Dialog';
 import styles from './SettingsDialog.module.css';
 
@@ -21,6 +28,8 @@ export interface SettingsDialogProps {
     readonly dark: Record<string, string>;
     readonly light: Record<string, string>;
   };
+  /** The current bounded workspace arrangement (T2.7). */
+  readonly layout: WorkspaceLayout;
   readonly onChange: (partial: Record<string, unknown>) => void;
   readonly onReset: () => void;
   readonly onResetColors: () => void;
@@ -34,9 +43,10 @@ const gridSizes = [1, 2, 4, 8, 16, 32, 64, 128, 256];
  * there is no OK/Cancel step.
  */
 export function SettingsDialog(props: SettingsDialogProps) {
-  const [tab, setTab] = createSignal<'general' | 'colors'>('general');
+  const [tab, setTab] = createSignal<'general' | 'layout' | 'colors'>('general');
   const tabs = [
     { id: 'general' as const, label: 'General' },
+    { id: 'layout' as const, label: 'Layout' },
     { id: 'colors' as const, label: 'Colors' },
   ];
   const moveTab = (event: KeyboardEvent) => {
@@ -44,7 +54,9 @@ export function SettingsDialog(props: SettingsDialogProps) {
       return;
     }
     event.preventDefault();
-    const next = tab() === 'general' ? 'colors' : 'general';
+    const index = tabs.findIndex((item) => item.id === tab());
+    const step = event.key === 'ArrowRight' ? 1 : -1;
+    const next = tabs[(index + step + tabs.length) % tabs.length]!.id;
     setTab(next);
     queueMicrotask(() => document.getElementById(`settings-tab-${next}`)?.focus());
   };
@@ -60,6 +72,16 @@ export function SettingsDialog(props: SettingsDialogProps) {
       colors: { dark: { ...props.colors.dark }, light: { ...props.colors.light }, [theme]: next },
     });
   };
+
+  const changeLayout = (layout: WorkspaceLayout) => props.onChange({ layout });
+  const movePanel = (zone: 'rightSections' | 'bottomTabs', id: string, delta: -1 | 1) =>
+    changeLayout(moveLayoutPanel(props.layout, zone, id, delta));
+  const setPanelVisible = (zone: 'rightSections' | 'bottomTabs', id: string, visible: boolean) =>
+    changeLayout(setLayoutPanelVisible(props.layout, zone, id, visible));
+  const panelLabel = (id: string) => id[0]!.toUpperCase() + id.slice(1);
+  const onlyVisible = (zone: 'rightSections' | 'bottomTabs', id: string) =>
+    props.layout[zone].filter((panel) => panel.visible).length === 1 &&
+    props.layout[zone].find((panel) => panel.id === id)?.visible === true;
   return (
     <Dialog title="Settings" onClose={props.onClose} testId="settings-dialog">
       <div role="tablist" aria-label="Settings sections" class={styles.tabs} onKeyDown={moveTab}>
@@ -132,6 +154,149 @@ export function SettingsDialog(props: SettingsDialogProps) {
               Reset colours
             </button>
           </footer>
+        </div>
+      </Show>
+      <Show when={tab() === 'layout'}>
+        <div class={styles.form} data-testid="settings-layout">
+          <section class={styles.group}>
+            <h3 class={styles.heading}>Workspace</h3>
+            <label class={styles.row}>
+              <span class={styles.label}>Viewport arrangement</span>
+              <select
+                data-testid="layout-viewport"
+                value={props.layout.viewport}
+                onChange={(event) =>
+                  changeLayout(
+                    updateWorkspaceLayout(props.layout, {
+                      viewport: event.currentTarget.value as LayoutViewport,
+                    }),
+                  )
+                }
+              >
+                <option value="quad">Four views</option>
+                <option value="3d">3D maximized</option>
+                <option value="top">Top maximized</option>
+                <option value="front">Front maximized</option>
+                <option value="side">Side maximized</option>
+              </select>
+            </label>
+            <label class={styles.row}>
+              <span class={styles.label}>Show right dock</span>
+              <input
+                type="checkbox"
+                data-testid="layout-right-dock-visible"
+                checked={props.layout.rightDockVisible}
+                onChange={(event) =>
+                  changeLayout(
+                    updateWorkspaceLayout(props.layout, {
+                      rightDockVisible: event.currentTarget.checked,
+                    }),
+                  )
+                }
+              />
+            </label>
+            <label class={styles.row}>
+              <span class={styles.label}>Show bottom dock</span>
+              <input
+                type="checkbox"
+                data-testid="layout-bottom-dock-visible"
+                checked={props.layout.bottomDockVisible}
+                onChange={(event) =>
+                  changeLayout(
+                    updateWorkspaceLayout(props.layout, {
+                      bottomDockVisible: event.currentTarget.checked,
+                    }),
+                  )
+                }
+              />
+            </label>
+          </section>
+          <section class={styles.group}>
+            <h3 class={styles.heading}>Right dock sections</h3>
+            <For each={props.layout.rightSections}>
+              {(panel, index) => (
+                <div class={styles.layoutItem} data-testid={`layout-right-${panel.id}`}>
+                  <label class={styles.layoutName}>
+                    <input
+                      type="checkbox"
+                      data-testid={`layout-right-${panel.id}-visible`}
+                      checked={panel.visible}
+                      disabled={
+                        props.layout.rightDockVisible && onlyVisible('rightSections', panel.id)
+                      }
+                      onChange={(event) =>
+                        setPanelVisible('rightSections', panel.id, event.currentTarget.checked)
+                      }
+                    />
+                    {panelLabel(panel.id)}
+                  </label>
+                  <span class={styles.layoutButtons}>
+                    <button
+                      type="button"
+                      aria-label={`Move ${panelLabel(panel.id)} up`}
+                      data-testid={`layout-right-${panel.id}-up`}
+                      disabled={index() === 0}
+                      onClick={() => movePanel('rightSections', panel.id, -1)}
+                    >
+                      ↑
+                    </button>
+                    <button
+                      type="button"
+                      aria-label={`Move ${panelLabel(panel.id)} down`}
+                      data-testid={`layout-right-${panel.id}-down`}
+                      disabled={index() === props.layout.rightSections.length - 1}
+                      onClick={() => movePanel('rightSections', panel.id, 1)}
+                    >
+                      ↓
+                    </button>
+                  </span>
+                </div>
+              )}
+            </For>
+          </section>
+          <section class={styles.group}>
+            <h3 class={styles.heading}>Bottom tabs</h3>
+            <For each={props.layout.bottomTabs}>
+              {(panel, index) => (
+                <div class={styles.layoutItem} data-testid={`layout-bottom-${panel.id}`}>
+                  <label class={styles.layoutName}>
+                    <input
+                      type="checkbox"
+                      data-testid={`layout-bottom-${panel.id}-visible`}
+                      checked={panel.visible}
+                      disabled={
+                        props.layout.bottomDockVisible && onlyVisible('bottomTabs', panel.id)
+                      }
+                      onChange={(event) =>
+                        setPanelVisible('bottomTabs', panel.id, event.currentTarget.checked)
+                      }
+                    />
+                    {panelLabel(panel.id)}
+                  </label>
+                  <span class={styles.layoutButtons}>
+                    <button
+                      type="button"
+                      aria-label={`Move ${panelLabel(panel.id)} up`}
+                      data-testid={`layout-bottom-${panel.id}-up`}
+                      disabled={index() === 0}
+                      onClick={() => movePanel('bottomTabs', panel.id, -1)}
+                    >
+                      ↑
+                    </button>
+                    <button
+                      type="button"
+                      aria-label={`Move ${panelLabel(panel.id)} down`}
+                      data-testid={`layout-bottom-${panel.id}-down`}
+                      disabled={index() === props.layout.bottomTabs.length - 1}
+                      onClick={() => movePanel('bottomTabs', panel.id, 1)}
+                    >
+                      ↓
+                    </button>
+                  </span>
+                </div>
+              )}
+            </For>
+          </section>
         </div>
       </Show>
       <Show when={tab() === 'general'}>

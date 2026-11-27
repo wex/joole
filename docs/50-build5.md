@@ -369,7 +369,7 @@ flowchart LR
 
 ---
 
-### T2.7 – Rearrangeable panel/viewport layout state
+### T2.7 – Rearrangeable panel/viewport layout state — DONE
 
 **TODO item part:** users can create custom arrangements of tools/windows.
 

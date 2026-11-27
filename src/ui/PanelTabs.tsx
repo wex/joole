@@ -19,6 +19,8 @@ const viewTabs: readonly { id: ViewId; label: string; key: string }[] = [
 
 export interface PanelTabsProps {
   readonly selected: BottomTab;
+  /** Visible bottom tabs in their layout order. */
+  readonly tabs: readonly BottomTab[];
   readonly maximized: ViewId | null;
   /** The panel is collapsed to its tab strip (T15.9). */
   readonly collapsed: boolean;
@@ -35,9 +37,12 @@ export function PanelTabs(props: PanelTabsProps) {
       return;
     }
     event.preventDefault();
-    const index = contentTabs.findIndex((tab) => tab.id === props.selected);
+    const visible = contentTabs.filter((tab) => props.tabs.includes(tab.id));
+    if (visible.length === 0) return;
+    const current = visible.findIndex((tab) => tab.id === props.selected);
+    const index = current >= 0 ? current : 0;
     const step = event.key === 'ArrowRight' ? 1 : -1;
-    const next = contentTabs[(index + step + contentTabs.length) % contentTabs.length]!.id;
+    const next = visible[(index + step + visible.length) % visible.length]!.id;
     props.onSelect(next);
     queueMicrotask(() => document.getElementById(`bottom-tab-${next}`)?.focus());
   };
@@ -54,7 +59,7 @@ export function PanelTabs(props: PanelTabsProps) {
         <Icon name={props.collapsed ? 'chevronRight' : 'chevronDown'} />
       </button>
       <div role="tablist" aria-label="Bottom panel" class={styles.group} onKeyDown={move}>
-        <For each={contentTabs}>
+        <For each={contentTabs.filter((tab) => props.tabs.includes(tab.id))}>
           {(tab) => (
             <button
               type="button"
