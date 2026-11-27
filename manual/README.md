@@ -40,7 +40,7 @@ _The default workspace: toolbar, four views, properties panel, texture browser a
 4. Edit in the four views. Press `B` and drag in Top, Front or Side to create a brush; press `S` and click a brush to select it.
 5. Save often with `Ctrl+S` (`Cmd+S` on macOS). This writes a `.joole.json` project, the primary lossless format.
 6. Use **File → Export .map…** when the map is needed by another editor or by external compile tools.
-7. Choose **Compile → Fast** for a quick sealed-map check. When the `.bsp` is produced, save or copy it into `baseq2/maps/` and test it in q2pro or another Quake 2 engine with `+map <name>`.
+7. Choose **Compile**, set VIS to **Fast** and Lighting to **Off** for a quick sealed-map check, then choose the menu’s **Compile** action. When the `.bsp` is produced, save or copy it into `baseq2/maps/` and test it in q2pro or another Quake 2 engine with `+map <name>`.
 
 ## The workspace
 
@@ -612,17 +612,18 @@ Prefab insertion is undoable. Because prefabs use `.map` text, they can contain 
 
 ## Compiling and testing a map
 
-### Profiles
+### Compile options
 
-Compilation runs entirely in browser workers using WASM builds of id's Quake 2 tools. The tools communicate through an in-memory filesystem; no data leaves the browser.
+Compilation runs entirely in browser workers using WASM builds of id's Quake 2 tools. The tools communicate through an in-memory filesystem; no data leaves the browser. qbsp3 always runs. VIS and lighting are independent options:
 
-| Profile | Steps                          | Intended use                      |
-| ------- | ------------------------------ | --------------------------------- |
-| Fast    | qbsp3, qvis3 `-fast`; no qrad3 | quick leak and structural checks  |
-| Normal  | qbsp3, qvis3, qrad3            | regular testing with lighting     |
-| Final   | qbsp3, qvis3, qrad3 `-extra`   | slower high-quality lighting pass |
+| VIS      | Lighting | Steps                        | Intended use                                 |
+| -------- | -------- | ---------------------------- | -------------------------------------------- |
+| **Off**  | **Off**  | qbsp3                        | quickest plain-BSP playtest/structural check |
+| **Fast** | **Off**  | qbsp3, qvis3 `-fast`         | quick leak and visibility check              |
+| **Full** | Normal   | qbsp3, qvis3, qrad3          | regular testing with lighting                |
+| **Full** | Final    | qbsp3, qvis3, qrad3 `-extra` | slower high-quality lighting pass            |
 
-Choose **Compile**, then a profile. While compilation is active, the menu contains **Cancel**.
+Lighting without VIS is allowed; qrad3 then treats visibility as all-visible, which can be slower and leaves the BSP without VIS data. Choose **Compile**, adjust the two selectors and press the menu's **Compile** action. While compilation is active, a persistent status chip shows a spinner and the active tool (`qbsp3`, `qvis3` or `qrad3`) with a **Cancel** button.
 
 The compile pipeline first performs the same export validation as `.map` export. It supplies the `.wal` headers of the textures used by the map and `pics/colormap.pcx` when available. Tool output streams line by line into the **Log** tab. Entries are labeled **Info**, **Ok**, **Warning** or **Error**; the label color distinguishes routine compiler output from editor warnings and failures.
 
@@ -656,8 +657,8 @@ This example builds and tests a simple room using the features described above.
 12. **Set surface attributes.** Mark sky, water, translucency, nodraw and light-emitting surfaces as needed. Check the value field for light-emitting faces.
 13. **Organize.** Group repeated or dense areas in the Tree. Use scope when working inside them. Save reusable assemblies as prefabs.
 14. **Save the project.** Press `Ctrl+S` / `Cmd+S` and keep the `.joole.json` as the authoritative source.
-15. **Compile Fast.** Fix leaks and geometry warnings first. Use `N` to inspect leak paths.
-16. **Compile Normal or Final.** Save the `.bsp` into `baseq2/maps/` and test it in q2pro.
+15. **Compile with Fast VIS and Lighting Off.** Fix leaks and geometry warnings first. Use `N` to inspect leak paths.
+16. **Compile with Full VIS and Normal or Final lighting.** Save the `.bsp` into `baseq2/maps/` and test it in q2pro.
 17. **Iterate.** Return to Joole, adjust the project, save and compile again.
 
 ## Keyboard and mouse reference

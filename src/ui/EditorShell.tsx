@@ -163,6 +163,10 @@ export function EditorShell(props: EditorShellProps) {
   const [activeView, setActiveView] = createSignal<ViewId>('3d');
   const [maximizedView, setMaximizedView] = createSignal<ViewId | null>(null);
   const [compileMenuOpen, setCompileMenuOpen] = createSignal(false);
+  const [compileVis, setCompileVis] = createSignal<'off' | 'fast' | 'full'>('full');
+  const [compileLighting, setCompileLighting] = createSignal<'off' | 'normal' | 'final'>('normal');
+  const [compiling, setCompiling] = createSignal(app.isCompiling);
+  const [compileStage, setCompileStage] = createSignal<string | null>(app.compileStage);
   const [bottomTab, setBottomTab] = createSignal<BottomTab>('tree');
   const [bottomCollapsed, setBottomCollapsed] = createSignal(
     initialSettings?.bottomCollapsed !== false,
@@ -1138,6 +1142,8 @@ export function EditorShell(props: EditorShellProps) {
         setCanUndo(app.canUndo);
         setCanRedo(app.canRedo);
         setMapName(app.mapName);
+        setCompiling(app.isCompiling);
+        setCompileStage(app.compileStage);
         if (!event.patch) {
           setSizePrompt(null);
           controller.frame(renderer.bounds(), renderer.viewRects());
@@ -1292,37 +1298,57 @@ export function EditorShell(props: EditorShellProps) {
         onBrushPrimitive={(kind, sides) => app.setBrushPrimitive(kind, sides)}
       />
       <Show when={compileMenuOpen()}>
-        <div class={styles.compileMenu} role="menu" aria-label="Compile profile">
-          <For each={['fast', 'normal', 'final'] as const}>
-            {(profile) => (
-              <button
-                type="button"
-                role="menuitem"
-                class={styles.contextMenuItem}
-                data-testid={`compile-${profile}`}
-                onClick={() => {
-                  setCompileMenuOpen(false);
-                  void app.compileMap(profile);
-                }}
-              >
-                {profile[0]!.toUpperCase() + profile.slice(1)}
-              </button>
-            )}
-          </For>
-          <Show when={app.isCompiling}>
-            <button
-              type="button"
-              role="menuitem"
-              class={styles.contextMenuItem}
-              data-testid="compile-cancel"
-              onClick={() => {
-                setCompileMenuOpen(false);
-                app.cancelCompile();
-              }}
+        <div class={styles.compileMenu} role="menu" aria-label="Compile options">
+          <label class={styles.compileOption}>
+            VIS
+            <select
+              data-testid="compile-vis"
+              value={compileVis()}
+              onChange={(event) =>
+                setCompileVis(event.currentTarget.value as 'off' | 'fast' | 'full')
+              }
             >
-              Cancel
-            </button>
-          </Show>
+              <option value="off">Off</option>
+              <option value="fast">Fast</option>
+              <option value="full">Full</option>
+            </select>
+          </label>
+          <label class={styles.compileOption}>
+            Lighting
+            <select
+              data-testid="compile-lighting"
+              value={compileLighting()}
+              onChange={(event) =>
+                setCompileLighting(event.currentTarget.value as 'off' | 'normal' | 'final')
+              }
+            >
+              <option value="off">Off</option>
+              <option value="normal">Normal</option>
+              <option value="final">Final</option>
+            </select>
+          </label>
+          <button
+            type="button"
+            role="menuitem"
+            class={styles.contextMenuItem}
+            data-testid="compile-start"
+            disabled={compiling()}
+            onClick={() => {
+              setCompileMenuOpen(false);
+              void app.compileMap({ vis: compileVis(), lighting: compileLighting() });
+            }}
+          >
+            Compile
+          </button>
+        </div>
+      </Show>
+      <Show when={compiling()}>
+        <div class={styles.compileStatus} data-testid="compile-status">
+          <span class={styles.compileSpinner} aria-hidden="true" />
+          <span>Compiling: {compileStage() ?? 'preparing'}</span>
+          <button type="button" data-testid="compile-cancel" onClick={() => app.cancelCompile()}>
+            Cancel
+          </button>
         </div>
       </Show>
 

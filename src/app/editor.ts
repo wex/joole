@@ -36,7 +36,7 @@ import {
   ungroupNodesPatch,
 } from './groups';
 import { boxSegments, dashedSegment } from './tools';
-import { runCompilePipeline, type CompileProfile, type CompileRunner } from './compile';
+import { runCompilePipeline, type CompileOptions, type CompileRunner } from './compile';
 import type { EntityClassDef } from '@core/formats/index';
 import type {
   Command,
@@ -1343,6 +1343,7 @@ export class EditorApp {
   cancelCompileWorker: (() => void) | null = null;
 
   private compiling = false;
+  private compileStageValue: string | null = null;
 
   /** The parsed leak path of the last compile, or null when there is none. */
   leakPath: readonly [number, number, number][] | null = null;
@@ -1361,6 +1362,11 @@ export class EditorApp {
     return this.compiling;
   }
 
+  /** The active compile tool while compiling, or null when idle. */
+  get compileStage(): string | null {
+    return this.compileStageValue;
+  }
+
   /** Cancels the running compile, if any. */
   cancelCompile(): void {
     this.cancelCompileWorker?.();
@@ -1373,7 +1379,7 @@ export class EditorApp {
    * the log and saves the .bsp. A leak stops the chain and keeps the
    * pointfile for the leak display.
    */
-  async compileMap(profile: CompileProfile): Promise<boolean> {
+  async compileMap(options: CompileOptions): Promise<boolean> {
     if (!this.compileRunner || !this.vfs) {
       this.log('warning', 'Open a game folder before compiling.');
       return false;
@@ -1405,16 +1411,20 @@ export class EditorApp {
     }
     const colormap = await this.vfs.readFile('pics/colormap.pcx');
     this.compiling = true;
-    this.log('info', `Compiling ${mapName} (${profile})…`);
+    this.log('info', `Compiling ${mapName} (VIS ${options.vis}, lighting ${options.lighting})…`);
     this.emit({ type: 'document' });
     try {
       const result = await runCompilePipeline(
         this.compileRunner,
-        profile,
+        options,
         mapName,
         exported.text,
         wals,
         colormap ?? null,
+        (tool) => {
+          this.compileStageValue = tool;
+          this.emit({ type: 'document' });
+        },
       );
       if (result.leaked) {
         this.leakPath = result.pts ? parsePts(new TextDecoder().decode(result.pts)) : null;
@@ -1431,10 +1441,15 @@ export class EditorApp {
       this.log('ok', `Compiled ${bspName} (${result.bsp.byteLength} bytes).`);
       return saved;
     } catch (error) {
-      this.log('error', `Compile failed: ${errorText(error)}`);
+      if (errorText(error) === 'compile cancelled') {
+        this.log('info', 'Compile cancelled.');
+      } else {
+        this.log('error', `Compile failed: ${errorText(error)}`);
+      }
       return false;
     } finally {
       this.compiling = false;
+      this.compileStageValue = null;
       this.emit({ type: 'document' });
     }
   }

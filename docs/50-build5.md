@@ -511,7 +511,7 @@ flowchart LR
 
 ---
 
-### T2.10 – Compile option matrix
+### T2.10 – Compile option matrix — DONE
 
 **TODO item:** compile should support building only a plain BSP without lightmaps for quick playtesting.
 
@@ -560,7 +560,7 @@ flowchart LR
 
 ---
 
-### T2.11 – Compile spinner, stage display and persistent cancel
+### T2.11 – Compile spinner, stage display and persistent cancel — DONE
 
 **TODO item:** compile should show progress and a cancel button.
 

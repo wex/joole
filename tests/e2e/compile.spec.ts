@@ -47,9 +47,9 @@ test('compiles the map in the browser through all three tools', async ({ page })
 
   // Compile with the fast profile through the toolbar menu.
   await page.locator('[data-testid=compile-button]').click();
-  await expect(page.locator('[data-testid=compile-normal]')).toBeVisible();
+  await expect(page.locator('[data-testid=compile-start]')).toBeVisible();
   const download = page.waitForEvent('download', { timeout: 60000 });
-  await page.locator('[data-testid=compile-normal]').click();
+  await page.locator('[data-testid=compile-start]').click();
   const file = await download;
   expect(file.suggestedFilename()).toMatch(/\.bsp$/);
   const filePath = await file.path();
@@ -70,8 +70,15 @@ test('compiles the map in the browser through all three tools', async ({ page })
   // The other two profiles compile the sample as well (Gate 5's rehearsal).
   for (const profile of ['fast', 'final'] as const) {
     await page.locator('[data-testid=compile-button]').click();
+    if (profile === 'fast') {
+      await page.locator('[data-testid=compile-vis]').selectOption('fast');
+      await page.locator('[data-testid=compile-lighting]').selectOption('off');
+    } else {
+      await page.locator('[data-testid=compile-vis]').selectOption('full');
+      await page.locator('[data-testid=compile-lighting]').selectOption('final');
+    }
     const nextDownload = page.waitForEvent('download', { timeout: 60000 });
-    await page.locator(`[data-testid=compile-${profile}]`).click();
+    await page.locator('[data-testid=compile-start]').click();
     const nextFile = await nextDownload;
     expect(nextFile.suggestedFilename()).toMatch(/\.bsp$/);
     const nextPath = await nextFile.path();

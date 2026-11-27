@@ -562,7 +562,7 @@ The implementation proceeds in five phases. Each phase ends with a usable versio
 **Decisions 27.11.2026 (phase 2 scope):**
 
 - **BSP import remains out of scope.** Test-only readers of BSP lumps may be used to verify compiler output, but the product does not decompile or open BSP files for editing.
-- **Compile options are a matrix.** qbsp3 always runs; VIS and lighting are independent options, with lighting quality normal/final. A qbsp-only compile is the quick plain-BSP playtesting path.
+- **Compile options are a matrix.** qbsp3 always runs; VIS is Off/Fast/Full and lighting is Off/Normal/Final independently. Lighting without VIS is allowed because qrad3 treats missing visdata as all-visible. A qbsp-only compile is the quick plain-BSP playtesting path. Compile state exposes the active tool rather than a fake percentage, with persistent cancellation.
 - **Compile feedback is stage-based.** The UI shows a spinner and the active tool/stage plus cancellation; it does not present a false percentage because the original tools emit no machine-readable progress.
 - **Panel layouts are bounded named arrangements.** Users can save and apply arrangements of the existing panels, panel visibility/order, sizes and viewport maximized state. Free docking and floating windows remain out of scope.
 - **2D overlap cycling is closest-first.** “Topmost” means closest to the orthographic viewer along the hidden axis. Edge candidates remain grouped before interior candidates for usability, and both groups order candidates by that closeness.
