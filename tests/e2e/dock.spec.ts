@@ -71,6 +71,13 @@ test('the bottom panel starts collapsed and expands on tab click (T15.9)', async
   await expect(page.getByRole('separator', { name: 'Resize bottom panel' })).toHaveCount(0);
   await expect(page.getByRole('tab', { name: 'Tree' })).toBeVisible();
 
+  // The collapsed strip is flush with the window's bottom edge (T16.3).
+  const flush = await page.evaluate(() => {
+    const panel = document.querySelector('[class*=bottomPanel]')?.getBoundingClientRect();
+    return panel ? Math.round(window.innerHeight - panel.bottom) : -1;
+  });
+  expect(flush).toBe(0);
+
   // Clicking the Tree tab expands the panel on that tab.
   await page.getByRole('tab', { name: 'Tree' }).click();
   await expect(page.locator('[data-testid=tree-view]')).toBeVisible();

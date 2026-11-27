@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { createEmptyDocument, addNodePatch, applyPatch } from '@core/doc/index';
+import { createEmptyDocument, addNodePatch, applyPatch, buildDocument } from '@core/doc/index';
 import { analyzeBrush, extractWireframe, validateBrush } from '@core/geom/index';
-import type { BrushNode, Command, MapDocument } from '@core/types/index';
+import type { BrushNode, Command, EntityNode, MapDocument } from '@core/types/index';
 import { makeBox } from '../core/geom/__tests__/helpers';
 import {
   BrushTool,
@@ -266,6 +266,30 @@ describe('typed brush size (T15.4)', () => {
     expect(box.min.map((x) => x + 0)).toEqual([-32, 16, 0]);
     expect(box.max.map((x) => x + 0)).toEqual([96, 48, 64]);
     expect(resizeToCommand(doc, new Set(), [8, 8, 8])).toBeNull();
+  });
+
+  it('frames a selected group by its member brushes (T16.2)', () => {
+    const nodes = new Map();
+    const world: EntityNode = {
+      kind: 'entity',
+      id: 'world',
+      props: [['classname', 'worldspawn']],
+      children: ['g1', 'g3'],
+    };
+    nodes.set('world', world);
+    nodes.set('a', { ...makeBox([0, 0, 0], [64, 64, 64]), id: 'a' });
+    nodes.set('b', { ...makeBox([128, 0, 0], [192, 64, 64]), id: 'b' });
+    nodes.set('g1', { kind: 'group', id: 'g1', name: 'group', props: [], children: ['a', 'b'] });
+    nodes.set('g3', { kind: 'group', id: 'g3', name: 'empty', props: [], children: [] });
+    const doc = buildDocument('world', nodes);
+
+    // The group's bounds span both member brushes.
+    const bounds = selectionBounds(doc, new Set(['g1']))!;
+    expect(bounds).not.toBeNull();
+    expect(bounds.min.map((x) => x + 0)).toEqual([0, 0, 0]);
+    expect(bounds.max.map((x) => x + 0)).toEqual([192, 64, 64]);
+    // An empty group has no bounds.
+    expect(selectionBounds(doc, new Set(['g3']))).toBeNull();
   });
 });
 

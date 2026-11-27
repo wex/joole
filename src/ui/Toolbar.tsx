@@ -404,6 +404,9 @@ export function Toolbar(props: ToolbarProps) {
         <Icon name="lock" />
       </button>
       <span class={styles.spacer} />
+      <span class={styles.version} data-testid="app-version" title={`Build ${__JOOLE_BUILD__}`}>
+        v{__JOOLE_VERSION__}
+      </span>
       <button
         type="button"
         class={styles.iconButton}

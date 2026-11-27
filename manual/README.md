@@ -158,7 +158,7 @@ The panel sizes, the collapsed sections and the splitter positions are remembere
 
 ![The complete toolbar](images/toolbar.png)
 
-The toolbar is arranged left to right in functional groups.
+The toolbar is arranged left to right in functional groups. At the right end, before the theme toggle, the application version is shown in muted text — hovering it reveals the exact build.
 
 Picking a tool — from the toolbar, with its shortcut or from a view's context menu — shows a large translucent overlay at the bottom centre of the views for a few seconds: the tool's icon, name, shortcut and a one-line description. The overlay never blocks the views, it hides while fly mode is on, and **Settings → Show tool overlay** turns it off.
 
@@ -679,7 +679,7 @@ This example builds and tests a simple room using the features described above.
 
 ### Editing commands
 
-Point at a view and press `Space` to frame the selection so it fills about half of that view. The zoom and the centre change; the depth coordinate of an orthographic camera stays, so brush painting keeps its working plane. With the pointer over the 3D view, the perspective camera frames the selection from its current direction. With nothing selected, `Space` does nothing. A control focused with the keyboard keeps `Space` for itself.
+Point at a view and press `Space` to frame the selection so it fills about half of that view. The zoom and the centre change; the depth coordinate of an orthographic camera stays, so brush painting keeps its working plane. With the pointer over the 3D view, the perspective camera frames the selection from its current direction. With nothing selected, `Space` does nothing. A control focused with the keyboard keeps `Space` for itself. Groups and brush entities frame their member contents.
 
 | Shortcut       | Action                                                                     |
 | -------------- | -------------------------------------------------------------------------- |

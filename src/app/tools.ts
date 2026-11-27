@@ -139,29 +139,41 @@ function depthAxis(view: ToolView): 0 | 1 | 2 {
 
 function boundsOf(doc: Readonly<MapDocument>, ids: ReadonlySet<Id>): Aabb | null {
   let out: Aabb | null = null;
-  for (const id of ids) {
+  // Groups and brush entities carry their geometry in their children, so the
+  // lookup descends: selecting a group frames its member brushes (T16.2).
+  const expand = (id: Id, depth: number): Id[] => {
+    if (depth > 32) return [];
     const node = doc.nodes.get(id);
-    if (node?.kind !== 'brush') {
-      continue;
+    if (!node) return [];
+    if (node.kind === 'brush') return [id];
+    return node.children.flatMap((child) => expand(child, depth + 1));
+  };
+  for (const id of ids) {
+    const brushIds = expand(id, 0);
+    for (const brushId of brushIds) {
+      const node = doc.nodes.get(brushId);
+      if (node?.kind !== 'brush') {
+        continue;
+      }
+      const box = analyzeBrush(node).aabb;
+      if (!box) {
+        continue;
+      }
+      out = out
+        ? {
+            min: [
+              Math.min(out.min[0], box.min[0]),
+              Math.min(out.min[1], box.min[1]),
+              Math.min(out.min[2], box.min[2]),
+            ],
+            max: [
+              Math.max(out.max[0], box.max[0]),
+              Math.max(out.max[1], box.max[1]),
+              Math.max(out.max[2], box.max[2]),
+            ],
+          }
+        : box;
     }
-    const box = analyzeBrush(node).aabb;
-    if (!box) {
-      continue;
-    }
-    out = out
-      ? {
-          min: [
-            Math.min(out.min[0], box.min[0]),
-            Math.min(out.min[1], box.min[1]),
-            Math.min(out.min[2], box.min[2]),
-          ],
-          max: [
-            Math.max(out.max[0], box.max[0]),
-            Math.max(out.max[1], box.max[1]),
-            Math.max(out.max[2], box.max[2]),
-          ],
-        }
-      : box;
   }
   return out;
 }

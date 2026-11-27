@@ -49,6 +49,13 @@ List of items to implement or fix:
     - Add tabs for settings - keep current settings in General -tab and add a new tab for Colors
     - Add a reset button to reset all colors to default
 
+- Phase 1.6: More features and fixes
+  - Add a version & build number to the app
+    - It should be displayed in top bar, before the dark/light mode toggle
+  - When a group is selected, pressing space should focus on the group
+  - There is a gap between bottom panel and app window while it's toggled closed - it should be flush with the window
+  - App should remember panel widths/heights, when those are resized - now resizing Properties/textures -panel is resetted - store in settings.
+
 - Phase 2: Future features
   - User should be able to create, save and load projects
   - User should be able to create custom arrangements of tools/windows in app and save them

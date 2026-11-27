@@ -415,6 +415,56 @@ test('an edit autosaves and reload offers recovery', async ({ page }) => {
   expect(errors).toEqual([]);
 });
 
+test('Space frames a selected group (T16.2)', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.locator('[data-testid=editor-shell]')).toBeVisible();
+
+  type Joole = {
+    joole: {
+      camera(name: string): { center: [number, number, number]; zoom: number };
+      viewRects(): Record<string, { x: number; y: number; width: number; height: number }>;
+      selection(): string[];
+    };
+  };
+
+  // Draw a box in the Top view.
+  await page.getByRole('button', { name: 'Brush (B)' }).click();
+  const top = await page.evaluate(() => {
+    const joole = (window as unknown as Joole).joole;
+    const cam = joole.camera('top');
+    const rect = joole.viewRects()['top']!;
+    const canvas = document.querySelector('canvas')!.getBoundingClientRect();
+    const ratio = window.devicePixelRatio || 1;
+    const toScreen = (wx: number, wy: number) => ({
+      x: canvas.left + rect.x + (wx - cam.center[0]) * (cam.zoom / ratio) + rect.width / 2,
+      y: canvas.top + rect.y - (wy - cam.center[1]) * (cam.zoom / ratio) + rect.height / 2,
+    });
+    return {
+      a: toScreen(0, 0),
+      b: toScreen(64, 64),
+      cx: canvas.left + rect.x + rect.width / 2,
+      cy: canvas.top + rect.y + rect.height / 2,
+    };
+  });
+  await page.mouse.move(top.a.x, top.a.y);
+  await page.mouse.down();
+  await page.mouse.move(top.b.x, top.b.y, { steps: 4 });
+  await page.mouse.up();
+
+  // Group the brush: the selection now holds the group, not the brush.
+  await page.keyboard.press('Control+g');
+  await page.waitForTimeout(200);
+
+  // Space in the Top view frames the group's members.
+  const before = await page.evaluate(() => (window as unknown as Joole).joole.camera('top'));
+  await page.mouse.move(top.cx, top.cy);
+  await page.keyboard.press(' ');
+  const after = await page.evaluate(() => (window as unknown as Joole).joole.camera('top'));
+  expect(after.center[0]).toBeCloseTo(32, 1);
+  expect(after.center[1]).toBeCloseTo(32, 1);
+  expect(after.zoom).not.toBeCloseTo(before.zoom, 2);
+});
+
 test('Space frames the selection in the hovered view (T15.5)', async ({ page }) => {
   await page.goto('/');
   await expect(page.locator('[data-testid=editor-shell]')).toBeVisible();
@@ -468,4 +518,18 @@ test('Space frames the selection in the hovered view (T15.5)', async ({ page }) 
   expect(fill).toBeLessThan(0.7);
   // The depth coordinate does not jump.
   expect(after.center[2]).toBeCloseTo(before.center[2], 5);
+});
+
+test('the top bar shows the application version before the theme toggle', async ({ page }) => {
+  await openEditor(page);
+  const version = page.locator('[data-testid=app-version]');
+  await expect(version).toHaveText(/^v\d+\.\d+\.\d+$/);
+  // It sits immediately before the theme toggle.
+  const order = await page.evaluate(() => {
+    const v = document.querySelector('[data-testid=app-version]');
+    const t = document.querySelector('[aria-label*="Theme"]');
+    if (!v || !t) return 'missing';
+    return v.compareDocumentPosition(t) & Node.DOCUMENT_POSITION_FOLLOWING ? 'before' : 'after';
+  });
+  expect(order).toBe('before');
 });

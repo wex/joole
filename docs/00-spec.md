@@ -477,6 +477,13 @@ The implementation proceeds in five phases. Each phase ends with a usable versio
 4. **Entities and structure.** The definition file parser, the entity panel, brush entities, the tree view, groups and entering a group, prefabs, md2 preview and `target` lines. _Done when_ a working single-player level (player start, door, button, enemy) can be made from start to finish.
 5. **Compilation and polish.** WASM tools in the browser (qbsp3, qvis3 and qrad3 in workers, threads), the leak path, compile profiles, PWA, the performance targets and Firefox/Safari support. _Done when_ the targets in the performance table are met and a map compiles to a playable BSP file without leaving the browser.
 
+**Decisions 27.11.2026:**
+
+- **Version and build in the top bar (27.11.2026):** the toolbar shows the application version in muted text before the theme toggle, with the exact build hash in its tooltip. The version source of truth is the `version` field of `package.json` and the build is the git short hash; both are injected at build time with vite's `define`, and the hash falls back to `dev` where git is unavailable (T16.1).
+- **Framing groups (27.11.2026):** Space framing resolves groups and brush entities to their member brushes, nested groups included, so selecting a group frames its contents. Point entities without brush children have no bounds and do not frame (T16.2).
+- **The collapsed bottom panel (27.11.2026):** while collapsed, the panel occupies exactly its tab strip at the window's bottom edge with no gap; the splitter's grid track collapses with it because the splitter itself is absent from the DOM (T16.3).
+- **Persisted panel sizes (27.11.2026):** the right dock's width, the bottom panel's height, the dock split and the collapsed states are applied from the persisted settings on startup through reactive effects, not only during drags (T16.4).
+
 **Decisions 26.11.2026:**
 
 - **The tool overlay (26.11.2026):** a user-initiated tool change — the toolbar, the shortcuts, V's vertex/edge toggle, the context menu's Add Brush — shows a translucent chip at the bottom centre of the views for 2.5 s with the tool's icon, name, shortcut and a one-line description. It appears and disappears without a fade, because the design system allows animation only when menus open. The overlay hides while fly mode owns the keyboard, the Settings dialog can turn it off, and the one tool-metadata table in `app/toolInfo.ts` feeds both the overlay and the toolbar titles (T1.16).
