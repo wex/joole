@@ -262,7 +262,7 @@ The Select tool picks and transforms whole brushes.
 - Click a brush in any view to replace the selection.
 - `Shift+click` adds a brush or removes an already selected brush.
 - Repeated plain clicks at the same position cycle through every overlapping brush, starting with the brush closest to the viewer in that orthographic view. If you press the mouse on the already selected brush and actually drag, the drag keeps operating on that brush instead of advancing the cycle.
-- Drag on empty space in an orthographic view for a box selection. Every brush whose projected bounding box intersects the rectangle is selected.
+- Drag on empty space in an orthographic view for a box selection. Every brush or point entity whose projected bounding box intersects the rectangle is selected.
 - Click empty space without `Shift` clears the selection.
 
 **Transforms:**
@@ -276,7 +276,7 @@ A drag is merged into one undo step even though intermediate positions are appli
 
 **Typing a size:** with brushes selected, point at an orthographic view and press `Enter`. A field opens at the selection's centre with its current size as _width height depth_ of that view — in Front, for example, width is X, height is Z and depth is Y. Type a new size and press `Enter`: the selection is resized around its centre in one undo step. `Escape` cancels. Typed sizes are used exactly and are not snapped to the grid.
 
-View picking is brush-based. Pick point entities, groups and brush-entity containers in the **Tree** tab; their properties then appear in the right panel.
+Point entities can be picked in the 2D and 3D views by their visible helper box and dragged like brushes; moving them rewrites their `origin` key. Clicking a brush that belongs to a brush entity selects the brush first; repeating the click escalates to the containing brush entity, and dragging that entity moves all its child brushes. Groups and entity containers can also be picked in the **Tree** tab; their properties then appear in the right panel.
 
 ### Brush (`B`)
 

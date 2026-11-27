@@ -159,7 +159,7 @@ flowchart LR
 
 ---
 
-### T2.2 – Entity picking, selection bounds and movement
+### T2.2 – Entity picking, selection bounds and movement — DONE
 
 **TODO item:** entities cannot be selected; consequently they cannot be moved.
 
