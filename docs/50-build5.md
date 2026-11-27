@@ -117,7 +117,7 @@ flowchart LR
 
 ---
 
-### T2.1 – Closest-first 2D overlap cycling
+### T2.1 – Closest-first 2D overlap cycling — DONE
 
 **TODO item:** clicking overlapping brushes in a 2D view cycles all brushes at that position, starting from the topmost.
 

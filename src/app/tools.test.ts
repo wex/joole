@@ -84,6 +84,30 @@ describe('SelectTool event scripts', () => {
     expect(analyzeBrush(other as BrushNode).aabb?.min[0]).toBe(0);
   });
 
+  it('repeated plain clicks cycle overlapping 2D brushes closest-first without breaking drags', () => {
+    let doc = createEmptyDocument();
+    for (const b of [
+      brush('low', [0, 0, 0], [64, 64, 64]),
+      brush('high', [0, 0, 64], [64, 64, 128]),
+    ]) {
+      doc = applyPatch(doc, addNodePatch(doc, doc.worldspawn, b));
+    }
+    const tool = new SelectTool(() => doc, 8);
+
+    expect([...(tool.pointer(down(32, 32)).selection ?? [])]).toEqual(['high']);
+    tool.pointer(up(32, 32));
+
+    tool.pointer(down(32, 32));
+    expect([...(tool.pointer(up(32, 32)).selection ?? [])]).toEqual(['low']);
+    tool.pointer(down(32, 32));
+    expect([...(tool.pointer(up(32, 32)).selection ?? [])]).toEqual(['high']);
+
+    // Once the mouse actually moves, the click is a drag of the current hit
+    // rather than a selection-cycle click.
+    const commands = runScript(tool, [down(32, 32), move(48, 32), up(48, 32)]);
+    expect(commands.length).toBeGreaterThan(0);
+  });
+
   it('dragging a selected brush produces merged translation commands snapped to the grid', () => {
     const doc = documentWithBrushes();
     const tool = new SelectTool(() => doc, 8);

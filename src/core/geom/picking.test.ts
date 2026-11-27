@@ -87,6 +87,39 @@ describe('BrushBvh', () => {
     expect(bvh.pick2D([128, 128, 128], 'xy', 4)).toEqual([]);
   });
 
+  it('orders overlapping interior hits closest-first in every orthographic view', () => {
+    const bvh = new BrushBvh();
+    // Top: larger Z is closer to the viewer.
+    bvh.insert('low-z', brush('low-z', [0, 0, 0], [64, 64, 64]));
+    bvh.insert('high-z', brush('high-z', [0, 0, 64], [64, 64, 128]));
+    expect(bvh.pick2D([32, 32, 0], 'xy', 4).map((hit) => hit.id)).toEqual(['high-z', 'low-z']);
+
+    // Front: smaller Y is closer to the viewer.
+    const front = new BrushBvh();
+    front.insert('back-y', brush('back-y', [0, 64, 0], [64, 128, 64]));
+    front.insert('front-y', brush('front-y', [0, 0, 0], [64, 64, 64]));
+    expect(front.pick2D([32, 0, 32], 'xz', 4).map((hit) => hit.id)).toEqual(['front-y', 'back-y']);
+
+    // Side: larger X is closer to the viewer.
+    const side = new BrushBvh();
+    side.insert('low-x', brush('low-x', [0, 0, 0], [64, 64, 64]));
+    side.insert('high-x', brush('high-x', [64, 0, 0], [128, 64, 64]));
+    expect(side.pick2D([0, 32, 32], 'yz', 4).map((hit) => hit.id)).toEqual(['high-x', 'low-x']);
+  });
+
+  it('keeps edge hits before interior hits but orders edge hits closest-first', () => {
+    const bvh = new BrushBvh();
+    bvh.insert('far-edge', brush('far-edge', [0, 0, 0], [64, 64, 64]));
+    bvh.insert('near-edge', brush('near-edge', [0, 0, 64], [64, 64, 128]));
+    bvh.insert('inside-only', brush('inside-only', [8, 8, 192], [56, 56, 256]));
+    const hits = bvh.pick2D([1, 32, 0], 'xy', 4);
+    expect(hits.map((hit) => hit.id)).toEqual(['near-edge', 'far-edge']);
+    expect(hits.every((hit) => hit.kind === 'edge')).toBe(true);
+
+    const inside = bvh.pick2D([32, 32, 0], 'xy', 1);
+    expect(inside.map((hit) => hit.id)).toEqual(['inside-only', 'near-edge', 'far-edge']);
+  });
+
   it('fast-check: BVH AABB queries match brute force', () => {
     const arb = fc.array(
       fc.record({

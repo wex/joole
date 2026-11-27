@@ -261,7 +261,7 @@ The Select tool picks and transforms whole brushes.
 
 - Click a brush in any view to replace the selection.
 - `Shift+click` adds a brush or removes an already selected brush.
-- When overlapping unselected brushes are hit at the same position, clicks can cycle between them; a brush that is already selected takes precedence in the current picking implementation.
+- Repeated plain clicks at the same position cycle through every overlapping brush, starting with the brush closest to the viewer in that orthographic view. If you press the mouse on the already selected brush and actually drag, the drag keeps operating on that brush instead of advancing the cycle.
 - Drag on empty space in an orthographic view for a box selection. Every brush whose projected bounding box intersects the rectangle is selected.
 - Click empty space without `Shift` clears the selection.
 

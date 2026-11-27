@@ -848,6 +848,8 @@ export class SelectTool {
   private mode: Mode = { kind: 'idle' };
   private dragSerial = 0;
   private preview: ToolPreview | null = null;
+  private dragChanged = false;
+  private pendingCycle: { hits: readonly Id[]; selected: Id } | null = null;
 
   private readonly gridSize: () => number;
 
@@ -916,6 +918,8 @@ export class SelectTool {
   cancel(): void {
     this.mode = { kind: 'idle' };
     this.preview = null;
+    this.dragChanged = false;
+    this.pendingCycle = null;
   }
 
   private rebuild(): void {
@@ -927,7 +931,7 @@ export class SelectTool {
     }
   }
 
-  private hit(event: ToolPointerEvent): Id | null {
+  private hit(event: ToolPointerEvent, trackClick = false): Id | null {
     const hits =
       event.view === '3d'
         ? this.bvh.rayHits(event.point, event.direction ?? [1, 0, 0]).map((hit) => hit.id)
@@ -939,15 +943,29 @@ export class SelectTool {
     }
     const selectedHit = resolved.find((id) => this.selected.has(id));
     if (selectedHit !== undefined) {
+      // A drag must keep operating on the already selected object. For a
+      // plain 2D click the advance is therefore deferred until pointer-up,
+      // when we know that no drag happened.
+      this.pendingCycle =
+        trackClick &&
+        event.view !== '3d' &&
+        !event.shift &&
+        !event.ctrl &&
+        this.selected.size === 1 &&
+        resolved.length > 1
+          ? { hits: resolved, selected: selectedHit }
+          : null;
       return selectedHit;
     }
+    this.pendingCycle = null;
     const key = event.point.map((x) => Math.round(x / Math.max(1, this.gridSize()))).join(':');
     return this.cycler.choose(resolved, `${event.view}:${key}`);
   }
 
   private pointerDown(event: ToolPointerEvent): ToolOutput {
     this.doc = this.getDocument();
-    const hit = this.hit(event);
+    this.dragChanged = false;
+    const hit = this.hit(event, true);
     const key = `drag-${++this.dragSerial}`;
     const bounds = boundsOf(this.doc, this.selected);
     if (bounds && this.nearCorner(event, bounds)) {
@@ -1060,6 +1078,7 @@ export class SelectTool {
         this.mode.last[1] + delta[1],
         this.mode.last[2] + delta[2],
       ];
+      this.dragChanged = true;
       return {
         commands: [
           createTransformCommand('Move selection', [...this.selected], mat4Translation(delta), {
@@ -1086,6 +1105,7 @@ export class SelectTool {
         return { commands: [] };
       }
       this.mode.last = event.point;
+      this.dragChanged = true;
       return {
         commands: [
           createTransformCommand(
@@ -1129,6 +1149,7 @@ export class SelectTool {
         return { commands: [] };
       }
       this.mode.current = target;
+      this.dragChanged = true;
       return {
         commands: [
           createTransformCommand(
@@ -1155,9 +1176,20 @@ export class SelectTool {
       this.selected = selection;
       this.mode = { kind: 'idle' };
       this.preview = null;
+      this.pendingCycle = null;
       return { commands: [], selection, preview: [] };
     }
     this.mode = { kind: 'idle' };
+    const cycle = this.pendingCycle;
+    const changed = this.dragChanged;
+    this.pendingCycle = null;
+    this.dragChanged = false;
+    if (cycle && !changed) {
+      const index = cycle.hits.indexOf(cycle.selected);
+      const next = cycle.hits[(index + 1) % cycle.hits.length]!;
+      this.selected = new Set([next]);
+      return { commands: [], selection: this.selected, editing: new Set(this.selected) };
+    }
     return { commands: [], editing: new Set() };
   }
 
