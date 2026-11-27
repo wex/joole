@@ -335,7 +335,7 @@ export function Toolbar(props: ToolbarProps) {
         class={styles.iconButton}
         title="Save"
         aria-label="Save"
-        onClick={props.onSaveProject}
+        onClick={() => props.onSaveProject()}
       >
         <Icon name="save" />
       </button>
@@ -346,7 +346,7 @@ export function Toolbar(props: ToolbarProps) {
         title="Undo"
         aria-label="Undo"
         disabled={!props.canUndo}
-        onClick={props.onUndo}
+        onClick={() => props.onUndo()}
       >
         <Icon name="undo" />
       </button>
@@ -356,7 +356,7 @@ export function Toolbar(props: ToolbarProps) {
         title="Redo"
         aria-label="Redo"
         disabled={!props.canRedo}
-        onClick={props.onRedo}
+        onClick={() => props.onRedo()}
       >
         <Icon name="redo" />
       </button>

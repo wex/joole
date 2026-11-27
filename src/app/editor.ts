@@ -41,6 +41,7 @@ import type { EntityClassDef } from '@core/formats/index';
 import type {
   Command,
   ConvertedTexture,
+  FaceTexture,
   Inflate,
   MapDocument,
   Patch,
@@ -1343,12 +1344,14 @@ export class EditorApp {
       this.log('warning', 'A compile is already running.');
       return false;
     }
+    const mapName = (this.map?.replace(/\.(map|joole\.json)$/i, '') || 'untitled') + '.map';
+    // The .wal headers of every texture the map uses. Loading them before
+    // export lets the writer emit edited surface flags and light values.
+    await this.loadWalAttribs([...this.texturesInUse()]);
     const exported = this.exportMapText();
     for (const warning of exported.warnings) {
       this.log('warning', warning);
     }
-    const mapName = (this.map?.replace(/\.(map|joole\.json)$/i, '') || 'untitled') + '.map';
-    // The .wal headers of every texture the map uses.
     const wals: { name: string; data: Uint8Array }[] = [];
     const missing: string[] = [];
     for (const name of this.texturesInUse()) {
@@ -1399,7 +1402,10 @@ export class EditorApp {
   }
 
   exportMapText(): { text: string; warnings: string[] } {
-    return writeMap(this.document, { mode: 'export' });
+    return writeMap(this.document, {
+      mode: 'export',
+      writeAttribs: (face) => this.shouldWriteFaceAttribs(face),
+    });
   }
 
   async saveProject(): Promise<boolean> {
@@ -1441,6 +1447,35 @@ export class EditorApp {
       }
     }
     return [...names].sort();
+  }
+
+  private async loadWalAttribs(names: readonly string[]): Promise<void> {
+    if (!this.vfs) return;
+    for (const name of names) {
+      if (this.walAttribs.has(name)) continue;
+      const bytes = await this.vfs.readFile(`textures/${name}.wal`);
+      if (!bytes) continue;
+      try {
+        const header = readWalHeader(new Uint8Array(bytes));
+        this.walAttribs.set(name, {
+          flags: header.flags,
+          contents: header.contents,
+          value: header.value,
+        });
+      } catch {
+        // An unreadable wal is treated as missing for attribute purposes.
+      }
+    }
+  }
+
+  private shouldWriteFaceAttribs(face: { tex: FaceTexture }): boolean {
+    const t = face.tex;
+    if (t.attribsInFile) return true;
+    const defaults = this.walAttribs.get(t.name);
+    if (!defaults) return true;
+    return (
+      t.contents !== defaults.contents || t.flags !== defaults.flags || t.value !== defaults.value
+    );
   }
 
   /**
@@ -1676,6 +1711,7 @@ export class EditorApp {
 
   async exportMap(): Promise<boolean> {
     if (!this.saveMapText) return false;
+    await this.loadWalAttribs([...this.texturesInUse()]);
     const result = this.exportMapText();
     for (const warning of result.warnings) this.log('warning', warning);
     const name = (this.map?.replace(/\.(map|joole\.json)$/i, '') ?? 'untitled') + '.map';
