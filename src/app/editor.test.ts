@@ -184,6 +184,30 @@ describe('EditorApp', () => {
     expect(conversionCount()).toBe(1);
   });
 
+  it('compile cancellation is a controlled non-error abort that returns to idle', async () => {
+    const { app } = makeApp();
+    expect(await app.openGameEntries(textureGameEntries(), 'fixture game')).toBe(true);
+    let rejectStep: ((error: Error) => void) | null = null;
+    app.compileRunner = () =>
+      new Promise((_resolve, reject) => {
+        rejectStep = reject;
+      });
+    app.cancelCompileWorker = () => rejectStep?.(new Error('compile cancelled'));
+
+    const running = app.compileMap({ vis: 'full', lighting: 'normal' });
+    for (let i = 0; i < 20 && !app.isCompiling; i++) {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    }
+    expect(app.isCompiling).toBe(true);
+
+    app.cancelCompile();
+    expect(await running).toBe(false);
+    expect(app.isCompiling).toBe(false);
+    expect(app.compileStage).toBeNull();
+    const last = app.logEntries().at(-1);
+    expect(last).toMatchObject({ level: 'info', text: 'Compile cancelled.' });
+  });
+
   it('keeps grid sizes to powers of two from 1 to 256', () => {
     const { app } = makeApp();
 

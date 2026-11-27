@@ -91,7 +91,7 @@ flowchart LR
 
 ## 4. Work packages
 
-### T2.0 – Phase-2 scope and build-5 work order
+### T2.0 – Phase-2 scope and build-5 work order — DONE
 
 **Goal:** make the repository documentation match the approved scope before code changes.
 
@@ -118,6 +118,8 @@ flowchart LR
 ---
 
 ### T2.1 – Closest-first 2D overlap cycling — DONE
+
+**Implementation note (27.11.2026):** Implemented closest-first ordering within edge/interior candidate groups, whole-list repeated-click cycling and drag preservation of the already selected object; covered by unit and Chromium E2E tests.
 
 **TODO item:** clicking overlapping brushes in a 2D view cycles all brushes at that position, starting from the topmost.
 
@@ -160,6 +162,8 @@ flowchart LR
 ---
 
 ### T2.2 – Entity picking, selection bounds and movement — DONE
+
+**Implementation note (27.11.2026):** Implemented point-entity picking and grid-snapped movement in orthographic and perspective views. Brush-entity viewport interaction remains brush-first, escalating to the whole entity on repeated click; mixed entity/brush transforms share undoable commands.
 
 **TODO item:** entities cannot be selected; consequently they cannot be moved.
 
@@ -221,6 +225,8 @@ flowchart LR
 
 ### T2.3 – Complete entity-key rows, worldspawn editing and verified defaults — DONE
 
+**Implementation note (27.11.2026):** Implemented editable worldspawn, virtual rows for documented absent keys, universal point-entity origin/angle rows and compiler/game-source-verified creation defaults. Existing maps are not backfilled; stale QUAKED prose is corrected from implementation evidence.
+
 **TODO items:** `worldspawn` is missing default properties; entities are missing default properties.
 
 **Owner decision:** implement **all documented keys**, not an invented universal defaults table. Values are filled only where a verified default exists; otherwise the row is visible but unset/blank.
@@ -280,6 +286,8 @@ flowchart LR
 
 ### T2.4 – Qoole-like sphere presets — DONE
 
+**Implementation note (27.11.2026):** Implemented fixed 14/18/20/26-face convex sphere presets with exact face counts. Arbitrary numeric input is normalized only at API boundaries; the UI exposes the four presets. Original `.qle` geometry was unavailable, so the approved algorithmic reconstruction is used.
+
 **TODO item:** creating a sphere with X sides does not work.
 
 **Current state:** `createPrimitiveBrush('sphere')` ignores `sides` completely and always creates an octahedron. The toolbar still exposes the numeric Sides input for every primitive.
@@ -320,6 +328,8 @@ flowchart LR
 
 ### T2.5 – Save toolbar button wiring — DONE
 
+**Implementation note (27.11.2026):** Wired the existing project save path to the toolbar button and its enabled/dirty state without expanding project lifecycle scope.
+
 **Scope addition discovered during research:** the Save toolbar button exists but is permanently disabled even though Ctrl+S/project saving works.
 
 **Design:**
@@ -341,6 +351,8 @@ flowchart LR
 ---
 
 ### T2.6 – Undo/redo toolbar and Edit-menu wiring — DONE
+
+**Implementation note (27.11.2026):** Wired the existing command history to toolbar and Edit-menu actions with correct enabled state; keyboard behavior is unchanged.
 
 **TODO item:** redo/undo functionality needs wiring.
 
@@ -370,6 +382,8 @@ flowchart LR
 ---
 
 ### T2.7 – Rearrangeable panel/viewport layout state — DONE
+
+**Implementation note (27.11.2026):** Implemented the bounded workspace model, Settings → Layout arrangement controls, viewport arrangement state and persistence. Free docking remains out of scope by design.
 
 **TODO item part:** users can create custom arrangements of tools/windows.
 
@@ -419,6 +433,8 @@ flowchart LR
 ---
 
 ### T2.8 – Named layouts in Settings → Layout — DONE
+
+**Implementation note (27.11.2026):** Implemented named layout save/apply/rename/update/delete/reset, tolerant settings parsing, size/split/collapse snapshots and persistence. Manual arrangement changes clear the active preset association.
 
 **TODO item part:** users can save custom arrangements.
 
@@ -515,6 +531,8 @@ flowchart LR
 
 ### T2.10 – Compile option matrix — DONE
 
+**Implementation note (27.11.2026):** Implemented typed VIS Off/Fast/Full and Lighting Off/Normal/Final options with qbsp3 unconditional. The UI uses two selectors rather than literal checkboxes, the documented logically equivalent alternative; qbsp-only and lighting-without-VIS combinations are covered by real-wasm tests.
+
 **TODO item:** compile should support building only a plain BSP without lightmaps for quick playtesting.
 
 **Owner decision:** use a **checkbox matrix**, not a new named profile or redefined Fast.
@@ -534,7 +552,7 @@ flowchart LR
   - old fast equivalent: fast VIS on, Lighting off;
   - old normal equivalent: full VIS on, Lighting Normal;
   - old final equivalent: full VIS on, Lighting Final;
-  - Lighting without VIS is allowed because qrad3 treats missing visdata as all-visible, but the log/UI notes it may be slower and the BSP remains unvised for engine use.
+  - Lighting without VIS is allowed, but verified qrad3 behavior is direct-only lighting with radiosity bounces disabled; the manual notes this quality limitation and the BSP remains unvised for engine use.
 - Replace `CompileProfile` with a typed options object. Since profiles were not persisted, no user-settings migration is needed.
 - Compile choices are session state unless implementation reveals an existing persistent profile setting; do not silently expand scope into persistent compiler preferences.
 
@@ -563,6 +581,8 @@ flowchart LR
 ---
 
 ### T2.11 – Compile spinner, stage display and persistent cancel — DONE
+
+**Implementation note (27.11.2026):** Implemented structured stage callbacks, a persistent spinner/status chip and always-visible cancellation. Cancellation terminates the current worker as a controlled abort, does not save partial output and returns the app to idle; browser E2E now covers cancellation and qbsp-only output.
 
 **TODO item:** compile should show progress and a cancel button.
 
@@ -604,7 +624,11 @@ flowchart LR
 
 ---
 
-### T2.12 – Final integration, documentation and verification
+### T2.12 – Final integration, documentation and verification — DONE
+
+**Implementation note (27.11.2026):** Phase-2 TODO entries are ticked, every work package is marked done with implementation notes, and the manual now uses current compile/entity/layout screenshots. Stale compile-menu selectors in the leak and offline E2E tests were updated to the matrix UI, Solid lint warnings in the new layout code were removed, and the type-aware canary received a realistic timeout because coverage instrumentation made it marginally exceed five seconds. No version bump was made (`package.json` remains 1.5.0).
+
+**Verification result (27.11.2026):** `pnpm check` passes (format, lint with zero warnings, typecheck, 621 passed + 3 skipped unit/integration tests, production build). `pnpm test:coverage` passes with core line coverage 94.78%. Full Chromium E2E passes: 74/74, including the production-preview offline compile smoke. Targeted Firefox and WebKit runs of settings, entity-panel and compile workflows pass: 16/16. Real-WASM lighting and compile-matrix tests are part of the passing unit/integration suite.
 
 **Goal:** close the phase coherently without a version bump.
 
@@ -645,7 +669,7 @@ flowchart LR
 | Layout refactor can re-trigger prior Solid/TDZ ordering bugs                                  | Extract pure layout model first; make small shell changes; test startup and reload paths carefully.                                            |
 | WAL defaults are asynchronous while `.map` export is synchronous                              | Make export/compile resolve required texture headers before writing; do not depend on whether the Properties panel happened to warm the cache. |
 | Lighting root cause may be more than surface-attribute omission                               | Build controlled fixtures first; split independent fixes into independent commits; do not patch qrad3 without proof.                           |
-| Lighting without VIS can be slow                                                              | Matrix permits it because qrad3 supports missing visdata as all-visible, but UI/log documentation sets expectations.                           |
+| Lighting without VIS is lower quality as well as potentially slow                             | Matrix permits it because qrad3 still performs direct lighting, but documentation states that radiosity bounces are disabled without VIS.      |
 | Compile cancellation is worker termination                                                    | Treat it as controlled pipeline abort; never save partial output as a successful compile.                                                      |
 | Settings schema grows complex                                                                 | Keep layout parsing pure and field-by-field tolerant; unknown keys survive; corrupt layout entries fall back individually.                     |
 

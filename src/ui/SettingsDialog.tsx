@@ -1,4 +1,4 @@
-import { createSignal, For, Show } from 'solid-js';
+import { createSignal, For, Show, untrack } from 'solid-js';
 import { COLOR_TOKENS, defaultColor } from '@app/colors';
 import {
   arrangementOfSnapshot,
@@ -57,7 +57,9 @@ const gridSizes = [1, 2, 4, 8, 16, 32, 64, 128, 256];
  */
 export function SettingsDialog(props: SettingsDialogProps) {
   const [tab, setTab] = createSignal<'general' | 'layout' | 'colors'>('general');
-  const [selectedLayout, setSelectedLayout] = createSignal(props.activeLayoutId ?? '');
+  const [selectedLayout, setSelectedLayout] = createSignal(
+    untrack(() => props.activeLayoutId) ?? '',
+  );
   const [layoutName, setLayoutName] = createSignal('');
   const [layoutError, setLayoutError] = createSignal<NamedLayoutError | null>(null);
   const tabs = [

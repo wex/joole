@@ -183,7 +183,7 @@ export function EditorShell(props: EditorShellProps) {
   const [activeLayoutId, setActiveLayoutId] = createSignal<string | null>(
     typeof initialSettings?.activeLayoutId === 'string' ? initialSettings.activeLayoutId : null,
   );
-  const initialMaximized = workspaceLayout().viewport;
+  const initialMaximized = untrack(workspaceLayout).viewport;
   const [maximizedView, setMaximizedView] = createSignal<ViewId | null>(
     initialMaximized === 'quad' ? null : initialMaximized,
   );
@@ -192,7 +192,9 @@ export function EditorShell(props: EditorShellProps) {
   const [compileLighting, setCompileLighting] = createSignal<'off' | 'normal' | 'final'>('normal');
   const [compiling, setCompiling] = createSignal(app.isCompiling);
   const [compileStage, setCompileStage] = createSignal<string | null>(app.compileStage);
-  const [bottomTab, setBottomTab] = createSignal<BottomTab>(workspaceLayout().bottomActiveTab);
+  const [bottomTab, setBottomTab] = createSignal<BottomTab>(
+    untrack(workspaceLayout).bottomActiveTab,
+  );
   const [bottomCollapsed, setBottomCollapsed] = createSignal(
     initialSettings?.bottomCollapsed !== false,
   );
@@ -1504,17 +1506,17 @@ export function EditorShell(props: EditorShellProps) {
       </Show>
 
       <div
-        class={[styles.main, workspaceLayout().rightDockVisible ? '' : styles.mainNoRightDock].join(
-          ' ',
-        )}
+        class={[styles.main, { [styles.mainNoRightDock!]: !workspaceLayout().rightDockVisible }]}
         ref={(el) => (mainElement = el)}
       >
         <div
           class={[
             styles.center,
-            bottomCollapsed() ? styles.centerCollapsed : '',
-            workspaceLayout().bottomDockVisible ? '' : styles.centerNoBottomDock,
-          ].join(' ')}
+            {
+              [styles.centerCollapsed!]: bottomCollapsed(),
+              [styles.centerNoBottomDock!]: !workspaceLayout().bottomDockVisible,
+            },
+          ]}
           ref={(el) => (centerElement = el)}
         >
           <div
@@ -1791,7 +1793,7 @@ export function EditorShell(props: EditorShellProps) {
           </Show>
           <Show when={workspaceLayout().bottomDockVisible}>
             <section
-              class={[styles.bottomPanel, bottomCollapsed() ? styles.collapsed : ''].join(' ')}
+              class={[styles.bottomPanel, { [styles.collapsed!]: bottomCollapsed() }]}
               aria-label="Textures and log"
             >
               <PanelTabs
@@ -1855,10 +1857,7 @@ export function EditorShell(props: EditorShellProps) {
                 {(section, index) => (
                   <>
                     <div
-                      class={[
-                        styles.dockSectionWrap,
-                        index() > 0 ? styles.dockSectionAfter : '',
-                      ].join(' ')}
+                      class={[styles.dockSectionWrap, { [styles.dockSectionAfter!]: index() > 0 }]}
                       style={rightSectionStyle(section.id, index(), visibleRightSections().length)}
                       data-testid={
                         section.id === 'textures' ? 'dock-textures-wrap' : `dock-${section.id}-wrap`

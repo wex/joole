@@ -57,7 +57,7 @@ test('the app starts and compiles fully offline', async ({ page, context }) => {
   // Compile offline through all three tools.
   await page.locator('[data-testid=compile-button]').click();
   const download = page.waitForEvent('download', { timeout: 60000 });
-  await page.locator('[data-testid=compile-normal]').click();
+  await page.locator('[data-testid=compile-start]').click();
   const file = await download;
   expect(file.suggestedFilename()).toMatch(/\.bsp$/);
   const filePath = await file.path();

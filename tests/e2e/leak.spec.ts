@@ -36,7 +36,7 @@ test('a leaking compile draws the pointfile path and N steps the camera along it
 
   // Compile: the map leaks, so no download happens and the log reports it.
   await page.locator('[data-testid=compile-button]').click();
-  await page.locator('[data-testid=compile-normal]').click();
+  await page.locator('[data-testid=compile-start]').click();
   await page.locator('#bottom-tab-log').click();
   await expect(page.locator('[data-testid=log-panel]')).toContainText('leaks', {
     timeout: 60000,

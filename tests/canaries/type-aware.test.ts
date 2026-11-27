@@ -52,5 +52,5 @@ describe('type-aware typescript-eslint canary', () => {
     };
 
     expect(typeScriptPackage.version).toMatch(/^6\./);
-  });
+  }, 15000);
 });

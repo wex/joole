@@ -57,17 +57,17 @@ List of items to implement or fix:
   - App should remember panel widths/heights, when those are resized - now resizing Properties/textures -panel is resetted - store in settings.
 
 - Phase 2: More features and fixes
-  - When clicking a brush in 2D view, selection should cycle through all brushes at that position, starting from the closest one
-  - Point entities should be selectable and movable in the views; brush entities should be movable as whole objects
-  - Worldspawn should expose its documented entity properties
-  - Entities should expose all documented properties and verified creation defaults
-  - Creating spheres should use working Qoole-like 14/18/20/26-sided presets instead of a broken arbitrary side count
-  - The disabled Save, Undo and Redo toolbar buttons should be wired
-  - User should be able to create custom arrangements of panels/views and save them as named layouts
-  - Compile lighting should be investigated and fixed; edited surface light attributes must reach the compiler
-  - Compile options should be an explicit matrix: BSP always, optional VIS, optional lighting with quality
-  - Compile should show the current stage with a spinner and an always-available cancel button
-  - Compile should support building only a plain BSP without VIS or lightmaps for quick playtesting
+  - [x] When clicking a brush in 2D view, selection should cycle through all brushes at that position, starting from the closest one
+  - [x] Point entities should be selectable and movable in the views; brush entities should be movable as whole objects
+  - [x] Worldspawn should expose its documented entity properties
+  - [x] Entities should expose all documented properties and verified creation defaults
+  - [x] Creating spheres should use working Qoole-like 14/18/20/26-sided presets instead of a broken arbitrary side count
+  - [x] The disabled Save, Undo and Redo toolbar buttons should be wired
+  - [x] User should be able to create custom arrangements of panels/views and save them as named layouts
+  - [x] Compile lighting should be investigated and fixed; edited surface light attributes must reach the compiler
+  - [x] Compile options should be an explicit matrix: BSP always, optional VIS, optional lighting with quality
+  - [x] Compile should show the current stage with a spinner and an always-available cancel button
+  - [x] Compile should support building only a plain BSP without VIS or lightmaps for quick playtesting
 
 - Phase 99: Investigation for future development
   - Qoole's .qle format should be supported
