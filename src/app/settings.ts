@@ -1,5 +1,11 @@
 import { COLOR_TOKENS, isHexColor } from './colors';
-import { DEFAULT_WORKSPACE_LAYOUT, normalizeWorkspaceLayout, type WorkspaceLayout } from './layout';
+import {
+  DEFAULT_WORKSPACE_LAYOUT,
+  normalizeNamedLayouts,
+  normalizeWorkspaceLayout,
+  type NamedLayout,
+  type WorkspaceLayout,
+} from './layout';
 
 /**
  * The persisted editor settings (T1.12): one typed object with defaults.
@@ -36,6 +42,10 @@ export interface EditorSettings {
   readonly bottomCollapsed: boolean;
   /** The bounded arrangement of docks, sections, tabs and maximized viewport (T2.7). */
   readonly layout: WorkspaceLayout;
+  /** Saved named arrangements (T2.8). */
+  readonly layouts: readonly NamedLayout[];
+  /** The last applied named layout, or null for a customized/default arrangement. */
+  readonly activeLayoutId: string | null;
   /** Colour overrides per theme, only the changed tokens (T15.10). */
   readonly colors: {
     readonly dark: Record<string, string>;
@@ -60,6 +70,8 @@ export const DEFAULT_SETTINGS: EditorSettings = {
   handleSize: 14,
   bottomCollapsed: true,
   layout: DEFAULT_WORKSPACE_LAYOUT,
+  layouts: [],
+  activeLayoutId: null,
   colors: { dark: {}, light: {} },
 };
 
@@ -96,6 +108,8 @@ const checks: Record<string, (value: unknown) => boolean> = {
   groupCsgResults: (value) => typeof value === 'boolean',
   handleSize: num(7, 28),
   layout: (value) => !!value && typeof value === 'object',
+  layouts: (value) => Array.isArray(value),
+  activeLayoutId: (value) => typeof value === 'string' || value === null,
 };
 
 /**
@@ -130,6 +144,11 @@ export function parseSettings(stored: unknown): EditorSettings {
   }
   out['colors'] = clean;
   out['layout'] = normalizeWorkspaceLayout(out['layout']);
+  const layouts = normalizeNamedLayouts(out['layouts']);
+  out['layouts'] = layouts;
+  out['activeLayoutId'] = layouts.some((layout) => layout.id === out['activeLayoutId'])
+    ? out['activeLayoutId']
+    : null;
   return out as EditorSettings;
 }
 

@@ -111,3 +111,47 @@ describe('workspace layout settings', () => {
     expect(partial.layout.bottomActiveTab).toBe('tree');
   });
 });
+
+describe('named layout settings', () => {
+  it('parses valid presets and drops corrupt entries individually', () => {
+    const parsed = parseSettings({
+      layouts: [
+        {
+          id: 'work',
+          name: 'Work',
+          snapshot: {
+            rightDockVisible: true,
+            rightSections: [
+              { id: 'textures', visible: true },
+              { id: 'properties', visible: true },
+            ],
+            bottomDockVisible: true,
+            bottomTabs: [
+              { id: 'tree', visible: true },
+              { id: 'prefabs', visible: true },
+              { id: 'log', visible: true },
+            ],
+            bottomActiveTab: 'tree',
+            viewport: 'quad',
+            rightWidth: 400,
+            bottomHeight: 180,
+            dockSplit: 0.6,
+            propertiesCollapsed: false,
+            texturesCollapsed: false,
+            bottomCollapsed: false,
+          },
+        },
+        { id: 'broken', name: '', snapshot: {} },
+      ],
+      activeLayoutId: 'work',
+    });
+    expect(parsed.layouts).toHaveLength(1);
+    expect(parsed.layouts[0]?.snapshot.rightWidth).toBe(400);
+    expect(parsed.activeLayoutId).toBe('work');
+  });
+
+  it('clears an active id that does not reference a valid layout', () => {
+    expect(parseSettings({ activeLayoutId: 'missing' }).activeLayoutId).toBeNull();
+    expect(parseSettings({ layouts: 'corrupt' }).layouts).toEqual([]);
+  });
+});

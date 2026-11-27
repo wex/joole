@@ -129,3 +129,39 @@
   color: var(--ink-disabled);
   cursor: default;
 }
+
+.layoutActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2xs);
+}
+
+.layoutActions button {
+  padding: var(--space-2xs) var(--space-sm);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--ink);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.layoutActions button:disabled {
+  color: var(--ink-disabled);
+  cursor: default;
+}
+
+.layoutError {
+  margin: 0;
+  color: var(--error);
+  font-size: 12px;
+}
+
+.row input[type='text'] {
+  width: 150px;
+  padding: var(--space-2xs) var(--space-xs);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--ink);
+}

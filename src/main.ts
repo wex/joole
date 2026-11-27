@@ -326,6 +326,8 @@ mountEditorShell(
       handleSize: settings.handleSize,
       bottomCollapsed: settings.bottomCollapsed,
       layout: settings.layout,
+      layouts: settings.layouts,
+      activeLayoutId: settings.activeLayoutId,
       colors: settings.colors,
     },
     onSettingsChange: queueSettingsSave,

@@ -33,10 +33,14 @@ import { SettingsDialog } from './SettingsDialog';
 import { ToolHint } from './ToolHint';
 import { DEFAULT_SETTINGS } from '@app/settings';
 import {
+  DEFAULT_LAYOUT_SNAPSHOT,
+  normalizeNamedLayouts,
   normalizeWorkspaceLayout,
   updateWorkspaceLayout,
+  type NamedLayout,
   type RightSectionId,
   type WorkspaceLayout,
+  type WorkspaceLayoutSnapshot,
 } from '@app/layout';
 import { toolInfo } from '@app/toolInfo';
 import { parseSizeInput } from '@app/sizeInput';
@@ -72,6 +76,8 @@ export interface EditorShellProps {
     readonly handleSize: number;
     readonly bottomCollapsed: boolean;
     readonly layout?: unknown;
+    readonly layouts?: unknown;
+    readonly activeLayoutId?: unknown;
     readonly colors: {
       readonly dark: Record<string, string>;
       readonly light: Record<string, string>;
@@ -171,6 +177,12 @@ export function EditorShell(props: EditorShellProps) {
   const [workspaceLayout, setWorkspaceLayout] = createSignal<WorkspaceLayout>(
     normalizeWorkspaceLayout(initialSettings?.layout),
   );
+  const [namedLayouts, setNamedLayouts] = createSignal<readonly NamedLayout[]>(
+    normalizeNamedLayouts(initialSettings?.layouts),
+  );
+  const [activeLayoutId, setActiveLayoutId] = createSignal<string | null>(
+    typeof initialSettings?.activeLayoutId === 'string' ? initialSettings.activeLayoutId : null,
+  );
   const initialMaximized = workspaceLayout().viewport;
   const [maximizedView, setMaximizedView] = createSignal<ViewId | null>(
     initialMaximized === 'quad' ? null : initialMaximized,
@@ -223,6 +235,17 @@ export function EditorShell(props: EditorShellProps) {
     initialSettings?.groupCsgResults ?? true,
   );
   const [handleSize, setHandleSize] = createSignal(initialSettings?.handleSize ?? 14);
+  /** Snapshots every layout-related piece of state, and nothing else. */
+  const currentLayoutSnapshot = (): WorkspaceLayoutSnapshot => ({
+    ...workspaceLayout(),
+    rightWidth: rightWidth(),
+    bottomHeight: bottomHeight(),
+    dockSplit: dockSplit(),
+    propertiesCollapsed: propertiesCollapsed(),
+    texturesCollapsed: texturesCollapsed(),
+    bottomCollapsed: bottomCollapsed(),
+  });
+
   /** Applies one dialog change immediately: signals, side effects, persistence. */
   const applySettingsChange = (partial: Record<string, unknown>) => {
     if (typeof partial['theme'] === 'string') {
@@ -258,6 +281,14 @@ export function EditorShell(props: EditorShellProps) {
     if (partial['layout'] && typeof partial['layout'] === 'object') {
       syncWorkspaceLayout(partial['layout'], false);
     }
+    if (Array.isArray(partial['layouts'])) {
+      setNamedLayouts(normalizeNamedLayouts(partial['layouts']));
+    }
+    if ('activeLayoutId' in partial) {
+      setActiveLayoutId(
+        typeof partial['activeLayoutId'] === 'string' ? partial['activeLayoutId'] : null,
+      );
+    }
     if (partial['colors'] && typeof partial['colors'] === 'object') {
       const next = partial['colors'] as {
         dark: Record<string, string>;
@@ -289,7 +320,10 @@ export function EditorShell(props: EditorShellProps) {
     setMaximizedView(maximized);
     if (maximized) setActiveView(maximized);
     renderer.setMaximized(maximized);
-    if (persist) reportSetting('layout', next);
+    if (persist) {
+      setActiveLayoutId(null);
+      props.onSettingsChange?.({ layout: next, activeLayoutId: null });
+    }
     return next;
   };
 
@@ -1872,6 +1906,10 @@ export function EditorShell(props: EditorShellProps) {
           }}
           colors={colors()}
           layout={workspaceLayout()}
+          layouts={namedLayouts()}
+          activeLayoutId={activeLayoutId()}
+          currentLayoutSnapshot={currentLayoutSnapshot}
+          defaultLayoutSnapshot={DEFAULT_LAYOUT_SNAPSHOT}
           onChange={applySettingsChange}
           onReset={() => applySettingsChange({ ...DEFAULT_SETTINGS })}
           onResetColors={() => applySettingsChange({ colors: { dark: {}, light: {} } })}

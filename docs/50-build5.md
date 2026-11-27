@@ -418,7 +418,7 @@ flowchart LR
 
 ---
 
-### T2.8 – Named layouts in Settings → Layout
+### T2.8 – Named layouts in Settings → Layout — DONE
 
 **TODO item part:** users can save custom arrangements.
 

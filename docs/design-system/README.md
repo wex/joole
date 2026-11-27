@@ -64,4 +64,4 @@ The default layout follows the spec:
 - The properties panel is on the right.
 - The texture browser and the log share the bottom as tabs.
 
-Every splitter is draggable, and F1–F4 maximize a view to the whole workspace. Build the layout with CSS Grid; the four views are one canvas with the title bars laid over it as DOM elements. Users may rearrange only the bounded panel set from Settings → Layout — panel order/visibility, whole-dock visibility and the maximized viewport — never free docking or floating windows.
+Every splitter is draggable, and F1–F4 maximize a view to the whole workspace. Build the layout with CSS Grid; the four views are one canvas with the title bars laid over it as DOM elements. Users may rearrange only the bounded panel set from Settings → Layout — panel order/visibility, whole-dock visibility and the maximized viewport — never free docking or floating windows. Named arrangements are managed in the same tab with compact select/text/button rows rather than a separate preset manager dialog.
